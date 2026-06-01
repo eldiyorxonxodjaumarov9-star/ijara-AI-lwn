@@ -13,6 +13,13 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // Tashqi tizimlar bilan sinxronlash (auth sessiya, real-time subscribe,
+      // mount holati) uchun effect ichida setState ataylab ishlatiladi.
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;

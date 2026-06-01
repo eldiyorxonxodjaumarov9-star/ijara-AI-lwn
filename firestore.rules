@@ -1,0 +1,78 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Foydalanuvchi tizimga kirganligini tekshirish
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Foydalanuvchi roli
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && userRole() == 'admin';
+    }
+
+    function isManager() {
+      return isSignedIn() && (userRole() == 'admin' || userRole() == 'manager');
+    }
+
+    // Foydalanuvchilar — har kim faqat o'z profilini o'qiy/yangilay oladi,
+    // admin esa barchasini boshqaradi.
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Asosiy biznes kolleksiyalari:
+    // O'qish — barcha tizimga kirgan foydalanuvchilar.
+    // Yozish — admin va menejerlar.
+    // O'chirish — faqat admin.
+    match /properties/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    match /tenants/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    match /contracts/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    match /expenses/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    match /maintenance/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isManager();
+    }
+
+    match /notifications/{docId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+  }
+}

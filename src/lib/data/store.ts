@@ -22,6 +22,7 @@ import {
   tokenStore,
 } from "@/lib/api/client";
 import { MAPPERS } from "@/lib/api/mappers";
+import { scheduleCloudPush } from "@/lib/cloud/sync-client";
 import type { CollectionEntity } from "@/types";
 
 export type CollectionName =
@@ -82,6 +83,22 @@ function readLocal<T>(name: CollectionName): T[] {
 function writeLocal<T>(name: CollectionName, items: T[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(items));
+  schedulePushFromSession();
+}
+
+function schedulePushFromSession() {
+  if (typeof window === "undefined") return;
+  if (isApiConfigured || isFirebaseConfigured) return;
+  try {
+    const raw = window.localStorage.getItem("arendahub:session");
+    if (!raw) return;
+    const user = JSON.parse(raw) as { email?: string; role?: string };
+    if (user.email && user.role !== "tenant") {
+      scheduleCloudPush(user.email);
+    }
+  } catch {
+    /* e'tiborsiz */
+  }
 }
 
 const listeners: Record<string, Set<() => void>> = {};

@@ -23,6 +23,11 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase/config";
 import { apiFetch, isApiConfigured, tokenStore } from "@/lib/api/client";
 import { recordClientLead } from "@/lib/clients";
+import {
+  mergeCloudOnLogin,
+  pushAccountState,
+  scheduleCloudPush,
+} from "@/lib/cloud/sync-client";
 import { getCollectionApi } from "@/lib/data/store";
 import type { AppUser, Role, Tenant } from "@/types";
 
@@ -198,7 +203,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         : null;
     if (raw) {
       try {
-        setUser(JSON.parse(raw));
+        const saved = JSON.parse(raw) as AppUser;
+        setUser(saved);
+        if (saved.email && saved.role !== "tenant") {
+          void mergeCloudOnLogin(saved.email).then((profile) => {
+            if (profile) setUser(profile);
+          });
+        }
       } catch {
         setUser(null);
       }
@@ -233,7 +244,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!found || found.password !== password) {
         throw new Error("Email yoki parol noto'g'ri");
       }
-      const { password: _pw, ...safe } = found;
+
+      await mergeCloudOnLogin(email.toLowerCase());
+
+      const refreshed = readDemoUsers().find(
+        (u) => u.email.toLowerCase() === email.toLowerCase()
+      );
+      const active = refreshed ?? found;
+      if (active.password !== password) {
+        throw new Error("Email yoki parol noto'g'ri");
+      }
+
+      const { password: _pw, ...safe } = active;
       void _pw;
       window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(safe));
       setUser(safe);
@@ -358,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void _pw;
       window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(safe));
       setUser(safe);
+      await pushAccountState(safe.email);
     },
     [apiMode, demoMode]
   );
@@ -437,6 +460,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             u.id === next.id ? { ...u, ...data } : u
           );
           writeDemoUsers(users);
+          scheduleCloudPush(next.email);
         }
         return next;
       });
@@ -452,6 +476,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               language: data.language,
             },
           });
+          const refreshed = await apiFetch<ApiUser>("/auth/me");
+          setUser(mapApiUser(refreshed));
         } catch {
           // Profilni serverda yangilash huquqi bo'lmasligi mumkin
         }

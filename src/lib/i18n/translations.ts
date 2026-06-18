@@ -45,6 +45,8 @@ export const translations = {
       "Server rejimi — ma'lumotlar PostgreSQL bazasida saqlanadi (barcha qurilmalarda bir xil).",
     "server.bannerOffline":
       "Server ulanmagan — ahost backend ishlamayapti yoki BACKEND_URL noto'g'ri.",
+    "server.bannerNoDatabase":
+      "PostgreSQL ulanmadi — Vercel Dashboard → Storage → Neon qo'shing (1 marta).",
 
     // Dashboard
     "dashboard.greeting": "Salom",

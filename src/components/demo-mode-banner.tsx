@@ -12,7 +12,7 @@ import {
   type CloudSyncStatus,
 } from "@/lib/cloud/sync-client";
 
-type ServerStatus = "checking" | "online" | "offline";
+type ServerStatus = "checking" | "online" | "offline" | "no_database";
 
 export function DemoModeBanner() {
   const { demoMode, user } = useAuth();
@@ -32,18 +32,31 @@ export function DemoModeBanner() {
   useEffect(() => {
     if (!isApiConfigured || user?.role === "tenant") return;
     void fetch("/api/health", { cache: "no-store" })
-      .then((r) => setServerStatus(r.ok ? "online" : "offline"))
+      .then(async (r) => {
+        if (r.ok) {
+          setServerStatus("online");
+          return;
+        }
+        if (r.status === 501) {
+          setServerStatus("no_database");
+          return;
+        }
+        setServerStatus("offline");
+      })
       .catch(() => setServerStatus("offline"));
   }, [user?.role]);
 
   if (isApiConfigured && user?.role !== "tenant") {
     const online = serverStatus === "online";
+    const noDb = serverStatus === "no_database";
     return (
       <div
         className={`flex items-center gap-2 border-b px-4 py-2 text-xs lg:px-6 ${
           online
             ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
-            : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400"
+            : noDb
+              ? "border-blue-500/20 bg-blue-500/10 text-blue-800 dark:text-blue-400"
+              : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400"
         }`}
       >
         {online ? (
@@ -52,7 +65,11 @@ export function DemoModeBanner() {
           <ServerOff className="size-3.5 shrink-0" />
         )}
         <span>
-          {online ? t("server.bannerOnline") : t("server.bannerOffline")}
+          {online
+            ? t("server.bannerOnline")
+            : noDb
+              ? t("server.bannerNoDatabase")
+              : t("server.bannerOffline")}
         </span>
       </div>
     );

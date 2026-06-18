@@ -196,6 +196,8 @@ export const translations = {
       "Серверный режим — данные в PostgreSQL (одинаково на всех устройствах).",
     "server.bannerOffline":
       "Сервер не подключён — backend на ahost не работает или BACKEND_URL неверный.",
+    "server.bannerNoDatabase":
+      "PostgreSQL не подключён — Vercel Dashboard → Storage → Neon.",
 
     "dashboard.greeting": "Привет",
     "dashboard.user": "пользователь",
@@ -342,6 +344,8 @@ export const translations = {
       "Server mode — data stored in PostgreSQL (same on all devices).",
     "server.bannerOffline":
       "Server offline — ahost backend not running or BACKEND_URL is wrong.",
+    "server.bannerNoDatabase":
+      "PostgreSQL not connected — Vercel Dashboard → Storage → Neon.",
 
     "dashboard.greeting": "Hello",
     "dashboard.user": "user",
@@ -486,6 +490,8 @@ export const translations = {
       "Сервер режимі — деректер PostgreSQL базасында (барлық құрылғыда бірдей).",
     "server.bannerOffline":
       "Сервер қосылмаған — ahost backend жұмыс істемейді немесе BACKEND_URL қате.",
+    "server.bannerNoDatabase":
+      "PostgreSQL қосылмаған — Vercel Dashboard → Storage → Neon.",
 
     "dashboard.greeting": "Сәлем",
     "dashboard.user": "пайдаланушы",

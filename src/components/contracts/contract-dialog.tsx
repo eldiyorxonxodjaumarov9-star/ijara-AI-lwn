@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MoneyInput } from "@/components/shared/money-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,7 +183,12 @@ export function ContractDialog({
 
             <div className="space-y-1.5">
               <Label>Oylik to&apos;lov (so&apos;m)</Label>
-              <Input type="number" {...register("monthlyPayment")} />
+              <MoneyInput
+                value={watch("monthlyPayment") ?? 0}
+                onChange={(v) =>
+                  setValue("monthlyPayment", v, { shouldValidate: true })
+                }
+              />
               {errors.monthlyPayment && (
                 <p className="text-xs text-destructive">
                   {errors.monthlyPayment.message}
@@ -191,7 +197,10 @@ export function ContractDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Garov (so&apos;m)</Label>
-              <Input type="number" {...register("deposit")} />
+              <MoneyInput
+                value={watch("deposit") ?? 0}
+                onChange={(v) => setValue("deposit", v)}
+              />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">

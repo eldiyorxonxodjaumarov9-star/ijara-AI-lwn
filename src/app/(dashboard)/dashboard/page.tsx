@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   Banknote,
   Building2,
-  Landmark,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import {
 import { RevenueChart } from "@/components/charts/revenue-chart";
 import { StatusChart } from "@/components/charts/status-chart";
 import { useCollection } from "@/hooks/use-collection";
+import { useLanguage } from "@/context/language-context";
 import {
   buildRevenueSeries,
   computeMetrics,
@@ -50,6 +50,7 @@ import type {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { data: properties, loading: lp } = useCollection<Property>("properties");
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lpay } = useCollection<Payment>("payments");
@@ -84,24 +85,24 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Salom, ${user?.displayName?.split(" ")[0] ?? "foydalanuvchi"}!`}
-        description="Biznesingizning umumiy ko'rsatkichlari va so'nggi faoliyat."
+        title={`${t("dashboard.greeting")}, ${user?.displayName?.split(" ")[0] ?? t("dashboard.user")}!`}
+        description={t("dashboard.desc")}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           index={0}
-          title="Jami mulklar"
+          title={t("dashboard.totalProperties")}
           value={String(metrics.totalProperties)}
           icon={Building2}
           tone="primary"
           trend={metrics.occupancyRate}
-          trendLabel="bandlik darajasi"
+          trendLabel={t("dashboard.occupancyTrend")}
           loading={loading}
         />
         <StatCard
           index={1}
-          title="Oylik daromad"
+          title={t("dashboard.monthlyIncome")}
           value={formatCurrency(metrics.monthlyIncome)}
           icon={Banknote}
           tone="blue"
@@ -109,31 +110,23 @@ export default function DashboardPage() {
         />
         <StatCard
           index={2}
-          title="Oylik soliq"
-          value={formatCurrency(metrics.monthlyTax)}
-          icon={Landmark}
-          tone="amber"
-          loading={loading}
-        />
-        <StatCard
-          index={3}
-          title="Muddati o'tgan shartnomalar"
+          title={t("dashboard.overdueContracts")}
           value={String(metrics.overdueContracts)}
           icon={AlertTriangle}
           tone="rose"
           loading={loading}
         />
         <StatCard
-          index={4}
-          title="Sof daromad"
+          index={3}
+          title={t("dashboard.netIncome")}
           value={formatCurrency(metrics.netIncome)}
           icon={TrendingUp}
           tone="primary"
           loading={loading}
         />
         <StatCard
-          index={5}
-          title="Bandlik darajasi"
+          index={4}
+          title={t("dashboard.occupancy")}
           value={`${metrics.occupancyRate}%`}
           icon={Wallet}
           tone="violet"
@@ -144,8 +137,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Daromad va xarajat</CardTitle>
-            <CardDescription>So&apos;nggi 6 oylik dinamika</CardDescription>
+            <CardTitle>{t("dashboard.revenueChart")}</CardTitle>
+            <CardDescription>{t("dashboard.revenueChartDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -158,8 +151,8 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Mulklar holati</CardTitle>
-            <CardDescription>Status bo&apos;yicha taqsimot</CardDescription>
+            <CardTitle>{t("dashboard.propertyStatus")}</CardTitle>
+            <CardDescription>{t("dashboard.propertyStatusDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -168,7 +161,7 @@ export default function DashboardPage() {
               <StatusChart data={statusSeries} />
             ) : (
               <p className="py-12 text-center text-sm text-muted-foreground">
-                Ma&apos;lumot yo&apos;q
+                {t("dashboard.noData")}
               </p>
             )}
           </CardContent>
@@ -179,11 +172,11 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle>So&apos;nggi to&apos;lovlar</CardTitle>
-              <CardDescription>Eng yangi 5 ta tranzaksiya</CardDescription>
+              <CardTitle>{t("dashboard.recentPayments")}</CardTitle>
+              <CardDescription>{t("dashboard.recentPaymentsDesc")}</CardDescription>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link href="/payments">Barchasi</Link>
+              <Link href="/payments">{t("dashboard.all")}</Link>
             </Button>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -204,7 +197,7 @@ export default function DashboardPage() {
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
-                      {p.tenantName ?? "Noma'lum"}
+                      {p.tenantName ?? t("dashboard.unknown")}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {p.propertyName ?? "—"} • {formatDate(p.date)}
@@ -222,7 +215,7 @@ export default function DashboardPage() {
               ))
             ) : (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Hozircha to&apos;lovlar yo&apos;q
+                {t("dashboard.noPayments")}
               </p>
             )}
           </CardContent>
@@ -231,8 +224,8 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div>
-              <CardTitle>Ogohlantirishlar</CardTitle>
-              <CardDescription>Muddati o&apos;tgan shartnomalar</CardDescription>
+              <CardTitle>{t("dashboard.warnings")}</CardTitle>
+              <CardDescription>{t("dashboard.warningsDesc")}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -249,17 +242,17 @@ export default function DashboardPage() {
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {c.propertyName ?? "Mulk"}
+                      {c.propertyName ?? t("dashboard.property")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {c.tenantName} • tugagan: {formatDate(c.endDate)}
+                      {c.tenantName} • {t("dashboard.ended")}: {formatDate(c.endDate)}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Muddati o&apos;tgan shartnomalar yo&apos;q ✅
+                {t("dashboard.noOverdue")}
               </p>
             )}
           </CardContent>

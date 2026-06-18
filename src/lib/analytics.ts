@@ -1,4 +1,3 @@
-import { TAX_RATE } from "@/lib/constants";
 import type {
   Contract,
   Expense,
@@ -24,7 +23,6 @@ const MONTHS_UZ = [
 export interface DashboardMetrics {
   totalProperties: number;
   monthlyIncome: number;
-  monthlyTax: number;
   overdueContracts: number;
   netIncome: number;
   occupancyRate: number;
@@ -58,14 +56,12 @@ export function computeMetrics({
     .filter((e) => isSameMonth(new Date(e.date), now))
     .reduce((sum, e) => sum + (e.amount || 0), 0);
 
-  const monthlyTax = Math.round(monthlyIncome * TAX_RATE);
-
   const overdueContracts = contracts.filter((c) => {
     const end = new Date(c.endDate);
     return c.status === "expired" || (c.status === "active" && end < now);
   }).length;
 
-  const netIncome = monthlyIncome - monthlyExpenses - monthlyTax;
+  const netIncome = monthlyIncome - monthlyExpenses;
 
   const rented = properties.filter((p) => p.status === "rented").length;
   const occupancyRate =
@@ -74,7 +70,6 @@ export function computeMetrics({
   return {
     totalProperties: properties.length,
     monthlyIncome,
-    monthlyTax,
     overdueContracts,
     netIncome,
     occupancyRate,

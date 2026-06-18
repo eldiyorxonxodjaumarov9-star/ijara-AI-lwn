@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MoneyInput } from "@/components/shared/money-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,7 +162,10 @@ export function MaintenanceDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Xarajat (so&apos;m)</Label>
-              <Input type="number" {...register("cost")} />
+              <MoneyInput
+                value={watch("cost") ?? 0}
+                onChange={(v) => setValue("cost", v)}
+              />
             </div>
           </div>
 

@@ -7,10 +7,12 @@ import { cn } from "@/lib/utils";
 import { navigation } from "@/config/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { useAuth } from "@/context/auth-context";
+import { useLanguage } from "@/context/language-context";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
@@ -28,9 +30,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           );
           if (items.length === 0) return null;
           return (
-            <div key={section.label}>
+            <div key={section.labelKey}>
               <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {section.label}
+                {t(section.labelKey)}
               </p>
               <ul className="space-y-1">
                 {items.map((item) => {
@@ -50,7 +52,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                         )}
                       >
                         <item.icon className="size-4 shrink-0" />
-                        {item.title}
+                        {t(item.titleKey)}
                       </Link>
                     </li>
                   );
@@ -63,8 +65,8 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="border-t p-4">
         <div className="rounded-lg bg-primary/5 p-3 text-xs text-muted-foreground">
-          <p className="font-semibold text-foreground">ArendaHub Pro</p>
-          <p className="mt-1">Barcha modullar faollashtirilgan.</p>
+          <p className="font-semibold text-foreground">{t("sidebar.pro")}</p>
+          <p className="mt-1">{t("sidebar.proDesc")}</p>
         </div>
       </div>
     </div>

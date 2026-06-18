@@ -1,3 +1,4 @@
+import { seedAnalyses } from "@/lib/data/seed-analyses";
 import type {
   Contract,
   Expense,
@@ -24,7 +25,9 @@ export const seedProperties: Property[] = [
     price: 6000000,
     status: "rented",
     description: "Markazda joylashgan, ta'mirlangan 3 xonali kvartira.",
-    images: [],
+    images: [
+      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80",
+    ],
     rooms: 3,
     area: 86,
     createdAt: iso(120),
@@ -38,7 +41,9 @@ export const seedProperties: Property[] = [
     price: 9000000,
     status: "rented",
     description: "Biznes markazda zamonaviy ofis maydoni.",
-    images: [],
+    images: [
+      "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
+    ],
     rooms: 5,
     area: 140,
     createdAt: iso(95),
@@ -52,7 +57,9 @@ export const seedProperties: Property[] = [
     price: 3500000,
     status: "available",
     description: "Yangi qurilgan studiya kvartira.",
-    images: [],
+    images: [
+      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80",
+    ],
     rooms: 1,
     area: 42,
     createdAt: iso(60),
@@ -66,7 +73,9 @@ export const seedProperties: Property[] = [
     price: 5000000,
     status: "maintenance",
     description: "Markaziy ko'chada savdo maydoni.",
-    images: [],
+    images: [
+      "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&q=80",
+    ],
     rooms: 2,
     area: 70,
     createdAt: iso(40),
@@ -251,4 +260,6 @@ export const SEED_MAP: Record<string, unknown[]> = {
   expenses: seedExpenses,
   maintenance: seedMaintenance,
   notifications: seedNotifications,
+  clients: [],
+  analyses: seedAnalyses,
 };

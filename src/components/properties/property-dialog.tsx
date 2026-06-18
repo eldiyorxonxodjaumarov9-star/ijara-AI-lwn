@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ImageUpload } from "@/components/shared/image-upload";
+import { MoneyInput } from "@/components/shared/money-input";
 import { useCollectionActions } from "@/hooks/use-collection";
 import { propertySchema, type PropertyInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
@@ -149,7 +150,10 @@ export function PropertyDialog({
 
             <div className="space-y-1.5">
               <Label>Narxi (so&apos;m / oy)</Label>
-              <Input type="number" {...register("price")} />
+              <MoneyInput
+                value={watch("price") ?? 0}
+                onChange={(v) => setValue("price", v, { shouldValidate: true })}
+              />
               {errors.price && (
                 <p className="text-xs text-destructive">{errors.price.message}</p>
               )}

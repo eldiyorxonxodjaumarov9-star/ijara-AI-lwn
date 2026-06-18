@@ -21,7 +21,55 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase/config";
-import type { AppUser, Role } from "@/types";
+import { apiFetch, isApiConfigured, tokenStore } from "@/lib/api/client";
+import { recordClientLead } from "@/lib/clients";
+import { getCollectionApi } from "@/lib/data/store";
+import type { AppUser, Role, Tenant } from "@/types";
+
+function mapApiRole(role?: string): Role {
+  switch (role) {
+    case "SUPER_ADMIN":
+    case "ADMIN":
+      return "admin";
+    case "EMPLOYEE":
+      return "employee";
+    case "TENANT":
+      return "tenant";
+    default:
+      return "manager";
+  }
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+interface ApiUser {
+  id: string;
+  email: string;
+  fullName?: string;
+  phone?: string;
+  role?: string;
+  avatarUrl?: string;
+  language?: string;
+  company?: string;
+  createdAt?: string;
+}
+
+function mapApiUser(u: ApiUser): AppUser {
+  return {
+    id: u.id,
+    uid: u.id,
+    email: u.email,
+    displayName: u.fullName ?? "",
+    phone: u.phone,
+    role: mapApiRole(u.role),
+    photoURL: u.avatarUrl,
+    language: (u.language as AppUser["language"]) ?? "uz",
+    company: u.company,
+    createdAt: u.createdAt,
+  };
+}
 
 interface RegisterPayload {
   displayName: string;
@@ -36,6 +84,7 @@ interface AuthContextValue {
   loading: boolean;
   demoMode: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginTenant: (fullName: string, phone: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -84,9 +133,39 @@ function writeDemoUsers(users: (AppUser & { password: string })[]) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const demoMode = !isFirebaseConfigured;
+  const apiMode = isApiConfigured;
+  const demoMode = !isFirebaseConfigured && !isApiConfigured;
 
   useEffect(() => {
+    // API (NestJS backend) rejimi
+    if (apiMode) {
+      if (tokenStore.access) {
+        apiFetch<ApiUser>("/auth/me")
+          .then((u) => setUser(mapApiUser(u)))
+          .catch(() => {
+            tokenStore.clear();
+            setUser(null);
+          })
+          .finally(() => setLoading(false));
+      } else {
+        // Ijarachi sessiyasi (token ishlatmaydi) saqlangan bo'lsa tiklaymiz
+        const raw =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem(DEMO_SESSION_KEY)
+            : null;
+        if (raw) {
+          try {
+            const saved = JSON.parse(raw) as AppUser;
+            if (saved.role === "tenant") setUser(saved);
+          } catch {
+            /* e'tiborsiz */
+          }
+        }
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!demoMode && auth) {
       const unsub = onAuthStateChanged(auth, async (fbUser: User | null) => {
         if (fbUser && db) {
@@ -125,10 +204,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setLoading(false);
-  }, [demoMode]);
+  }, [apiMode, demoMode]);
 
   const login = useCallback(
     async (email: string, password: string) => {
+      if (apiMode) {
+        const res = await apiFetch<{
+          user: ApiUser;
+          accessToken: string;
+          refreshToken: string;
+        }>("/auth/login", {
+          method: "POST",
+          auth: false,
+          body: { email, password },
+        });
+        tokenStore.set(res.accessToken, res.refreshToken);
+        setUser(mapApiUser(res.user));
+        return;
+      }
       if (!demoMode && auth) {
         await signInWithEmailAndPassword(auth, email, password);
         return;
@@ -145,11 +238,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(safe));
       setUser(safe);
     },
-    [demoMode]
+    [apiMode, demoMode]
+  );
+
+  const loginTenant = useCallback(
+    async (fullName: string, phone: string) => {
+      const wantedName = fullName.trim().toLowerCase();
+      const wantedPhone = normalizePhone(phone);
+
+      let tenants: Tenant[] = [];
+      try {
+        tenants = await getCollectionApi<Tenant>("tenants").list();
+      } catch {
+        throw new Error("Ijarachilar ro'yxatini olishda xatolik");
+      }
+
+      const match = tenants.find(
+        (t) =>
+          t.fullName.trim().toLowerCase() === wantedName &&
+          normalizePhone(t.phone) === wantedPhone
+      );
+      if (!match) {
+        await recordClientLead(fullName, phone);
+        throw new Error(
+          "Bunday ijarachi topilmadi. Ism familiya va telefonni tekshiring."
+        );
+      }
+
+      await recordClientLead(fullName, phone, match.id);
+
+      const tenantUser: AppUser = {
+        id: match.id,
+        uid: match.id,
+        email: match.email ?? "",
+        displayName: match.fullName,
+        phone: match.phone,
+        role: "tenant",
+        tenantId: match.id,
+        language: "uz",
+        createdAt: match.createdAt,
+      };
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          DEMO_SESSION_KEY,
+          JSON.stringify(tenantUser)
+        );
+      }
+      setUser(tenantUser);
+    },
+    []
   );
 
   const register = useCallback(
     async (payload: RegisterPayload) => {
+      if (apiMode) {
+        const roleToApi: Record<Role, string> = {
+          admin: "ADMIN",
+          manager: "MANAGER",
+          employee: "EMPLOYEE",
+          tenant: "TENANT",
+        };
+        const res = await apiFetch<{
+          user: ApiUser;
+          accessToken: string;
+          refreshToken: string;
+        }>("/auth/register", {
+          method: "POST",
+          auth: false,
+          body: {
+            email: payload.email,
+            password: payload.password,
+            fullName: payload.displayName,
+            role: roleToApi[payload.role ?? "manager"],
+          },
+        });
+        tokenStore.set(res.accessToken, res.refreshToken);
+        setUser(mapApiUser(res.user));
+        return;
+      }
       if (!demoMode && auth && db) {
         const cred = await createUserWithEmailAndPassword(
           auth,
@@ -192,20 +359,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(safe));
       setUser(safe);
     },
-    [demoMode]
+    [apiMode, demoMode]
   );
 
+  const clearTenantSession = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(DEMO_SESSION_KEY);
+    }
+  };
+
   const logout = useCallback(async () => {
+    if (apiMode) {
+      // Ijarachi (tokensiz) bo'lmasa, serverga logout yuboramiz
+      if (tokenStore.access) {
+        try {
+          await apiFetch("/auth/logout", { method: "POST" });
+        } catch {
+          // tokenni baribir tozalaymiz
+        }
+      }
+      tokenStore.clear();
+      clearTenantSession();
+      setUser(null);
+      return;
+    }
     if (!demoMode && auth) {
       await signOut(auth);
       return;
     }
     window.localStorage.removeItem(DEMO_SESSION_KEY);
     setUser(null);
-  }, [demoMode]);
+  }, [apiMode, demoMode]);
 
   const resetPassword = useCallback(
     async (email: string) => {
+      if (apiMode) {
+        await apiFetch("/auth/forgot-password", {
+          method: "POST",
+          auth: false,
+          body: { email },
+        });
+        return;
+      }
       if (!demoMode && auth) {
         await sendPasswordResetEmail(auth, email);
         return;
@@ -216,11 +411,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Demo rejimda haqiqiy email yuborilmaydi
     },
-    [demoMode]
+    [apiMode, demoMode]
   );
 
   const updateUser = useCallback(
     async (data: Partial<AppUser>) => {
+      if (demoMode && data.email && typeof window !== "undefined") {
+        const users = readDemoUsers();
+        const taken = users.some(
+          (u) =>
+            u.id !== user?.id &&
+            u.email.toLowerCase() === data.email!.toLowerCase()
+        );
+        if (taken) {
+          throw new Error("Bu email allaqachon ro'yxatdan o'tgan");
+        }
+      }
+
       setUser((prev) => {
         if (!prev) return prev;
         const next = { ...prev, ...data };
@@ -233,11 +440,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return next;
       });
+      if (apiMode && user) {
+        try {
+          await apiFetch(`/users/${user.id}`, {
+            method: "PATCH",
+            body: {
+              fullName: data.displayName,
+              phone: data.phone,
+              email: data.email,
+              avatarUrl: data.photoURL,
+              language: data.language,
+            },
+          });
+        } catch {
+          // Profilni serverda yangilash huquqi bo'lmasligi mumkin
+        }
+        return;
+      }
       if (!demoMode && db && user) {
         await setDoc(doc(db, "users", user.uid), data, { merge: true });
       }
     },
-    [demoMode, user]
+    [apiMode, demoMode, user]
   );
 
   const value = useMemo<AuthContextValue>(
@@ -246,12 +470,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       demoMode,
       login,
+      loginTenant,
       register,
       logout,
       resetPassword,
       updateUser,
     }),
-    [user, loading, demoMode, login, register, logout, resetPassword, updateUser]
+    [
+      user,
+      loading,
+      demoMode,
+      login,
+      loginTenant,
+      register,
+      logout,
+      resetPassword,
+      updateUser,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -6,13 +6,13 @@ import {
   Pencil,
   Plus,
   Search,
-  Send,
   Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { TelegramLink } from "@/components/shared/telegram-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -149,10 +149,7 @@ export default function TenantsPage() {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       {tenant.telegram ? (
-                        <span className="inline-flex items-center gap-1 text-primary">
-                          <Send className="size-3.5" />
-                          {tenant.telegram}
-                        </span>
+                        <TelegramLink value={tenant.telegram} />
                       ) : (
                         "—"
                       )}

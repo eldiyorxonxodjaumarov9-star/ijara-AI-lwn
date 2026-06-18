@@ -33,7 +33,6 @@ import { useCollection } from "@/hooks/use-collection";
 import { buildRevenueSeries } from "@/lib/analytics";
 import { exportToExcel, exportToPdf } from "@/lib/export";
 import { formatCurrency } from "@/lib/utils";
-import { TAX_RATE } from "@/lib/constants";
 import type { Expense, Payment } from "@/types";
 
 function ReportsContent() {
@@ -51,9 +50,8 @@ function ReportsContent() {
   const totals = useMemo(() => {
     const income = series.reduce((s, p) => s + p.daromad, 0);
     const expense = series.reduce((s, p) => s + p.xarajat, 0);
-    const tax = Math.round(income * TAX_RATE);
-    const profit = income - expense - tax;
-    return { income, expense, tax, profit };
+    const profit = income - expense;
+    return { income, expense, profit };
   }, [series]);
 
   const handleExcel = () => {
@@ -109,7 +107,7 @@ function ReportsContent() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           title="Jami daromad"
           value={formatCurrency(totals.income)}
@@ -126,20 +124,12 @@ function ReportsContent() {
           index={1}
         />
         <StatCard
-          title="Soliq (4%)"
-          value={formatCurrency(totals.tax)}
-          icon={Receipt}
-          tone="amber"
-          loading={loading}
-          index={2}
-        />
-        <StatCard
           title="Sof foyda"
           value={formatCurrency(totals.profit)}
           icon={TrendingUp}
           tone="violet"
           loading={loading}
-          index={3}
+          index={2}
         />
       </div>
 

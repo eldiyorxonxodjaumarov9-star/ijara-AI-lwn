@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { MoneyInput } from "@/components/shared/money-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -127,7 +128,10 @@ export function ExpenseDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Summa (so&apos;m)</Label>
-              <Input type="number" {...register("amount")} />
+              <MoneyInput
+                value={watch("amount") ?? 0}
+                onChange={(v) => setValue("amount", v, { shouldValidate: true })}
+              />
               {errors.amount && (
                 <p className="text-xs text-destructive">{errors.amount.message}</p>
               )}

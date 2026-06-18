@@ -23,6 +23,13 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("To'g'ri email kiriting"),
 });
 
+export const tenantLoginSchema = z.object({
+  fullName: z.string().min(2, "Ism familiyangizni kiriting"),
+  phone: z.string().min(7, "Telefon raqamingizni kiriting"),
+});
+
+export type TenantLoginInput = z.infer<typeof tenantLoginSchema>;
+
 export const propertySchema = z.object({
   name: z.string().min(2, "Nomini kiriting"),
   address: z.string().min(3, "Manzilni kiriting"),

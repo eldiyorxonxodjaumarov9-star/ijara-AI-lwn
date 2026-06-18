@@ -10,10 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
@@ -21,12 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -35,17 +27,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/context/auth-context";
+import { translateAt, useLanguage } from "@/context/language-context";
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
 import type { Language } from "@/types";
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
+  const { t, setLanguage: setAppLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [language, setLanguage] = useState<Language>("uz");
   const [saving, setSaving] = useState(false);
@@ -55,16 +50,26 @@ export default function SettingsPage() {
     if (user) {
       setDisplayName(user.displayName ?? "");
       setPhone(user.phone ?? "");
+      setEmail(user.email ?? "");
       setCompany(user.company ?? "");
       setLanguage(user.language ?? "uz");
     }
   }, [user]);
 
   const saveProfile = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error(t("settings.emailInvalid"));
+      return;
+    }
     try {
       setSaving(true);
-      await updateUser({ displayName, phone });
-      toast.success("Profil saqlandi");
+      await updateUser({ displayName, phone, email: trimmedEmail });
+      toast.success(t("settings.savedProfile"));
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : t("settings.saveFailed")
+      );
     } finally {
       setSaving(false);
     }
@@ -72,40 +77,38 @@ export default function SettingsPage() {
 
   const saveCompany = async () => {
     await updateUser({ company });
-    toast.success("Kompaniya ma'lumotlari saqlandi");
+    toast.success(t("settings.savedCompany"));
   };
 
   const saveLanguage = async (lang: Language) => {
     setLanguage(lang);
+    setAppLanguage(lang);
     await updateUser({ language: lang });
-    toast.success("Til o'zgartirildi");
+    toast.success(translateAt(lang, "settings.savedLanguage"));
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Sozlamalar"
-        description="Profil, kompaniya va ilova sozlamalari."
-      />
+      <PageHeader title={t("settings.title")} description={t("settings.desc")} />
 
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">
-            <User className="mr-1.5 size-4" /> Profil
+            <User className="mr-1.5 size-4" /> {t("settings.profile")}
           </TabsTrigger>
           <TabsTrigger value="company">
-            <Building2 className="mr-1.5 size-4" /> Kompaniya
+            <Building2 className="mr-1.5 size-4" /> {t("settings.company")}
           </TabsTrigger>
           <TabsTrigger value="appearance">
-            <Moon className="mr-1.5 size-4" /> Ko&apos;rinish
+            <Moon className="mr-1.5 size-4" /> {t("settings.appearance")}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
           <Card>
             <CardHeader>
-              <CardTitle>Profil ma&apos;lumotlari</CardTitle>
-              <CardDescription>Shaxsiy ma&apos;lumotlaringiz.</CardDescription>
+              <CardTitle>{t("settings.profileTitle")}</CardTitle>
+              <CardDescription>{t("settings.profileDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="flex items-center gap-4">
@@ -125,29 +128,36 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>To&apos;liq ism</Label>
+                  <Label>{t("settings.fullName")}</Label>
                   <Input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Telefon</Label>
+                  <Label>{t("settings.phone")}</Label>
                   <Input
                     value={phone}
                     placeholder="+998..."
                     onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input value={user?.email ?? ""} disabled />
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>{t("settings.email")}</Label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.emailHint")}
+                  </p>
                 </div>
               </div>
 
               <Button onClick={saveProfile} disabled={saving}>
                 {saving && <Loader2 className="size-4 animate-spin" />}
-                Saqlash
+                {t("common.save")}
               </Button>
             </CardContent>
           </Card>
@@ -156,18 +166,18 @@ export default function SettingsPage() {
         <TabsContent value="company">
           <Card>
             <CardHeader>
-              <CardTitle>Kompaniya ma&apos;lumotlari</CardTitle>
-              <CardDescription>Biznesingiz haqida.</CardDescription>
+              <CardTitle>{t("settings.companyTitle")}</CardTitle>
+              <CardDescription>{t("settings.companyDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-1.5">
-                <Label>Kompaniya nomi</Label>
+                <Label>{t("settings.companyName")}</Label>
                 <Input
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                 />
               </div>
-              <Button onClick={saveCompany}>Saqlash</Button>
+              <Button onClick={saveCompany}>{t("common.save")}</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -175,17 +185,17 @@ export default function SettingsPage() {
         <TabsContent value="appearance">
           <Card>
             <CardHeader>
-              <CardTitle>Ko&apos;rinish va til</CardTitle>
-              <CardDescription>Interfeys sozlamalari.</CardDescription>
+              <CardTitle>{t("settings.appearanceTitle")}</CardTitle>
+              <CardDescription>{t("settings.appearanceDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="flex items-center gap-3">
                   <Moon className="size-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">Tungi rejim</p>
+                    <p className="font-medium">{t("settings.darkMode")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Qorong&apos;i mavzuni yoqish
+                      {t("settings.darkModeDesc")}
                     </p>
                   </div>
                 </div>
@@ -201,9 +211,9 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <Globe className="size-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">Til</p>
+                    <p className="font-medium">{t("settings.language")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Interfeys tili
+                      {t("settings.languageDesc")}
                     </p>
                   </div>
                 </div>
@@ -215,9 +225,10 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="uz">O&apos;zbekcha</SelectItem>
-                    <SelectItem value="ru">Русский</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="uz">{t("settings.langUz")}</SelectItem>
+                    <SelectItem value="ru">{t("settings.langRu")}</SelectItem>
+                    <SelectItem value="kk">{t("settings.langKk")}</SelectItem>
+                    <SelectItem value="en">{t("settings.langEn")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

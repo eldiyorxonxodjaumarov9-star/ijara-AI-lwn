@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   Banknote,
   Bell,
+  BookUser,
+  Bot,
   Building2,
   FileText,
   LayoutDashboard,
@@ -15,36 +17,45 @@ import {
 
 import type { Role } from "@/types";
 
+import type { TranslationKey } from "@/lib/i18n/translations";
+
 export interface NavItem {
-  title: string;
+  titleKey: TranslationKey;
   href: string;
   icon: LucideIcon;
   roles?: Role[];
 }
 
 export interface NavSection {
-  label: string;
+  labelKey: TranslationKey;
   items: NavItem[];
 }
 
 export const navigation: NavSection[] = [
   {
-    label: "Asosiy",
+    labelKey: "nav.section.main",
     items: [
-      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { title: "Aktivlar", href: "/properties", icon: Building2 },
-      { title: "Arendatorlar", href: "/tenants", icon: Users },
-      { title: "Shartnomalar", href: "/contracts", icon: FileText },
+      { titleKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { titleKey: "nav.properties", href: "/properties", icon: Building2 },
+      { titleKey: "nav.tenants", href: "/tenants", icon: Users },
+      { titleKey: "nav.clients", href: "/clients", icon: BookUser },
+      {
+        titleKey: "nav.aiAgent",
+        href: "/ai-agent",
+        icon: Bot,
+        roles: ["admin", "manager"],
+      },
+      { titleKey: "nav.contracts", href: "/contracts", icon: FileText },
     ],
   },
   {
-    label: "Moliya",
+    labelKey: "nav.section.finance",
     items: [
-      { title: "To'lovlar", href: "/payments", icon: Banknote },
-      { title: "Qarzdorliklar", href: "/debts", icon: AlertTriangle },
-      { title: "Xarajatlar", href: "/expenses", icon: Receipt },
+      { titleKey: "nav.payments", href: "/payments", icon: Banknote },
+      { titleKey: "nav.debts", href: "/debts", icon: AlertTriangle },
+      { titleKey: "nav.expenses", href: "/expenses", icon: Receipt },
       {
-        title: "Hisobotlar",
+        titleKey: "nav.reports",
         href: "/reports",
         icon: PieChart,
         roles: ["admin", "manager"],
@@ -52,11 +63,11 @@ export const navigation: NavSection[] = [
     ],
   },
   {
-    label: "Boshqaruv",
+    labelKey: "nav.section.management",
     items: [
-      { title: "Ta'mirlash", href: "/maintenance", icon: Wrench },
-      { title: "Xabarlar", href: "/notifications", icon: Bell },
-      { title: "Sozlamalar", href: "/settings", icon: Settings },
+      { titleKey: "nav.maintenance", href: "/maintenance", icon: Wrench },
+      { titleKey: "nav.notifications", href: "/notifications", icon: Bell },
+      { titleKey: "nav.settings", href: "/settings", icon: Settings },
     ],
   },
 ];

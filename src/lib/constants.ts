@@ -1,4 +1,6 @@
 import type {
+  AnalysisLevel,
+  ClientStatus,
   ContractStatus,
   ExpenseCategory,
   MaintenanceStatus,
@@ -8,6 +10,13 @@ import type {
 } from "@/types";
 
 export const APP_NAME = "ArendaHub";
+
+/** Ijarachilar uchun ijara egasi bilan bog'lanish (demo) */
+export const LANDLORD_CONTACT = {
+  name: "UmarxonMedia Studio",
+  phone: "+998901234567",
+  telegram: "@UmarxonMedia_Studio",
+};
 
 export const UZ_REGIONS = [
   "Toshkent shahri",
@@ -70,10 +79,27 @@ export const MAINTENANCE_STATUS_MAP: Record<
   completed: { label: "Tugatilgan", variant: "success" },
 };
 
+export const ANALYSIS_LEVEL_MAP: Record<
+  AnalysisLevel,
+  { label: string; variant: "success" | "warning" | "secondary" | "destructive" }
+> = {
+  high: { label: "Yuqori", variant: "success" },
+  medium: { label: "O'rtacha", variant: "warning" },
+  low: { label: "Past", variant: "secondary" },
+  unknown: { label: "Noma'lum", variant: "destructive" },
+};
+
+export const CLIENT_STATUS_MAP: Record<
+  ClientStatus,
+  { label: string; variant: "success" | "warning" | "secondary" }
+> = {
+  new: { label: "Yangi", variant: "warning" },
+  matched: { label: "Ro'yxatda bor", variant: "success" },
+};
+
 export const ROLE_MAP: Record<Role, string> = {
   admin: "Administrator",
   manager: "Menejer",
   employee: "Xodim",
+  tenant: "Ijarachi",
 };
-
-export const TAX_RATE = 0.04; // 4% — soliqning shartli stavkasi

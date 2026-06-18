@@ -1,43 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Bot, Loader2, Lock, LogOut, Mail, Phone, User } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InstagramAnalyzeForm } from "@/components/analyze/instagram-analyze-form";
 import { useAuth } from "@/context/auth-context";
-import { loginSchema, type LoginInput } from "@/lib/validations";
+import {
+  loginSchema,
+  tenantLoginSchema,
+  type LoginInput,
+  type TenantLoginInput,
+} from "@/lib/validations";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
-  const { login, user, demoMode } = useAuth();
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") === "analyze" ? "analyze" : "owner";
+  const { login, loginTenant, logout, user, demoMode } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginInput>({
+  const ownerForm = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
-  useEffect(() => {
-    if (user) router.replace("/dashboard");
-  }, [user, router]);
+  const tenantForm = useForm<TenantLoginInput>({
+    resolver: zodResolver(tenantLoginSchema),
+    defaultValues: { fullName: "", phone: "" },
+  });
 
-  const onSubmit = async (values: LoginInput) => {
+  const onOwnerSubmit = async (values: LoginInput) => {
     try {
       setSubmitting(true);
       await login(values.email, values.password);
       toast.success("Xush kelibsiz!");
       router.push("/dashboard");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Kirishda xatolik yuz berdi"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onTenantSubmit = async (values: TenantLoginInput) => {
+    try {
+      setSubmitting(true);
+      await loginTenant(values.fullName, values.phone);
+      toast.success("Xush kelibsiz!");
+      router.push("/portal");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Kirishda xatolik yuz berdi"
@@ -56,71 +80,205 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {demoMode && (
-        <div className="mb-5 rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Demo kirish ma&apos;lumotlari:</p>
-          <p>Email: admin@arendahub.uz</p>
-          <p>Parol: 123456</p>
+      {user && (
+        <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+          <p className="font-medium">
+            Siz allaqachon tizimdasiz: {user.displayName}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Boshqa hisob bilan kirish uchun avval chiqing.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                router.push(user.role === "tenant" ? "/portal" : "/dashboard")
+              }
+            >
+              Davom etish
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={loggingOut}
+              onClick={async () => {
+                setLoggingOut(true);
+                await logout();
+                setLoggingOut(false);
+                toast.success("Tizimdan chiqildi");
+              }}
+            >
+              {loggingOut ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LogOut className="size-4" />
+              )}
+              Chiqish
+            </Button>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="email"
-              type="email"
-              placeholder="siz@example.com"
-              className="pl-9"
-              {...register("email")}
-            />
-          </div>
-          {errors.email && (
-            <p className="text-xs text-destructive">{errors.email.message}</p>
-          )}
-        </div>
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="owner">Arenda egasi</TabsTrigger>
+          <TabsTrigger value="tenant">Ijarachi</TabsTrigger>
+          <TabsTrigger value="analyze">
+            <Bot className="mr-1 size-3.5" />
+            AI Demo
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Parol</Label>
+        {/* ===== Arenda egasi ===== */}
+        <TabsContent value="owner">
+          {demoMode && (
+            <div className="mb-5 rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">
+                Demo kirish ma&apos;lumotlari:
+              </p>
+              <p>Email: admin@arendahub.uz</p>
+              <p>Parol: 123456</p>
+            </div>
+          )}
+
+          <form
+            onSubmit={ownerForm.handleSubmit(onOwnerSubmit)}
+            className="space-y-4"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="siz@example.com"
+                  className="pl-9"
+                  {...ownerForm.register("email")}
+                />
+              </div>
+              {ownerForm.formState.errors.email && (
+                <p className="text-xs text-destructive">
+                  {ownerForm.formState.errors.email.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Parol</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-primary hover:underline"
+                >
+                  Parolni unutdingizmi?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••"
+                  className="pl-9"
+                  {...ownerForm.register("password")}
+                />
+              </div>
+              {ownerForm.formState.errors.password && (
+                <p className="text-xs text-destructive">
+                  {ownerForm.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting && <Loader2 className="size-4 animate-spin" />}
+              Kirish
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Hisobingiz yo&apos;qmi?{" "}
             <Link
-              href="/forgot-password"
-              className="text-xs text-primary hover:underline"
+              href="/register"
+              className="font-medium text-primary hover:underline"
             >
-              Parolni unutdingizmi?
+              Ro&apos;yxatdan o&apos;tish
             </Link>
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••"
-              className="pl-9"
-              {...register("password")}
-            />
-          </div>
-          {errors.password && (
-            <p className="text-xs text-destructive">
-              {errors.password.message}
-            </p>
-          )}
-        </div>
+          </p>
+        </TabsContent>
 
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting && <Loader2 className="size-4 animate-spin" />}
-          Kirish
-        </Button>
-      </form>
+        {/* ===== Arenda turgan odam ===== */}
+        <TabsContent value="tenant">
+          <div className="mb-5 rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
+            Ism familiyangiz va telefon raqamingiz orqali kiring. Ma&apos;lumotlar
+            arenda egasi sizni ro&apos;yxatga qo&apos;shgani bilan bir xil
+            bo&apos;lishi kerak.
+          </div>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        Hisobingiz yo&apos;qmi?{" "}
-        <Link href="/register" className="font-medium text-primary hover:underline">
-          Ro&apos;yxatdan o&apos;tish
-        </Link>
-      </p>
+          <form
+            onSubmit={tenantForm.handleSubmit(onTenantSubmit)}
+            className="space-y-4"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="fullName">Ism familiya</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="fullName"
+                  placeholder="Alisher Karimov"
+                  className="pl-9"
+                  {...tenantForm.register("fullName")}
+                />
+              </div>
+              {tenantForm.formState.errors.fullName && (
+                <p className="text-xs text-destructive">
+                  {tenantForm.formState.errors.fullName.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">Telefon raqam</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+998 90 123 45 67"
+                  className="pl-9"
+                  {...tenantForm.register("phone")}
+                />
+              </div>
+              {tenantForm.formState.errors.phone && (
+                <p className="text-xs text-destructive">
+                  {tenantForm.formState.errors.phone.message}
+                </p>
+              )}
+            </div>
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting && <Loader2 className="size-4 animate-spin" />}
+              Kirish
+            </Button>
+          </form>
+        </TabsContent>
+
+        {/* ===== Instagram AI Demo ===== */}
+        <TabsContent value="analyze">
+          <InstagramAnalyzeForm />
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Yuklanmoqda...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

@@ -20,6 +20,11 @@ export function ProtectedRoute({
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
+      return;
+    }
+    // Ijarachi admin panelga kira olmaydi — o'z portaliga yo'naltiramiz
+    if (!loading && user?.role === "tenant") {
+      router.replace("/portal");
     }
   }, [loading, user, router]);
 

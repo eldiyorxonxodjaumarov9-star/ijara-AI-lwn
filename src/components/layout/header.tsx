@@ -28,6 +28,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarContent } from "@/components/layout/sidebar";
 import { useAuth } from "@/context/auth-context";
+import { useLanguage } from "@/context/language-context";
 import { useCollection } from "@/hooks/use-collection";
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
@@ -37,13 +38,14 @@ import { useState } from "react";
 export function Header() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const { data: notifications } = useCollection<AppNotification>("notifications");
   const [mobileOpen, setMobileOpen] = useState(false);
   const unread = notifications.filter((n) => !n.read).length;
 
   const handleLogout = async () => {
     await logout();
-    toast.success("Tizimdan chiqdingiz");
+    toast.success(t("common.logoutSuccess"));
     router.push("/login");
   };
 
@@ -63,9 +65,9 @@ export function Header() {
       <div className="relative hidden max-w-sm flex-1 md:block">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Qidirish..."
+          placeholder={t("common.search")}
           className="pl-9"
-          aria-label="Qidirish"
+          aria-label={t("common.search")}
         />
       </div>
 
@@ -113,12 +115,12 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/settings">
-                <User className="size-4" /> Profil
+                <User className="size-4" /> {t("common.profile")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/settings">
-                <Settings className="size-4" /> Sozlamalar
+                <Settings className="size-4" /> {t("nav.settings")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -126,7 +128,7 @@ export function Header() {
               onClick={handleLogout}
               className="text-destructive focus:text-destructive"
             >
-              <LogOut className="size-4" /> Chiqish
+              <LogOut className="size-4" /> {t("common.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

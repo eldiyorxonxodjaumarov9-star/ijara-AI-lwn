@@ -20,8 +20,6 @@ import {
 import { useAuth } from "@/context/auth-context";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
-import type { Role } from "@/types";
-
 export default function RegisterPage() {
   const router = useRouter();
   const { register: registerUser } = useAuth();
@@ -96,7 +94,9 @@ export default function RegisterPage() {
             <Label>Rol</Label>
             <Select
               value={watch("role")}
-              onValueChange={(v) => setValue("role", v as Role)}
+              onValueChange={(v) =>
+                setValue("role", v as "admin" | "manager" | "employee")
+              }
             >
               <SelectTrigger>
                 <SelectValue />

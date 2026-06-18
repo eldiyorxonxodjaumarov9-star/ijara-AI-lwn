@@ -1,6 +1,6 @@
-export type Role = "admin" | "manager" | "employee";
+export type Role = "admin" | "manager" | "employee" | "tenant";
 
-export type Language = "uz" | "ru" | "en";
+export type Language = "uz" | "ru" | "en" | "kk";
 
 export interface AppUser {
   id: string;
@@ -12,6 +12,7 @@ export interface AppUser {
   company?: string;
   photoURL?: string;
   language?: Language;
+  tenantId?: string;
   createdAt?: string;
 }
 
@@ -117,6 +118,42 @@ export interface AppNotification {
   message: string;
   type: NotificationType;
   read: boolean;
+  createdAt: string;
+}
+
+export type ClientStatus = "new" | "matched";
+
+/** Portal orqali ism+telefon bilan kirganlar (CRM) */
+export interface Client {
+  id: string;
+  fullName: string;
+  phone: string;
+  status: ClientStatus;
+  tenantId?: string;
+  loginCount: number;
+  firstLoginAt: string;
+  lastLoginAt: string;
+  createdAt: string;
+}
+
+export type AnalysisLevel = "high" | "medium" | "low" | "unknown";
+
+/** AI Instagram biznes tahlili natijasi */
+export interface BusinessAnalysis {
+  id: string;
+  instagramUrl: string;
+  username: string;
+  businessName?: string;
+  businessType: string;
+  summary: string;
+  rentalFit: AnalysisLevel;
+  rentalFitReason: string;
+  footTraffic: AnalysisLevel;
+  footTrafficReason: string;
+  recommendations: string[];
+  confidence: number;
+  source: "ai" | "heuristic" | "demo";
+  rawBio?: string;
   createdAt: string;
 }
 

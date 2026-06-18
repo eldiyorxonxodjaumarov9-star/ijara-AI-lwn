@@ -1,16 +1,28 @@
-# Bulut sinxronizatsiya (barcha qurilmalarda bir xil ma'lumot)
+# Bulut sinxronizatsiya (telefon + kompyuter bir xil ma'lumot)
 
-## Variant 1: Upstash Redis (Vercel — tavsiya)
+Hozir `arendaai.uz` da bulut **ulanmagan** — shuning uchun telefon va kompyuter alohida saqlaydi.
 
-1. [Vercel Dashboard](https://vercel.com) → loyihangiz → **Storage** → **Redis** (Upstash) qo'shing
-2. Environment variables avtomatik qo'shiladi:
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
-3. Redeploy qiling
+## Variant 1: Neon Postgres (eng oson — tavsiya)
 
-## Variant 2: Firebase Firestore
+1. [Vercel Dashboard](https://vercel.com) → loyihangiz → **Storage** → **Neon** → **Create**
+2. `DATABASE_URL` avtomatik qo'shiladi
+3. **Redeploy** qiling (Deployments → ... → Redeploy)
+4. Banner yashil bo'ladi: *"Bulut sinxron faol"*
 
-Agar Redis bo'lmasa, `.env` ga Firebase o'zgaruvchilarini qo'ying — profil va ma'lumotlar `accountSync` kolleksiyasida saqlanadi.
+## Variant 2: Upstash Redis
+
+1. Vercel → **Storage** → **Redis** (Upstash)
+2. Redeploy
+
+## Variant 3: Vercel Blob
+
+1. Vercel → **Storage** → **Blob**
+2. `BLOB_READ_WRITE_TOKEN` avtomatik qo'shiladi
+3. Redeploy
+
+## Variant 4: Firebase Firestore
+
+`.env` ga Firebase o'zgaruvchilari:
 
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=
@@ -22,14 +34,20 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 ```
 
 Firestore qoidalari (demo):
+
 ```
 match /accountSync/{doc} {
   allow read, write: if true;
 }
 ```
 
+## Tekshirish
+
+- `https://www.arendaai.uz/api/sync/status` → `{"available":true,...}`
+- Sozlamalar → **Hozir sinxronlash** tugmasi ishlaydi
+
 ## Qanday ishlaydi
 
-- Admin bir xil email bilan kirganda profil + barcha ma'lumotlar bulutdan yuklanadi
-- Sozlamalar, mulklar, shartnomalar o'zgarganda avtomatik saqlanadi
-- Boshqa qurilmada login qilsangiz — oxirgi o'zgarishlar ko'rinadi
+- Login qilganda bulutdagi oxirgi ma'lumot yuklanadi
+- O'zgarishlar avtomatik bulutga saqlanadi
+- Boshqa qurilmada shu email bilan kirsangiz — bir xil ko'rinadi

@@ -26,6 +26,7 @@ import { recordClientLead } from "@/lib/clients";
 import {
   mergeCloudOnLogin,
   pushAccountState,
+  refreshFromCloud,
   scheduleCloudPush,
 } from "@/lib/cloud/sync-client";
 import { getCollectionApi } from "@/lib/data/store";
@@ -206,8 +207,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const saved = JSON.parse(raw) as AppUser;
         setUser(saved);
         if (saved.email && saved.role !== "tenant") {
-          void mergeCloudOnLogin(saved.email).then((profile) => {
-            if (profile) setUser(profile);
+          void refreshFromCloud(saved.email).then((updated) => {
+            if (!updated) return;
+            const rawSession = window.localStorage.getItem(DEMO_SESSION_KEY);
+            if (!rawSession) return;
+            try {
+              setUser(JSON.parse(rawSession) as AppUser);
+            } catch {
+              /* e'tiborsiz */
+            }
           });
         }
       } catch {

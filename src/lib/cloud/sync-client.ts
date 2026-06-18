@@ -15,6 +15,10 @@ const DEMO_USERS_KEY = "arendahub:users";
 const DEMO_SESSION_KEY = "arendahub:session";
 const SYNC_META_KEY = "arendahub:sync-updated-at";
 
+export type CloudSyncStatus = "checking" | "active" | "offline";
+
+let cachedSyncStatus: CloudSyncStatus = "checking";
+
 function readDemoUsers(): (AppUser & { password: string })[] {
   if (typeof window === "undefined") return [];
   const raw = window.localStorage.getItem(DEMO_USERS_KEY);
@@ -95,47 +99,82 @@ export function getLocalSyncUpdatedAt(): string | null {
   return window.localStorage.getItem(SYNC_META_KEY);
 }
 
+function profileFromState(
+  email: string,
+  state: AccountSyncState
+): AppUser | null {
+  const key = accountSyncKey(email);
+  const fromUsers = state.demoUsers.find(
+    (u) => u.email.toLowerCase() === key
+  );
+  if (fromUsers) {
+    const { password: _pw, ...safe } = fromUsers;
+    void _pw;
+    return safe;
+  }
+  if (
+    state.profile &&
+    state.profile.email.toLowerCase() === key
+  ) {
+    return state.profile;
+  }
+  return state.profile;
+}
+
 export async function pullAccountState(
   email: string
 ): Promise<AccountSyncState | null> {
-  const res = await fetch(
-    `/api/sync/account?email=${encodeURIComponent(accountSyncKey(email))}`,
-    { cache: "no-store" }
-  );
-  if (res.ok) {
-    const data = (await res.json()) as AccountSyncState | null;
-    return data?.updatedAt ? data : null;
+  const fromFirestore = await pullFromFirestore(email);
+  if (fromFirestore) return fromFirestore;
+
+  try {
+    const res = await fetch(
+      `/api/sync/account?email=${encodeURIComponent(accountSyncKey(email))}`,
+      { cache: "no-store" }
+    );
+    if (res.ok) {
+      const data = (await res.json()) as AccountSyncState | null;
+      return data?.updatedAt ? data : null;
+    }
+  } catch {
+    /* tarmoq xatosi */
   }
-  if (res.status === 501 || res.status === 404) {
-    return pullFromFirestore(email);
-  }
+
   return null;
 }
 
-export async function pushAccountState(email: string, state?: AccountSyncState) {
-  const payload = state ?? collectLocalAccountState();
-  const res = await fetch("/api/sync/account", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: accountSyncKey(email),
-      state: payload,
-    }),
-  });
-  if (res.ok) {
+export async function pushAccountState(
+  email: string,
+  state?: AccountSyncState
+): Promise<boolean> {
+  const payload: AccountSyncState = {
+    ...(state ?? collectLocalAccountState()),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const viaFirestore = await pushToFirestore(email, payload);
+  if (viaFirestore) {
     window.localStorage.setItem(SYNC_META_KEY, payload.updatedAt);
     return true;
   }
-  if (res.status === 501) {
-    const ok = await pushToFirestore(email, {
-      ...payload,
-      updatedAt: new Date().toISOString(),
+
+  try {
+    const res = await fetch("/api/sync/account", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: accountSyncKey(email),
+        state: payload,
+      }),
     });
-    if (ok) {
+    if (res.ok) {
       window.localStorage.setItem(SYNC_META_KEY, payload.updatedAt);
+      return true;
     }
-    return ok;
+  } catch {
+    /* tarmoq xatosi */
   }
+
   return false;
 }
 
@@ -149,23 +188,22 @@ export function scheduleCloudPush(email: string | undefined) {
   }, 1200);
 }
 
+/** Kirish paytida bulutdagi ma'lumot doimo ustun (agar mavjud bo'lsa) */
 export async function mergeCloudOnLogin(email: string): Promise<AppUser | null> {
   const remote = await pullAccountState(email);
-  const localAt = getLocalSyncUpdatedAt();
-  const remoteAt = remote?.updatedAt ?? null;
 
-  if (remote && (!localAt || new Date(remoteAt!) >= new Date(localAt))) {
+  if (remote) {
     applyAccountState(remote);
     window.dispatchEvent(new Event("arendahub:sync-applied"));
-    return remote.profile;
+    return profileFromState(email, remote);
   }
 
   await pushAccountState(email);
-  return collectLocalAccountState().profile;
+  return profileFromState(email, collectLocalAccountState());
 }
 
 export async function refreshFromCloud(email: string | undefined) {
-  if (!email) return;
+  if (!email) return false;
   const remote = await pullAccountState(email);
   const localAt = getLocalSyncUpdatedAt();
   if (
@@ -174,5 +212,50 @@ export async function refreshFromCloud(email: string | undefined) {
   ) {
     applyAccountState(remote);
     window.dispatchEvent(new Event("arendahub:sync-applied"));
+    return true;
   }
+  return false;
+}
+
+export async function forceCloudSync(email: string): Promise<{
+  ok: boolean;
+  direction: "pull" | "push" | "none";
+}> {
+  const remote = await pullAccountState(email);
+  const localAt = getLocalSyncUpdatedAt();
+
+  if (remote && (!localAt || new Date(remote.updatedAt) >= new Date(localAt))) {
+    applyAccountState(remote);
+    window.dispatchEvent(new Event("arendahub:sync-applied"));
+    return { ok: true, direction: "pull" };
+  }
+
+  const pushed = await pushAccountState(email);
+  return { ok: pushed, direction: pushed ? "push" : "none" };
+}
+
+export async function checkCloudSyncAvailable(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const res = await fetch("/api/sync/status", { cache: "no-store" });
+    if (res.ok) {
+      const data = (await res.json()) as { available?: boolean };
+      cachedSyncStatus = data.available ? "active" : "offline";
+      return Boolean(data.available);
+    }
+  } catch {
+    /* offline */
+  }
+
+  cachedSyncStatus = "offline";
+  return false;
+}
+
+export function getCachedSyncStatus(): CloudSyncStatus {
+  return cachedSyncStatus;
+}
+
+export function setCachedSyncStatus(status: CloudSyncStatus) {
+  cachedSyncStatus = status;
 }

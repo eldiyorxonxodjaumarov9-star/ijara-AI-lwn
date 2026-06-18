@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
 
 import type { AccountSyncState } from "@/lib/cloud/account-state";
-
-function getRedis() {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  return new Redis({ url, token });
-}
-
-function storageKey(email: string) {
-  return `arendahub:account:${email.toLowerCase()}`;
-}
+import {
+  detectSyncBackend,
+  readAccountState,
+  writeAccountState,
+} from "@/lib/cloud/sync-storage";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -22,13 +14,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Email kerak" }, { status: 400 });
   }
 
-  const redis = getRedis();
-  if (!redis) {
-    return NextResponse.json({ error: "Redis sozlanmagan" }, { status: 501 });
+  if (detectSyncBackend() === "none") {
+    return NextResponse.json({ error: "Bulut sozlanmagan" }, { status: 501 });
   }
 
   try {
-    const state = await redis.get<AccountSyncState>(storageKey(email));
+    const state = await readAccountState(email);
     if (!state) {
       return NextResponse.json(null, { status: 404 });
     }
@@ -39,9 +30,8 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const redis = getRedis();
-  if (!redis) {
-    return NextResponse.json({ error: "Redis sozlanmagan" }, { status: 501 });
+  if (detectSyncBackend() === "none") {
+    return NextResponse.json({ error: "Bulut sozlanmagan" }, { status: 501 });
   }
 
   try {
@@ -54,13 +44,20 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Ma'lumot noto'g'ri" }, { status: 400 });
     }
 
-    const state: AccountSyncState = {
-      ...body.state,
-      updatedAt: new Date().toISOString(),
-    };
-    await redis.set(storageKey(email), state);
+    await writeAccountState(email, body.state);
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === "SYNC_NOT_CONFIGURED") {
+      return NextResponse.json({ error: "Bulut sozlanmagan" }, { status: 501 });
+    }
     return NextResponse.json({ error: "Saqlash xatosi" }, { status: 500 });
   }
+}
+
+export async function HEAD() {
+  const backend = detectSyncBackend();
+  return new NextResponse(null, {
+    status: backend === "none" ? 501 : 200,
+    headers: { "X-Sync-Backend": backend },
+  });
 }

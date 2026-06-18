@@ -36,7 +36,15 @@ export const translations = {
 
     // Demo
     "demo.banner":
-      "Demo rejim faol — ma'lumotlar brauzer xotirasida saqlanmoqda.",
+      "Demo rejim — bulut o'rnatilmagan. Ma'lumotlar faqat shu brauzerda saqlanadi.",
+    "demo.bannerSync":
+      "Bulut sinxron faol — telefon va kompyuter bir xil ma'lumotni ko'radi.",
+
+    // Server (API rejimi)
+    "server.bannerOnline":
+      "Server rejimi — ma'lumotlar PostgreSQL bazasida saqlanadi (barcha qurilmalarda bir xil).",
+    "server.bannerOffline":
+      "Server ulanmagan — ahost backend ishlamayapti yoki BACKEND_URL noto'g'ri.",
 
     // Dashboard
     "dashboard.greeting": "Salom",
@@ -96,6 +104,15 @@ export const translations = {
     "settings.savedProfile": "Profil saqlandi",
     "settings.savedCompany": "Kompaniya ma'lumotlari saqlandi",
     "settings.savedLanguage": "Til o'zgartirildi",
+    "settings.syncTitle": "Bulut sinxronizatsiya",
+    "settings.syncDesc":
+      "Telefon va kompyuterdagi ma'lumotlarni bir xil qilish uchun sinxronlang.",
+    "settings.syncOfflineHint":
+      "Bulut hali ulanmagan (Vercel'da Neon Postgres yoki Firebase qo'shing).",
+    "settings.syncNow": "Hozir sinxronlash",
+    "settings.syncPulled": "Bulutdan yuklandi",
+    "settings.syncPushed": "Bulutga saqlandi",
+    "settings.syncFailed": "Sinxron ishlamadi — bulut sozlanmagan",
 
     // Ijarachi portali
     "portal.greeting": "Salom",
@@ -169,7 +186,14 @@ export const translations = {
     "common.logoutSuccess": "Вы вышли из системы",
 
     "demo.banner":
-      "Демо-режим — данные сохраняются в браузере.",
+      "Демо-режим — облако не настроено. Данные только в этом браузере.",
+    "demo.bannerSync":
+      "Облачная синхронизация активна — телефон и компьютер видят одни данные.",
+
+    "server.bannerOnline":
+      "Серверный режим — данные в PostgreSQL (одинаково на всех устройствах).",
+    "server.bannerOffline":
+      "Сервер не подключён — backend на ahost не работает или BACKEND_URL неверный.",
 
     "dashboard.greeting": "Привет",
     "dashboard.user": "пользователь",
@@ -227,6 +251,15 @@ export const translations = {
     "settings.savedProfile": "Профиль сохранён",
     "settings.savedCompany": "Данные компании сохранены",
     "settings.savedLanguage": "Язык изменён",
+    "settings.syncTitle": "Облачная синхронизация",
+    "settings.syncDesc":
+      "Синхронизируйте данные между телефоном и компьютером.",
+    "settings.syncOfflineHint":
+      "Облако не подключено (добавьте Neon Postgres или Firebase в Vercel).",
+    "settings.syncNow": "Синхронизировать",
+    "settings.syncPulled": "Загружено из облака",
+    "settings.syncPushed": "Сохранено в облако",
+    "settings.syncFailed": "Синхронизация не работает — облако не настроено",
 
     "portal.greeting": "Привет",
     "portal.desc":
@@ -298,7 +331,15 @@ export const translations = {
     "common.notifications": "Notifications",
     "common.logoutSuccess": "You have logged out",
 
-    "demo.banner": "Demo mode — data is stored in browser memory.",
+    "demo.banner":
+      "Demo mode — cloud not configured. Data stays in this browser only.",
+    "demo.bannerSync":
+      "Cloud sync active — phone and computer share the same data.",
+
+    "server.bannerOnline":
+      "Server mode — data stored in PostgreSQL (same on all devices).",
+    "server.bannerOffline":
+      "Server offline — ahost backend not running or BACKEND_URL is wrong.",
 
     "dashboard.greeting": "Hello",
     "dashboard.user": "user",
@@ -355,6 +396,14 @@ export const translations = {
     "settings.savedProfile": "Profile saved",
     "settings.savedCompany": "Company info saved",
     "settings.savedLanguage": "Language changed",
+    "settings.syncTitle": "Cloud sync",
+    "settings.syncDesc": "Sync data between your phone and computer.",
+    "settings.syncOfflineHint":
+      "Cloud not connected (add Neon Postgres or Firebase on Vercel).",
+    "settings.syncNow": "Sync now",
+    "settings.syncPulled": "Downloaded from cloud",
+    "settings.syncPushed": "Saved to cloud",
+    "settings.syncFailed": "Sync failed — cloud not configured",
 
     "portal.greeting": "Hello",
     "portal.desc":
@@ -427,7 +476,14 @@ export const translations = {
     "common.logoutSuccess": "Жүйеден шықтыңыз",
 
     "demo.banner":
-      "Демо режимі — деректер браузер жадында сақталады.",
+      "Демо режимі — бұлт орнатылмаған. Деректер тек осы браузерде.",
+    "demo.bannerSync":
+      "Бұлт синхроны белсенді — телефон мен компьютер бір деректерді көреді.",
+
+    "server.bannerOnline":
+      "Сервер режимі — деректер PostgreSQL базасында (барлық құрылғыда бірдей).",
+    "server.bannerOffline":
+      "Сервер қосылмаған — ahost backend жұмыс істемейді немесе BACKEND_URL қате.",
 
     "dashboard.greeting": "Сәлем",
     "dashboard.user": "пайдаланушы",
@@ -485,6 +541,15 @@ export const translations = {
     "settings.savedProfile": "Профиль сақталды",
     "settings.savedCompany": "Компания деректері сақталды",
     "settings.savedLanguage": "Тіл өзгертілді",
+    "settings.syncTitle": "Бұлт синхронизациясы",
+    "settings.syncDesc":
+      "Телефон мен компьютердегі деректерді бірдей етіңіз.",
+    "settings.syncOfflineHint":
+      "Бұлт қосылмаған (Vercel-ге Neon Postgres немесе Firebase қосыңыз).",
+    "settings.syncNow": "Қазір синхрондау",
+    "settings.syncPulled": "Бұлттан жүктелді",
+    "settings.syncPushed": "Бұлтқа сақталды",
+    "settings.syncFailed": "Синхрон жұмыс істемейді — бұлт орнатылмаған",
 
     "portal.greeting": "Сәлем",
     "portal.desc":

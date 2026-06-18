@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Building2, Globe, Loader2, Moon, User } from "lucide-react";
+import { Building2, Cloud, Globe, Loader2, Moon, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
@@ -28,12 +28,16 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/context/auth-context";
 import { translateAt, useLanguage } from "@/context/language-context";
+import {
+  checkCloudSyncAvailable,
+  forceCloudSync,
+} from "@/lib/cloud/sync-client";
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
 import type { Language } from "@/types";
 
 export default function SettingsPage() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, demoMode } = useAuth();
   const { t, setLanguage: setAppLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -44,8 +48,14 @@ export default function SettingsPage() {
   const [company, setCompany] = useState("");
   const [language, setLanguage] = useState<Language>("uz");
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [cloudAvailable, setCloudAvailable] = useState<boolean | null>(null);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!demoMode) return;
+    void checkCloudSyncAvailable().then(setCloudAvailable);
+  }, [demoMode]);
   useEffect(() => {
     if (user) {
       setDisplayName(user.displayName ?? "");
@@ -85,6 +95,28 @@ export default function SettingsPage() {
     setAppLanguage(lang);
     await updateUser({ language: lang });
     toast.success(translateAt(lang, "settings.savedLanguage"));
+  };
+
+  const runCloudSync = async () => {
+    if (!user?.email) return;
+    setSyncing(true);
+    try {
+      const result = await forceCloudSync(user.email);
+      if (result.ok) {
+        toast.success(
+          result.direction === "pull"
+            ? t("settings.syncPulled")
+            : t("settings.syncPushed")
+        );
+        if (result.direction === "pull") {
+          window.location.reload();
+        }
+      } else {
+        toast.error(t("settings.syncFailed"));
+      }
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -159,6 +191,33 @@ export default function SettingsPage() {
                 {saving && <Loader2 className="size-4 animate-spin" />}
                 {t("common.save")}
               </Button>
+
+              {demoMode && (
+                <div className="rounded-lg border border-dashed p-4">
+                  <div className="flex items-start gap-3">
+                    <Cloud className="mt-0.5 size-5 text-muted-foreground" />
+                    <div className="flex-1 space-y-2">
+                      <p className="font-medium">{t("settings.syncTitle")}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {cloudAvailable === false
+                          ? t("settings.syncOfflineHint")
+                          : t("settings.syncDesc")}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={runCloudSync}
+                        disabled={syncing || cloudAvailable === false}
+                      >
+                        {syncing && (
+                          <Loader2 className="size-4 animate-spin" />
+                        )}
+                        {t("settings.syncNow")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

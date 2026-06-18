@@ -45,3 +45,5 @@ auth-shm
 next-env.d.ts
 
 .vercel
+
+.env*

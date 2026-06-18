@@ -30,6 +30,7 @@ import {
   scheduleCloudPush,
 } from "@/lib/cloud/sync-client";
 import { getCollectionApi } from "@/lib/data/store";
+import { clearDemoStorage } from "@/lib/demo-storage";
 import type { AppUser, Role, Tenant } from "@/types";
 
 function mapApiRole(role?: string): Role {
@@ -146,15 +147,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // API (NestJS backend) rejimi
     if (apiMode) {
       if (tokenStore.access) {
+        clearDemoStorage();
         apiFetch<ApiUser>("/auth/me")
           .then((u) => setUser(mapApiUser(u)))
           .catch(() => {
             tokenStore.clear();
+            clearDemoStorage();
             setUser(null);
           })
           .finally(() => setLoading(false));
       } else {
-        // Ijarachi sessiyasi (token ishlatmaydi) saqlangan bo'lsa tiklaymiz
+        // Eski demo sessiya — server rejimida admin sifatida qoldirilmaydi
         const raw =
           typeof window !== "undefined"
             ? window.localStorage.getItem(DEMO_SESSION_KEY)
@@ -162,9 +165,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (raw) {
           try {
             const saved = JSON.parse(raw) as AppUser;
-            if (saved.role === "tenant") setUser(saved);
+            if (saved.role === "tenant") {
+              setUser(saved);
+            } else {
+              clearDemoStorage();
+            }
           } catch {
-            /* e'tiborsiz */
+            clearDemoStorage();
           }
         }
         setLoading(false);
@@ -238,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: { email, password },
         });
         tokenStore.set(res.accessToken, res.refreshToken);
+        clearDemoStorage();
         setUser(mapApiUser(res.user));
         return;
       }
@@ -344,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
         tokenStore.set(res.accessToken, res.refreshToken);
+        clearDemoStorage();
         setUser(mapApiUser(res.user));
         return;
       }
@@ -410,6 +419,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       tokenStore.clear();
+      clearDemoStorage();
       clearTenantSession();
       setUser(null);
       return;

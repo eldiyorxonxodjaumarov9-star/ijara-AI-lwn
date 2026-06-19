@@ -55,6 +55,8 @@ export const translations = {
     "dashboard.desc":
       "Biznesingizning umumiy ko'rsatkichlari va so'nggi faoliyat.",
     "dashboard.totalProperties": "Jami mulklar",
+    "dashboard.totalRooms": "Jami xonalar",
+    "dashboard.roomsVacantHint": "{count} ta bo'sh xona",
     "dashboard.totalTenants": "Jami arendatorlar",
     "dashboard.totalClients": "Jami klientlar",
     "dashboard.monthlyIncome": "Oylik daromad",
@@ -223,6 +225,8 @@ export const translations = {
     "dashboard.desc":
       "Общие показатели бизнеса и последняя активность.",
     "dashboard.totalProperties": "Всего объектов",
+    "dashboard.totalRooms": "Всего комнат",
+    "dashboard.roomsVacantHint": "{count} свободных",
     "dashboard.totalTenants": "Всего арендаторов",
     "dashboard.totalClients": "Всего клиентов",
     "dashboard.monthlyIncome": "Месячный доход",
@@ -388,6 +392,8 @@ export const translations = {
     "dashboard.user": "user",
     "dashboard.desc": "Your business overview and recent activity.",
     "dashboard.totalProperties": "Total properties",
+    "dashboard.totalRooms": "Total rooms",
+    "dashboard.roomsVacantHint": "{count} vacant",
     "dashboard.totalTenants": "Total tenants",
     "dashboard.totalClients": "Total clients",
     "dashboard.monthlyIncome": "Monthly income",
@@ -553,6 +559,8 @@ export const translations = {
     "dashboard.desc":
       "Бизнесіңіздің жалпы көрсеткіштері мен соңғы белсенділік.",
     "dashboard.totalProperties": "Барлық мүлік",
+    "dashboard.totalRooms": "Барлық бөлме",
+    "dashboard.roomsVacantHint": "{count} бос бөлме",
     "dashboard.totalTenants": "Барлық жалға алушы",
     "dashboard.totalClients": "Барлық клиент",
     "dashboard.monthlyIncome": "Айлық кіріс",

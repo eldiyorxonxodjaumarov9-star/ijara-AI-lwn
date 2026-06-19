@@ -7,6 +7,7 @@ import {
   Banknote,
   BookUser,
   Building2,
+  DoorOpen,
   TrendingUp,
   Users,
   Wallet,
@@ -37,6 +38,7 @@ import {
   computeMetrics,
   getOverdueContracts,
 } from "@/lib/analytics";
+import { getLwnRoomStats } from "@/lib/lwn-rooms";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import {
   PAYMENT_METHOD_MAP,
@@ -92,6 +94,11 @@ export default function DashboardPage() {
   const recentClients = clients.slice(0, 5);
   const overdue = useMemo(() => getOverdueContracts(contracts), [contracts]);
 
+  const roomStats = useMemo(
+    () => getLwnRoomStats(properties),
+    [properties]
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -112,6 +119,22 @@ export default function DashboardPage() {
         />
         <StatCard
           index={1}
+          title={t("dashboard.totalRooms")}
+          value={String(roomStats.total)}
+          icon={DoorOpen}
+          tone="amber"
+          loading={loading}
+          subtitle={
+            roomStats.total > 0
+              ? t("dashboard.roomsVacantHint").replace(
+                  "{count}",
+                  String(roomStats.vacant)
+                )
+              : undefined
+          }
+        />
+        <StatCard
+          index={2}
           title={t("dashboard.totalTenants")}
           value={String(tenants.length)}
           icon={Users}
@@ -119,7 +142,7 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
-          index={2}
+          index={3}
           title={t("dashboard.totalClients")}
           value={String(clients.length)}
           icon={BookUser}
@@ -127,7 +150,7 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
-          index={3}
+          index={4}
           title={t("dashboard.monthlyIncome")}
           value={formatCurrency(metrics.monthlyIncome)}
           icon={Banknote}
@@ -142,7 +165,7 @@ export default function DashboardPage() {
           }
         />
         <StatCard
-          index={4}
+          index={5}
           title={t("dashboard.overdueContracts")}
           value={String(metrics.overdueContracts)}
           icon={AlertTriangle}
@@ -150,7 +173,7 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
-          index={5}
+          index={6}
           title={t("dashboard.netIncome")}
           value={formatCurrency(metrics.netIncome)}
           icon={TrendingUp}
@@ -163,7 +186,7 @@ export default function DashboardPage() {
           }
         />
         <StatCard
-          index={6}
+          index={7}
           title={t("dashboard.occupancy")}
           value={`${metrics.occupancyRate}%`}
           icon={Wallet}

@@ -9,6 +9,15 @@ export function filterLwnRooms(properties: Property[]) {
   return properties.filter(isLwnRoom);
 }
 
+export function getLwnRoomStats(properties: Property[]) {
+  const rooms = filterLwnRooms(properties);
+  return {
+    total: rooms.length,
+    vacant: rooms.filter((p) => p.status === "available").length,
+    rented: rooms.filter((p) => p.status === "rented").length,
+  };
+}
+
 export function lwnRoomToProperty(input: {
   name: string;
   price: number;

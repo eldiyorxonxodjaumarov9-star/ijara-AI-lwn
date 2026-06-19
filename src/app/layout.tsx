@@ -16,21 +16,21 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "ArendaHub — Ko'chmas mulk ijarasi boshqaruvi",
-    template: "%s | ArendaHub",
+    default: "arendaAi — Ko'chmas mulk ijarasi boshqaruvi",
+    template: "%s | arendaAi",
   },
   description:
-    "ArendaHub — ko'chmas mulk ijarasini boshqarish uchun zamonaviy SaaS platforma: mulklar, arendatorlar, shartnomalar, to'lovlar va hisobotlar.",
+    "arendaAi — ko'chmas mulk ijarasini boshqarish uchun zamonaviy SaaS platforma: mulklar, arendatorlar, shartnomalar, to'lovlar va hisobotlar.",
   keywords: [
     "arenda",
+    "arendaAi",
     "ko'chmas mulk",
     "ijara boshqaruvi",
     "property management",
-    "ArendaHub",
   ],
-  authors: [{ name: "ArendaHub" }],
+  authors: [{ name: "arendaAi" }],
   openGraph: {
-    title: "ArendaHub",
+    title: "arendaAi",
     description: "Ko'chmas mulk ijarasi boshqaruv platformasi",
     type: "website",
   },

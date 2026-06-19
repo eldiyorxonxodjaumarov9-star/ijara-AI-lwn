@@ -9,7 +9,7 @@ import type {
   Role,
 } from "@/types";
 
-export const APP_NAME = "ArendaHub";
+export const APP_NAME = "arendaAi";
 
 /** Ijarachilar uchun ijara egasi bilan bog'lanish (demo) */
 export const LANDLORD_CONTACT = {

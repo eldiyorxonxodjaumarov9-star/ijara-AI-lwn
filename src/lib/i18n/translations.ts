@@ -21,7 +21,7 @@ export const translations = {
     "nav.maintenance": "Ta'mirlash",
     "nav.notifications": "Xabarlar",
     "nav.settings": "Sozlamalar",
-    "sidebar.pro": "ArendaHub Pro",
+    "sidebar.pro": "arendaAi Pro",
     "sidebar.proDesc": "Barcha modullar faollashtirilgan.",
 
     // Umumiy
@@ -175,7 +175,7 @@ export const translations = {
     "nav.maintenance": "Ремонт",
     "nav.notifications": "Уведомления",
     "nav.settings": "Настройки",
-    "sidebar.pro": "ArendaHub Pro",
+    "sidebar.pro": "arendaAi Pro",
     "sidebar.proDesc": "Все модули активированы.",
 
     "common.search": "Поиск...",
@@ -323,7 +323,7 @@ export const translations = {
     "nav.maintenance": "Maintenance",
     "nav.notifications": "Notifications",
     "nav.settings": "Settings",
-    "sidebar.pro": "ArendaHub Pro",
+    "sidebar.pro": "arendaAi Pro",
     "sidebar.proDesc": "All modules activated.",
 
     "common.search": "Search...",
@@ -469,7 +469,7 @@ export const translations = {
     "nav.maintenance": "Жөндеу",
     "nav.notifications": "Хабарламалар",
     "nav.settings": "Баптаулар",
-    "sidebar.pro": "ArendaHub Pro",
+    "sidebar.pro": "arendaAi Pro",
     "sidebar.proDesc": "Барлық модульдер қосылған.",
 
     "common.search": "Іздеу...",

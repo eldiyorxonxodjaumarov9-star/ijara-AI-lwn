@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { APP_NAME } from "@/lib/constants";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -26,7 +27,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </ul>
         </div>
         <p className="relative text-xs text-primary-foreground/70">
-          © {new Date().getFullYear()} ArendaHub. Barcha huquqlar himoyalangan.
+          © {new Date().getFullYear()} {APP_NAME}. Barcha huquqlar himoyalangan.
         </p>
       </div>
 

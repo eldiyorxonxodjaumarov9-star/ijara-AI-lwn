@@ -62,7 +62,7 @@ export const CONTRACT_STATUS_MAP: Record<
 export const PAYMENT_METHOD_MAP: Record<PaymentMethod, string> = {
   cash: "Naqd",
   card: "Karta",
-  bank: "Bank",
+  bank: "Perechisleniya",
 };
 
 export const EXPENSE_CATEGORY_MAP: Record<ExpenseCategory, string> = {

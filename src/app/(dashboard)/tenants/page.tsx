@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  Link2,
   MoreVertical,
   Pencil,
   Plus,
@@ -17,6 +18,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TenantDialog } from "@/components/tenants/tenant-dialog";
+import { TenantAssignDialog } from "@/components/tenants/tenant-assign-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,7 +51,9 @@ export default function TenantsPage() {
   const { remove } = useCollectionActions<Tenant>("tenants");
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [editing, setEditing] = useState<Tenant | null>(null);
+  const [assigning, setAssigning] = useState<Tenant | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
@@ -127,7 +131,14 @@ export default function TenantsPage() {
               </TableHeader>
               <TableBody>
                 {paged.map((tenant) => (
-                  <TableRow key={tenant.id}>
+                  <TableRow
+                    key={tenant.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      setAssigning(tenant);
+                      setAssignOpen(true);
+                    }}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
@@ -164,7 +175,7 @@ export default function TenantsPage() {
                     <TableCell className="font-medium">
                       {formatCurrency(tenant.rentAmount)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="icon" variant="ghost">
@@ -172,6 +183,14 @@ export default function TenantsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setAssigning(tenant);
+                              setAssignOpen(true);
+                            }}
+                          >
+                            <Link2 className="size-4" /> Xonaga biriktirish
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
                               setEditing(tenant);
@@ -208,6 +227,11 @@ export default function TenantsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         tenant={editing}
+      />
+      <TenantAssignDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        tenant={assigning}
       />
       <ConfirmDialog
         open={!!deleteId}

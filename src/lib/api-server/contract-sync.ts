@@ -1,6 +1,7 @@
 import type { Tenant } from "@prisma/client";
 
 import { prisma } from "@/lib/api-server/prisma";
+import { upsertPaymentFromContract } from "@/lib/api-server/payment-sync";
 
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
@@ -35,7 +36,7 @@ export async function upsertContractFromTenant(tenant: Tenant) {
   const notes = `Arendatordan avtomatik (${durationMonths} oy)`;
 
   if (existing) {
-    return prisma.contract.update({
+    const updated = await prisma.contract.update({
       where: { id: existing.id },
       data: {
         propertyId,
@@ -46,9 +47,11 @@ export async function upsertContractFromTenant(tenant: Tenant) {
       },
       include: { property: true, tenant: true },
     });
+    await upsertPaymentFromContract(updated);
+    return updated;
   }
 
-  return prisma.contract.create({
+  const created = await prisma.contract.create({
     data: {
       propertyId,
       tenantId: tenant.id,
@@ -61,6 +64,8 @@ export async function upsertContractFromTenant(tenant: Tenant) {
     },
     include: { property: true, tenant: true },
   });
+  await upsertPaymentFromContract(created);
+  return created;
 }
 
 export async function syncContractsFromTenants() {

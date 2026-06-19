@@ -2,13 +2,13 @@ import { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
-import { getTenantNotifications } from "@/lib/api-server/payment-reminders";
 import {
+  getPortalDataForTenant,
   normalizePhone,
   resolveTenantByCredentials,
 } from "@/lib/api-server/portal-data";
 
-/** Ijarachi portali: o'z xabarlarini olish (ism + telefon) */
+/** Ijarachi portali: shartnoma, to'lovlar va boshqa ma'lumotlar (ism + telefon) */
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
 
@@ -23,8 +23,10 @@ export async function POST(req: NextRequest) {
     const tenant = await resolveTenantByCredentials(fullName, phone);
     if (!tenant) return fail("Ijarachi topilmadi", 404);
 
-    const notifications = await getTenantNotifications(tenant.id);
-    return ok(notifications);
+    const data = await getPortalDataForTenant(tenant.id);
+    if (!data) return fail("Ma'lumot topilmadi", 404);
+
+    return ok(data);
   } catch {
     return fail("Xatolik yuz berdi", 500);
   }

@@ -22,6 +22,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase/config";
 import { apiFetch, isApiConfigured, tokenStore } from "@/lib/api/client";
+import { MAPPERS } from "@/lib/api/mappers";
 import { recordClientLead } from "@/lib/clients";
 import {
   mergeCloudOnLogin,
@@ -284,18 +285,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const wantedName = fullName.trim().toLowerCase();
       const wantedPhone = normalizePhone(phone);
 
-      let tenants: Tenant[] = [];
-      try {
-        tenants = await getCollectionApi<Tenant>("tenants").list();
-      } catch {
-        throw new Error("Ijarachilar ro'yxatini olishda xatolik");
+      let match: Tenant | undefined;
+
+      if (isApiConfigured) {
+        try {
+          const raw = await apiFetch<Record<string, unknown>>("/portal/lookup", {
+            method: "POST",
+            auth: false,
+            body: { fullName, phone },
+          });
+          match = MAPPERS.tenants!.fromApi(raw) as Tenant;
+        } catch {
+          match = undefined;
+        }
+      } else {
+        let tenants: Tenant[] = [];
+        try {
+          tenants = await getCollectionApi<Tenant>("tenants").list();
+        } catch {
+          throw new Error("Ijarachilar ro'yxatini olishda xatolik");
+        }
+
+        match = tenants.find(
+          (t) =>
+            t.fullName.trim().toLowerCase() === wantedName &&
+            normalizePhone(t.phone) === wantedPhone
+        );
       }
 
-      const match = tenants.find(
-        (t) =>
-          t.fullName.trim().toLowerCase() === wantedName &&
-          normalizePhone(t.phone) === wantedPhone
-      );
       if (!match) {
         await recordClientLead(fullName, phone);
         throw new Error(

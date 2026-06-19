@@ -17,7 +17,7 @@ import {
 
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
-import { useCollection } from "@/hooks/use-collection";
+import { usePortalData } from "@/hooks/use-portal-data";
 import { VacantRoomsSection } from "@/components/portal/vacant-rooms-section";
 import { TenantNotificationsSection } from "@/components/portal/tenant-notifications-section";
 import { StatCard } from "@/components/shared/stat-card";
@@ -41,7 +41,7 @@ import {
 } from "@/lib/constants";
 import type { TranslationKey } from "@/lib/i18n/translations";
 import { daysBetween, formatCurrency, formatDate } from "@/lib/utils";
-import type { Contract, Maintenance, Payment, Property, Tenant } from "@/types";
+import type { Contract, Maintenance, Payment, Property } from "@/types";
 
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
@@ -67,7 +67,6 @@ function estimateNextPayment(
 export default function PortalPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const tenantId = user?.tenantId;
 
   const tf = (key: TranslationKey, params?: Record<string, string | number>) => {
     let text = t(key);
@@ -79,57 +78,14 @@ export default function PortalPage() {
     return text;
   };
 
-  const { data: allContracts, loading: cLoading } =
-    useCollection<Contract>("contracts");
-  const { data: allPayments, loading: pLoading } =
-    useCollection<Payment>("payments");
-  const { data: properties, loading: prLoading } =
-    useCollection<Property>("properties");
-  const { data: tenants, loading: tLoading } =
-    useCollection<Tenant>("tenants");
-  const { data: maintenance, loading: mLoading } =
-    useCollection<Maintenance>("maintenance");
-
-  const myTenant = useMemo(
-    () => tenants.find((t) => t.id === tenantId),
-    [tenants, tenantId]
-  );
-
-  const myContracts = useMemo(
-    () => allContracts.filter((c) => c.tenantId === tenantId),
-    [allContracts, tenantId]
-  );
-
-  const myContractIds = useMemo(
-    () => new Set(myContracts.map((c) => c.id)),
-    [myContracts]
-  );
-
-  const myPropertyIds = useMemo(
-    () => new Set(myContracts.map((c) => c.propertyId)),
-    [myContracts]
-  );
-
-  const myPayments = useMemo(
-    () =>
-      allPayments
-        .filter((p) => p.contractId && myContractIds.has(p.contractId))
-        .sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        ),
-    [allPayments, myContractIds]
-  );
-
-  const myMaintenance = useMemo(
-    () =>
-      maintenance
-        .filter((m) => myPropertyIds.has(m.propertyId))
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        ),
-    [maintenance, myPropertyIds]
-  );
+  const {
+    tenant: myTenant,
+    contracts: myContracts,
+    payments: myPayments,
+    properties,
+    maintenance: myMaintenance,
+    loading,
+  } = usePortalData();
 
   const propertyMap = useMemo(
     () => new Map(properties.map((p) => [p.id, p])),
@@ -170,8 +126,6 @@ export default function PortalPage() {
     daysUntilEnd !== null &&
     daysUntilEnd > 0 &&
     daysUntilEnd <= 30;
-
-  const loading = cLoading || pLoading || prLoading || tLoading || mLoading;
 
   return (
     <div className="space-y-6">

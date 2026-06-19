@@ -24,15 +24,24 @@ import { tenantSchema, type TenantInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
 import type { Tenant } from "@/types";
 
-const defaults: TenantInput = {
+const today = () => new Date().toISOString().slice(0, 10);
+
+const defaults = (): TenantInput => ({
   fullName: "",
   phone: "",
   passport: "",
   telegram: "",
   email: "",
+  entryDate: today(),
+  paymentDueDate: today(),
   contractDuration: 12,
   rentAmount: 0,
-};
+});
+
+function toDateInput(value?: string) {
+  if (!value) return today();
+  return value.slice(0, 10);
+}
 
 export function TenantDialog({
   open,
@@ -53,22 +62,37 @@ export function TenantDialog({
     formState: { errors, isSubmitting },
   } = useForm<TenantInput>({
     resolver: zResolver<TenantInput>(tenantSchema),
-    defaultValues: defaults,
+    defaultValues: defaults(),
   });
 
   useEffect(() => {
-    if (open) reset(tenant ? { ...defaults, ...tenant } : defaults);
+    if (!open) return;
+    if (tenant) {
+      reset({
+        ...defaults(),
+        ...tenant,
+        email: tenant.email ?? "",
+        entryDate: toDateInput(tenant.entryDate),
+        paymentDueDate: toDateInput(tenant.paymentDueDate),
+      });
+    } else {
+      reset(defaults());
+    }
   }, [open, tenant, reset]);
 
   const onSubmit = async (values: TenantInput) => {
     try {
+      const payload = {
+        ...values,
+        email: values.email?.trim() || undefined,
+      };
       let savedId = tenant?.id;
       if (tenant) {
-        await update(tenant.id, values);
+        await update(tenant.id, payload);
         savedId = tenant.id;
         toast.success("Arendator yangilandi");
       } else {
-        savedId = await create(values);
+        savedId = await create(payload);
         toast.success("Arendator qo'shildi");
       }
 
@@ -80,6 +104,8 @@ export function TenantDialog({
           passport: values.passport,
           rentAmount: values.rentAmount ?? 0,
           contractDuration: values.contractDuration,
+          entryDate: values.entryDate,
+          paymentDueDate: values.paymentDueDate,
           createdAt: tenant?.createdAt ?? new Date().toISOString(),
         });
       }
@@ -134,10 +160,29 @@ export function TenantDialog({
               <Input placeholder="@username" {...register("telegram")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" placeholder="email@example.com" {...register("email")} />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
+              <Label>Email (ixtiyoriy)</Label>
+              <Input
+                type="email"
+                placeholder="email@example.com"
+                {...register("email")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kirish sanasi</Label>
+              <Input type="date" {...register("entryDate")} />
+              {errors.entryDate && (
+                <p className="text-xs text-destructive">
+                  {errors.entryDate.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>To&apos;lov qilish sanasi</Label>
+              <Input type="date" {...register("paymentDueDate")} />
+              {errors.paymentDueDate && (
+                <p className="text-xs text-destructive">
+                  {errors.paymentDueDate.message}
+                </p>
               )}
             </div>
             <div className="space-y-1.5">

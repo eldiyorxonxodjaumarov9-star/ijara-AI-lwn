@@ -48,13 +48,9 @@ export const tenantSchema = z.object({
   phone: z.string().min(7, "Telefon raqam kiriting"),
   passport: z.string().min(4, "Passport kiriting"),
   telegram: z.string().optional(),
-  email: z
-    .string()
-    .optional()
-    .refine(
-      (v) => !v || v.trim() === "" || z.string().email().safeParse(v.trim()).success,
-      { message: "To'g'ri email kiriting" }
-    ),
+  email: z.string().optional(),
+  entryDate: z.string().min(1, "Kirish sanasini kiriting"),
+  paymentDueDate: z.string().min(1, "To'lov sanasini kiriting"),
   contractDuration: z.coerce.number().min(1, "Kamida 1 oy").optional(),
   rentAmount: z.coerce.number().min(0, "Summani kiriting"),
 });

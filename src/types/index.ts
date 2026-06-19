@@ -43,6 +43,8 @@ export interface Tenant {
   email?: string;
   contractDuration?: number;
   rentAmount: number;
+  entryDate?: string;
+  paymentDueDate?: string;
   createdAt: string;
 }
 

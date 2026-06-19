@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
-import { formatCurrency, getInitials } from "@/lib/utils";
+import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import type { Tenant } from "@/types";
 
 export default function TenantsPage() {
@@ -117,6 +117,8 @@ export default function TenantsPage() {
                   <TableHead className="hidden md:table-cell">Telefon</TableHead>
                   <TableHead className="hidden lg:table-cell">Passport</TableHead>
                   <TableHead className="hidden lg:table-cell">Telegram</TableHead>
+                  <TableHead className="hidden xl:table-cell">Kirish</TableHead>
+                  <TableHead className="hidden xl:table-cell">To&apos;lov</TableHead>
                   <TableHead>Ijara</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -153,6 +155,14 @@ export default function TenantsPage() {
                       ) : (
                         "—"
                       )}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell whitespace-nowrap text-muted-foreground">
+                      {tenant.entryDate ? formatDate(tenant.entryDate) : "—"}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell whitespace-nowrap text-muted-foreground">
+                      {tenant.paymentDueDate
+                        ? formatDate(tenant.paymentDueDate)
+                        : "—"}
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(tenant.rentAmount)}

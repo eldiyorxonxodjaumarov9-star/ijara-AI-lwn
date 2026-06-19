@@ -144,6 +144,8 @@ model Tenant {
   address          String?
   rentAmount       Float    @default(0)
   contractDuration Int?
+  entryDate        DateTime?
+  paymentDueDate   DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

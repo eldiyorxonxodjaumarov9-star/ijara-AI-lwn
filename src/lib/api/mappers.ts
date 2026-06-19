@@ -141,6 +141,8 @@ const tenant: MapperConfig = {
     rentAmount: n(i.rentAmount),
     contractDuration:
       i.contractDuration != null ? n(i.contractDuration) : undefined,
+    entryDate: String(i.entryDate ?? i.createdAt ?? ""),
+    paymentDueDate: s(i.paymentDueDate),
     createdAt: String(i.createdAt ?? new Date().toISOString()),
   }),
   toCreate: (d) => ({
@@ -153,6 +155,8 @@ const tenant: MapperConfig = {
     rentAmount: n(d.rentAmount),
     contractDuration:
       d.contractDuration != null ? n(d.contractDuration) : undefined,
+    entryDate: d.entryDate,
+    paymentDueDate: d.paymentDueDate,
   }),
   toUpdate(d) {
     return this.toCreate(d);

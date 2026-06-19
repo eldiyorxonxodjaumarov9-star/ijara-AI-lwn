@@ -1,5 +1,10 @@
 import type { Prisma } from "@prisma/client";
 
+function parseDate(value: unknown) {
+  if (value == null || String(value).trim() === "") return undefined;
+  return new Date(String(value));
+}
+
 export function mapTenantBody(body: Record<string, unknown>) {
   const emailRaw = body.email != null ? String(body.email).trim() : "";
   const data: Prisma.TenantUpdateInput = {
@@ -21,6 +26,12 @@ export function mapTenantBody(body: Record<string, unknown>) {
     ...(body.contractDuration != null
       ? { contractDuration: Number(body.contractDuration) || null }
       : {}),
+    ...(body.entryDate != null
+      ? { entryDate: parseDate(body.entryDate) ?? null }
+      : {}),
+    ...(body.paymentDueDate != null
+      ? { paymentDueDate: parseDate(body.paymentDueDate) ?? null }
+      : {}),
   };
   return data;
 }
@@ -39,5 +50,7 @@ export function mapTenantCreate(body: Record<string, unknown>) {
       body.contractDuration != null
         ? Number(body.contractDuration) || undefined
         : undefined,
+    entryDate: parseDate(body.entryDate),
+    paymentDueDate: parseDate(body.paymentDueDate),
   };
 }

@@ -19,7 +19,9 @@ export async function syncContractFromTenant(tenant: Tenant) {
     tenant.contractDuration && tenant.contractDuration > 0
       ? tenant.contractDuration
       : 12;
-  const startDate = new Date(tenant.createdAt ?? Date.now());
+  const startDate = tenant.entryDate
+    ? new Date(tenant.entryDate)
+    : new Date(tenant.createdAt ?? Date.now());
   const endDate = addMonths(startDate, durationMonths);
   const contracts = await contractApi.list();
   const existing = contracts.find((c) => c.tenantId === tenant.id);
@@ -38,13 +40,11 @@ export async function syncContractFromTenant(tenant: Tenant) {
   };
 
   if (existing) {
+    const contractStart = tenant.entryDate ?? existing.startDate;
     await contractApi.update(existing.id, {
       ...payload,
-      startDate: existing.startDate,
-      endDate: addMonths(
-        new Date(existing.startDate),
-        durationMonths
-      ).toISOString(),
+      startDate: contractStart,
+      endDate: addMonths(new Date(contractStart), durationMonths).toISOString(),
     });
     return existing.id;
   }

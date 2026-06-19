@@ -114,8 +114,31 @@ export async function fetchTenantNotifications(fullName: string, phone: string) 
     id: n.id,
     title: n.title,
     message: n.message,
-    type: n.type === "LATE_PAYMENT" || n.type === "WARNING" ? "warning" as const : "info" as const,
+    type:
+      n.type === "SUCCESS"
+        ? ("success" as const)
+        : n.type === "LATE_PAYMENT" || n.type === "WARNING"
+          ? ("warning" as const)
+          : ("info" as const),
     read: n.isRead,
     createdAt: n.createdAt,
   }));
+}
+
+export function notifyTenantPaymentLocal(
+  tenantId: string,
+  tenantName: string,
+  propertyName: string,
+  amount: number
+) {
+  const notification: AppNotification = {
+    id: crypto.randomUUID(),
+    title: "To'lov qabul qilindi",
+    message: `Assalomu alaykum, ${tenantName}! ${propertyName} bo'yicha ${new Intl.NumberFormat("uz-UZ").format(Math.round(amount))} UZS to'lovingiz qabul qilindi. Rahmat! — ArendaAi`,
+    type: "success",
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
+  pushTenantLocalNotification(tenantId, notification);
+  return notification;
 }

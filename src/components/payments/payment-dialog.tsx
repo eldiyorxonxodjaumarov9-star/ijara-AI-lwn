@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { isApiConfigured } from "@/lib/api/client";
+import { notifyTenantPaymentLocal } from "@/lib/payment-reminders";
 import { zResolver } from "@/lib/form";
 import { paymentSchema, type PaymentInput } from "@/lib/validations";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
@@ -102,6 +104,14 @@ export function PaymentDialog({
         toast.success("To'lov yangilandi");
       } else {
         await create(payload);
+        if (!isApiConfigured && contract?.tenantId) {
+          notifyTenantPaymentLocal(
+            contract.tenantId,
+            contract.tenantName ?? "Arendator",
+            contract.propertyName ?? "—",
+            values.amount
+          );
+        }
         toast.success("To'lov qo'shildi");
       }
       onOpenChange(false);

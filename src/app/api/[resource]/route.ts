@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { mapTenantCreate } from "@/lib/api-server/tenants";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
+import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -144,20 +145,28 @@ export async function POST(
           }),
           201
         );
-      case "payments":
-        return ok(
-          await prisma.payment.create({
-            data: {
-              contractId: String(body.contractId),
-              amount: Number(body.amount ?? 0),
-              paymentDate: new Date(String(body.paymentDate ?? body.date ?? Date.now())),
-              paymentMethod: (body.paymentMethod as never) ?? "CASH",
-              notes: body.notes ? String(body.notes) : undefined,
-            },
-            include: { contract: { include: { property: true, tenant: true } } },
-          }),
-          201
-        );
+      case "payments": {
+        const created = await prisma.payment.create({
+          data: {
+            contractId: String(body.contractId),
+            amount: Number(body.amount ?? 0),
+            paymentDate: new Date(
+              String(body.paymentDate ?? body.date ?? Date.now())
+            ),
+            paymentMethod: (body.paymentMethod as never) ?? "CASH",
+            notes: body.notes ? String(body.notes) : undefined,
+          },
+          include: {
+            contract: { include: { property: true, tenant: true } },
+          },
+        });
+        try {
+          await notifyTenantPaymentReceived(created);
+        } catch {
+          /* xabar yuborilmasa ham to'lov saqlanadi */
+        }
+        return ok(created, 201);
+      }
       case "expenses":
         return ok(
           await prisma.expense.create({

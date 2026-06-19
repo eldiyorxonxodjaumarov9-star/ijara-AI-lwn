@@ -4,9 +4,10 @@ import {
   groupDebtsByTenant,
   type DebtReminderInput,
 } from "@/lib/payment-reminder-utils";
+import { getTenantNotifications } from "@/lib/api-server/tenant-notifications";
 
 export type { DebtReminderInput };
-export { buildPaymentReminderMessage, groupDebtsByTenant };
+export { buildPaymentReminderMessage, groupDebtsByTenant, getTenantNotifications };
 
 export async function sendPaymentReminders(
   debts: DebtReminderInput[],
@@ -50,17 +51,4 @@ export async function sendPaymentReminders(
   }
 
   return results;
-}
-
-export async function getTenantNotifications(tenantId: string) {
-  const rows = await prisma.notification.findMany({
-    where: { type: "LATE_PAYMENT" },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
-
-  return rows.filter((n) => {
-    const meta = n.meta as { tenantId?: string | null } | null;
-    return meta?.tenantId === tenantId;
-  });
 }

@@ -6,6 +6,7 @@ import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { uploadImage } from "@/lib/firebase/storage";
+import { ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 export function ImageUpload({
@@ -32,8 +33,14 @@ export function ImageUpload({
         uploaded.push(await uploadImage(file, folder));
       }
       onChange(multiple ? [...value, ...uploaded] : uploaded.slice(-1));
-    } catch {
-      toast.error("Rasm yuklashda xatolik");
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Rasm yuklashda xatolik";
+      toast.error(msg);
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

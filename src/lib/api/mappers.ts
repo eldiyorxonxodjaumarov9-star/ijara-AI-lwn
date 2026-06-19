@@ -130,6 +130,8 @@ const tenant: MapperConfig = {
     telegram: s(i.telegram),
     email: s(i.email),
     rentAmount: n(i.rentAmount),
+    contractDuration:
+      i.contractDuration != null ? n(i.contractDuration) : undefined,
     createdAt: String(i.createdAt ?? new Date().toISOString()),
   }),
   toCreate: (d) => ({
@@ -139,6 +141,9 @@ const tenant: MapperConfig = {
     telegram: d.telegram || undefined,
     email: d.email || undefined,
     address: d.address || undefined,
+    rentAmount: n(d.rentAmount),
+    contractDuration:
+      d.contractDuration != null ? n(d.contractDuration) : undefined,
   }),
   toUpdate(d) {
     return this.toCreate(d);

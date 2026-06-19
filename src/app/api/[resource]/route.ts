@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { mapTenantCreate } from "@/lib/api-server/tenants";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -119,14 +120,7 @@ export async function POST(
       case "tenants":
         return ok(
           await prisma.tenant.create({
-            data: {
-              fullName: String(body.fullName ?? ""),
-              phone: String(body.phone ?? ""),
-              passport: String(body.passport ?? ""),
-              telegram: body.telegram ? String(body.telegram) : undefined,
-              email: body.email ? String(body.email) : undefined,
-              address: body.address ? String(body.address) : undefined,
-            },
+            data: mapTenantCreate(body),
           }),
           201
         );

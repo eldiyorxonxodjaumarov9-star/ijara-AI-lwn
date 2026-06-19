@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ApiError } from "@/lib/api/client";
 import { useCollectionActions } from "@/hooks/use-collection";
 import { tenantSchema, type TenantInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
@@ -68,8 +69,10 @@ export function TenantDialog({
         toast.success("Arendator qo'shildi");
       }
       onOpenChange(false);
-    } catch {
-      toast.error("Xatolik yuz berdi");
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Xatolik yuz berdi";
+      toast.error(message);
     }
   };
 
@@ -116,7 +119,7 @@ export function TenantDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
-              <Input type="email" placeholder="email" {...register("email")} />
+              <Input type="email" placeholder="email@example.com" {...register("email")} />
               {errors.email && (
                 <p className="text-xs text-destructive">{errors.email.message}</p>
               )}
@@ -124,6 +127,11 @@ export function TenantDialog({
             <div className="space-y-1.5">
               <Label>Shartnoma muddati (oy)</Label>
               <Input type="number" {...register("contractDuration")} />
+              {errors.contractDuration && (
+                <p className="text-xs text-destructive">
+                  {errors.contractDuration.message}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Ijara summasi (so&apos;m)</Label>

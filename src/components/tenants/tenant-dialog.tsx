@@ -18,9 +18,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, isApiConfigured } from "@/lib/api/client";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { filterLwnRooms } from "@/lib/lwn-rooms";
+import { upsertLocalClientFromTenant } from "@/lib/tenant-client-sync";
 import {
   generateTenantPassword,
   suggestTenantLogin,
@@ -205,6 +206,10 @@ export function TenantDialog({
           paymentAmount: paymentStatus === "paid" ? paymentAmount : undefined,
           paymentDate: paymentStatus === "paid" ? paymentDate : undefined,
         });
+      }
+
+      if (!isApiConfigured) {
+        await upsertLocalClientFromTenant(savedTenant);
       }
 
       if (!tenant) {

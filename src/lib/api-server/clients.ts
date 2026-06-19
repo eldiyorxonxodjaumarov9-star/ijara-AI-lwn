@@ -99,11 +99,59 @@ export async function upsertClientFromTenant(tenant: {
   });
 }
 
+export async function deleteClientsByTenantId(tenantId: string) {
+  return prisma.client.deleteMany({ where: { tenantId } });
+}
+
+export async function deleteTenantAndClientsForClient(clientId: string) {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) return { deletedClient: false, deletedTenant: false };
+
+  if (client.tenantId) {
+    await deleteClientsByTenantId(client.tenantId);
+    await prisma.tenant.delete({ where: { id: client.tenantId } });
+    return { deletedClient: true, deletedTenant: true };
+  }
+
+  await prisma.client.delete({ where: { id: clientId } });
+  return { deletedClient: true, deletedTenant: false };
+}
+
+export async function deleteTenantAndLinkedClients(tenantId: string) {
+  await deleteClientsByTenantId(tenantId);
+  await prisma.tenant.delete({ where: { id: tenantId } });
+}
+
 export async function syncClientsFromTenants() {
   const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
+  const tenantIds = new Set(tenants.map((t) => t.id));
   const results = [];
+
   for (const tenant of tenants) {
     results.push(await upsertClientFromTenant(tenant));
   }
+
+  if (tenantIds.size > 0) {
+    await prisma.client.deleteMany({
+      where: { tenantId: { notIn: [...tenantIds] } },
+    });
+  } else {
+    await prisma.client.deleteMany({ where: { tenantId: { not: null } } });
+  }
+
+  const staleClients = await prisma.client.findMany({
+    where: { tenantId: null, status: "MATCHED" },
+  });
+  for (const client of staleClients) {
+    const stillTenant = tenants.find(
+      (t) =>
+        t.fullName.trim().toLowerCase() === client.fullName.trim().toLowerCase() &&
+        normalizePhone(t.phone) === normalizePhone(client.phone)
+    );
+    if (!stillTenant) {
+      await prisma.client.delete({ where: { id: client.id } });
+    }
+  }
+
   return results;
 }

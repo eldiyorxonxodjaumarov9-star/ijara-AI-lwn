@@ -1,5 +1,6 @@
 import { apiFetch, isApiConfigured } from "@/lib/api/client";
 import { getCollectionApi } from "@/lib/data/store";
+import { syncLocalClientsFromTenants } from "@/lib/tenant-client-sync";
 import type { Client } from "@/types";
 
 function normalizePhone(value: string): string {
@@ -56,7 +57,10 @@ export async function recordClientLead(
 }
 
 export async function syncClientsFromTenants() {
-  if (!isApiConfigured) return 0;
+  if (!isApiConfigured) {
+    await syncLocalClientsFromTenants();
+    return 0;
+  }
   const res = await apiFetch<{ synced: number }>("/clients", {
     method: "PUT",
   });

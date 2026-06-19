@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { mapTenantBody, stripTenantSecret } from "@/lib/api-server/tenants";
+import { deleteTenantAndLinkedClients } from "@/lib/api-server/clients";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { requireUser } from "@/lib/api-server/auth";
@@ -136,7 +137,7 @@ export async function DELETE(
   try {
     switch (resource) {
       case "tenants":
-        await prisma.tenant.delete({ where: { id } });
+        await deleteTenantAndLinkedClients(id);
         break;
       case "contracts":
         await prisma.contract.delete({ where: { id } });

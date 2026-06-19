@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { requireUser } from "@/lib/api-server/auth";
-import { mapClientUpdate } from "@/lib/api-server/clients";
+import { mapClientUpdate, deleteTenantAndClientsForClient } from "@/lib/api-server/clients";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
@@ -34,7 +34,7 @@ export async function DELETE(
 
   const { id } = await ctx.params;
   try {
-    await prisma.client.delete({ where: { id } });
+    await deleteTenantAndClientsForClient(id);
     return ok({ ok: true });
   } catch {
     return fail("O'chirish xatosi", 500);

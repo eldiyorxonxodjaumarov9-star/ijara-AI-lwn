@@ -44,8 +44,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
+import { isApiConfigured } from "@/lib/api/client";
+import { refreshCollection } from "@/lib/data/store";
 import { getTenantRoomMaps } from "@/lib/tenant-room-assign";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
+import { deleteTenantWithLinkedClients } from "@/lib/tenant-client-sync";
 import type { Contract, Tenant } from "@/types";
 
 type TenantRow = Tenant & { assignedRoom: string };
@@ -84,7 +87,12 @@ export default function TenantsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await remove(deleteId);
+    if (isApiConfigured) {
+      await remove(deleteId);
+      await refreshCollection("clients");
+    } else {
+      await deleteTenantWithLinkedClients(deleteId);
+    }
     toast.success("Arendator o'chirildi");
     setDeleteId(null);
   };

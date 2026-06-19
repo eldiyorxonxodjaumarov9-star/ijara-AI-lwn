@@ -37,8 +37,10 @@ import {
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
+import { refreshCollection } from "@/lib/data/store";
 import { CLIENT_STATUS_MAP } from "@/lib/constants";
 import { syncClientsFromTenants } from "@/lib/clients";
+import { deleteClientWithLinkedTenant } from "@/lib/tenant-client-sync";
 import { exportToPdf } from "@/lib/export";
 import { formatDate } from "@/lib/utils";
 import type { Client } from "@/types";
@@ -71,12 +73,10 @@ export default function ClientsPage() {
   };
 
   useEffect(() => {
-    if (!isApiConfigured || loading || autoSynced.current) return;
-    if (data.length === 0) {
-      autoSynced.current = true;
-      void runSync(true);
-    }
-  }, [loading, data.length]);
+    if (!isApiConfigured || autoSynced.current) return;
+    autoSynced.current = true;
+    void runSync(true);
+  }, [isApiConfigured]);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
     useTableData<Client>({
@@ -87,7 +87,12 @@ export default function ClientsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await remove(deleteId);
+    if (isApiConfigured) {
+      await remove(deleteId);
+      await refreshCollection("tenants");
+    } else {
+      await deleteClientWithLinkedTenant(deleteId);
+    }
     toast.success("Klient o'chirildi");
     setDeleteId(null);
   };
@@ -124,7 +129,7 @@ export default function ClientsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Klientlar"
-        description="Portal orqali ism va telefon bilan kirganlar. CRM uchun saqlanadi."
+        description="Arendatorlar bilan avtomatik sinxron. Qo'shilsa qo'shiladi, o'chirilsa o'chiriladi."
         action={
           <div className="flex flex-wrap gap-2">
             {isApiConfigured && (

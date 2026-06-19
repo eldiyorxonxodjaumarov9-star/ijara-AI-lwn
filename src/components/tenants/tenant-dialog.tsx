@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { MoneyInput } from "@/components/shared/money-input";
+import { TenantRoomFields } from "@/components/tenants/tenant-room-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +18,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ApiError, isApiConfigured } from "@/lib/api/client";
-import { useCollectionActions } from "@/hooks/use-collection";
-import { syncContractFromTenant } from "@/lib/contract-sync";
+import { ApiError } from "@/lib/api/client";
+import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { filterLwnRooms } from "@/lib/lwn-rooms";
+import {
+  assignTenantToRoom,
+  getTenantContract,
+  type TenantPaymentStatus,
+} from "@/lib/tenant-room-assign";
 import { tenantSchema, type TenantInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
-import type { Tenant } from "@/types";
+import type { Contract, PaymentMethod, Property, Tenant } from "@/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -63,7 +69,17 @@ export function TenantDialog({
   onOpenChange: (open: boolean) => void;
   tenant?: Tenant | null;
 }) {
+  const { data: properties } = useCollection<Property>("properties");
+  const { data: contracts } = useCollection<Contract>("contracts");
   const { create, update } = useCollectionActions<Tenant>("tenants");
+
+  const [roomId, setRoomId] = useState("");
+  const [paymentStatus, setPaymentStatus] =
+    useState<TenantPaymentStatus>("debt");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentDate, setPaymentDate] = useState(today());
+
   const {
     register,
     handleSubmit,
@@ -76,6 +92,23 @@ export function TenantDialog({
     defaultValues: defaults(),
   });
 
+  const existingContract = useMemo(
+    () => (tenant ? getTenantContract(tenant.id, contracts) : undefined),
+    [tenant, contracts]
+  );
+
+  const lwnRooms = useMemo(() => filterLwnRooms(properties), [properties]);
+
+  const selectableRooms = useMemo(() => {
+    const currentId = existingContract?.propertyId;
+    return lwnRooms.filter(
+      (r) => r.status === "available" || r.id === currentId
+    );
+  }, [lwnRooms, existingContract?.propertyId]);
+
+  const selectedRoom = lwnRooms.find((r) => r.id === roomId);
+  const rentAmount = watch("rentAmount") ?? 0;
+
   useEffect(() => {
     if (!open) return;
     if (tenant) {
@@ -87,38 +120,66 @@ export function TenantDialog({
         paymentDueDate: toDateInput(tenant.paymentDueDate),
         contractDuration: tenant.contractDuration ?? 12,
       });
+      setRoomId(existingContract?.propertyId ?? "");
     } else {
       reset(defaults());
+      setRoomId(selectableRooms[0]?.id ?? "");
     }
-  }, [open, tenant, reset]);
+    setPaymentStatus("debt");
+    setPaymentMethod("cash");
+    setPaymentDate(today());
+  }, [open, tenant, reset, existingContract?.propertyId, selectableRooms]);
+
+  useEffect(() => {
+    if (!selectedRoom || selectedRoom.price <= 0) return;
+    setValue("rentAmount", selectedRoom.price, { shouldValidate: true });
+  }, [selectedRoom, setValue]);
 
   const onSubmit = async (values: TenantInput) => {
+    if (!tenant && !roomId) {
+      toast.error("LWN xonani tanlang");
+      return;
+    }
+
     try {
       const payload = buildTenantPayload(values, tenant);
       let savedId = tenant?.id;
       if (tenant) {
         await update(tenant.id, payload);
         savedId = tenant.id;
-        toast.success("Arendator yangilandi");
       } else {
         savedId = await create(payload);
-        toast.success("Arendator qo'shildi");
       }
 
-      if (!isApiConfigured && savedId) {
-        await syncContractFromTenant({
-          id: savedId,
-          fullName: values.fullName,
-          phone: values.phone,
-          passport: payload.passport,
-          rentAmount: values.rentAmount ?? 0,
-          contractDuration: payload.contractDuration,
-          entryDate: payload.entryDate,
-          paymentDueDate: payload.paymentDueDate,
-          createdAt: tenant?.createdAt ?? new Date().toISOString(),
+      const savedTenant: Tenant = {
+        id: savedId!,
+        fullName: values.fullName,
+        phone: values.phone,
+        passport: payload.passport,
+        rentAmount: values.rentAmount ?? 0,
+        entryDate: payload.entryDate,
+        paymentDueDate: payload.paymentDueDate,
+        contractDuration: payload.contractDuration,
+        createdAt: tenant?.createdAt ?? new Date().toISOString(),
+      };
+
+      if (roomId) {
+        const room = lwnRooms.find((r) => r.id === roomId);
+        if (!room) {
+          toast.error("Xona topilmadi");
+          return;
+        }
+        await assignTenantToRoom({
+          tenant: savedTenant,
+          room,
+          paymentStatus,
+          paymentMethod: paymentStatus === "paid" ? paymentMethod : undefined,
+          paymentAmount: paymentStatus === "paid" ? paymentAmount : undefined,
+          paymentDate: paymentStatus === "paid" ? paymentDate : undefined,
         });
       }
 
+      toast.success(tenant ? "Arendator yangilandi" : "Arendator qo'shildi");
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -129,13 +190,13 @@ export function TenantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {tenant ? "Arendatorni tahrirlash" : "Yangi arendator"}
           </DialogTitle>
           <DialogDescription>
-            Arendator va shartnoma ma&apos;lumotlarini kiriting.
+            Arendator ma&apos;lumotlari va LWN xonasini kiriting.
           </DialogDescription>
         </DialogHeader>
 
@@ -160,7 +221,7 @@ export function TenantDialog({
             <div className="space-y-1.5">
               <Label>Ijara summasi (so&apos;m)</Label>
               <MoneyInput
-                value={watch("rentAmount") ?? 0}
+                value={rentAmount}
                 onChange={(v) =>
                   setValue("rentAmount", v, { shouldValidate: true })
                 }
@@ -199,6 +260,23 @@ export function TenantDialog({
               )}
             </div>
           </div>
+
+          <TenantRoomFields
+            roomId={roomId}
+            onRoomIdChange={setRoomId}
+            selectableRooms={selectableRooms}
+            selectedRoom={selectedRoom}
+            paymentStatus={paymentStatus}
+            onPaymentStatusChange={setPaymentStatus}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={setPaymentMethod}
+            paymentAmount={paymentAmount}
+            onPaymentAmountChange={setPaymentAmount}
+            paymentDate={paymentDate}
+            onPaymentDateChange={setPaymentDate}
+            rentFallback={rentAmount}
+            required={!tenant}
+          />
 
           <DialogFooter>
             <Button

@@ -92,3 +92,18 @@ export function getTenantContract(
       (c.status === "active" || c.status === "pending")
   );
 }
+
+function isActiveContract(c: Contract) {
+  return c.status === "active" || c.status === "pending";
+}
+
+export function getTenantRoomMaps(contracts: Contract[]) {
+  const byTenant = new Map<string, string>();
+  const byProperty = new Map<string, string>();
+  for (const c of contracts) {
+    if (!isActiveContract(c)) continue;
+    byTenant.set(c.tenantId, c.propertyName ?? "—");
+    byProperty.set(c.propertyId, c.tenantName ?? "—");
+  }
+  return { byTenant, byProperty };
+}

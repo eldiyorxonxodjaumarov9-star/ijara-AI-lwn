@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Link2,
   MoreVertical,
@@ -21,6 +21,7 @@ import { TenantDialog } from "@/components/tenants/tenant-dialog";
 import { TenantAssignDialog } from "@/components/tenants/tenant-assign-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -43,12 +44,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
+import { getTenantRoomMaps } from "@/lib/tenant-room-assign";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
-import type { Tenant } from "@/types";
+import type { Contract, Tenant } from "@/types";
+
+type TenantRow = Tenant & { assignedRoom: string };
 
 export default function TenantsPage() {
   const { data, loading } = useCollection<Tenant>("tenants");
+  const { data: contracts } = useCollection<Contract>("contracts");
   const { remove } = useCollectionActions<Tenant>("tenants");
+
+  const { byTenant: roomByTenant } = useMemo(
+    () => getTenantRoomMaps(contracts),
+    [contracts]
+  );
+
+  const tenantsWithRoom = useMemo<TenantRow[]>(
+    () =>
+      data.map((t) => ({
+        ...t,
+        assignedRoom: roomByTenant.get(t.id) ?? "",
+      })),
+    [data, roomByTenant]
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -57,9 +76,9 @@ export default function TenantsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
-    useTableData<Tenant>({
-      data,
-      searchFields: ["fullName", "phone"],
+    useTableData<TenantRow>({
+      data: tenantsWithRoom,
+      searchFields: ["fullName", "phone", "assignedRoom"],
       pageSize: 10,
     });
 
@@ -93,7 +112,7 @@ export default function TenantsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Ism yoki telefon bo'yicha..."
+          placeholder="Ism, telefon yoki xona bo'yicha..."
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -121,6 +140,7 @@ export default function TenantsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>F.I.O</TableHead>
+                  <TableHead>Xona</TableHead>
                   <TableHead className="hidden md:table-cell">Telefon</TableHead>
                   <TableHead className="hidden lg:table-cell">Arenda kirish</TableHead>
                   <TableHead className="hidden lg:table-cell">To&apos;lov muddati</TableHead>
@@ -155,6 +175,15 @@ export default function TenantsPage() {
                           </p>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {tenant.assignedRoom ? (
+                        <Badge variant="secondary">{tenant.assignedRoom}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Biriktirilmagan
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {tenant.phone}

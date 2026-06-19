@@ -49,12 +49,19 @@ import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { PROPERTY_STATUS_MAP } from "@/lib/constants";
 import { filterLwnRooms } from "@/lib/lwn-rooms";
+import { getTenantRoomMaps } from "@/lib/tenant-room-assign";
 import { formatCurrency } from "@/lib/utils";
-import type { Property } from "@/types";
+import type { Contract, Property } from "@/types";
 
 export default function LwnRoomsPage() {
   const { data, loading } = useCollection<Property>("properties");
+  const { data: contracts } = useCollection<Contract>("contracts");
   const { remove } = useCollectionActions<Property>("properties");
+
+  const { byProperty: tenantByRoom } = useMemo(
+    () => getTenantRoomMaps(contracts),
+    [contracts]
+  );
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -188,6 +195,7 @@ export default function LwnRoomsPage() {
                 <TableRow>
                   <TableHead className="w-16">Rasm</TableHead>
                   <TableHead>Xona</TableHead>
+                  <TableHead className="hidden lg:table-cell">Arendator</TableHead>
                   <TableHead className="hidden md:table-cell">Narx</TableHead>
                   <TableHead className="hidden sm:table-cell">Kv (m²)</TableHead>
                   <TableHead>Holat</TableHead>
@@ -221,6 +229,14 @@ export default function LwnRoomsPage() {
                         <p className="text-xs text-muted-foreground md:hidden">
                           {formatCurrency(room.price)} · {room.area} m²
                         </p>
+                        <p className="text-xs text-muted-foreground lg:hidden">
+                          {tenantByRoom.get(room.id) ?? "Bo'sh"}
+                        </p>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {tenantByRoom.get(room.id) ?? (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="hidden md:table-cell font-medium">
                         {formatCurrency(room.price)}

@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, TrendingDown } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { SendPaymentRemindersButton } from "@/components/shared/send-payment-reminders-button";
 import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { useCollection } from "@/hooks/use-collection";
 import { computeDebts } from "@/lib/analytics";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Contract, Payment } from "@/types";
 
 export default function DebtsPage() {
@@ -38,6 +39,9 @@ export default function DebtsPage() {
       <PageHeader
         title="Qarzdorliklar"
         description="Kechikkan to'lovlar avtomatik hisoblanadi."
+        action={
+          <SendPaymentRemindersButton label="Barchaga eslatma yuborish" />
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

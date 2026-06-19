@@ -238,6 +238,15 @@ async function refetchApi(name: CollectionName) {
   }
 }
 
+/** Tashqi chaqiruv: ma'lumotlar yangilansin (masalan, eslatma yuborilgandan keyin) */
+export function refreshCollection(name: CollectionName) {
+  if (!isApiConfigured) {
+    notify(name);
+    return Promise.resolve();
+  }
+  return refetchApi(name);
+}
+
 function startNotificationsSse(name: CollectionName) {
   if (name !== "notifications" || sseStarted[name]) return;
   if (typeof window === "undefined" || typeof EventSource === "undefined")

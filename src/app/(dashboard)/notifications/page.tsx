@@ -28,6 +28,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, formatDate } from "@/lib/utils";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { SendPaymentRemindersButton } from "@/components/shared/send-payment-reminders-button";
 import type { AppNotification, NotificationType } from "@/types";
 
 const ICON_MAP: Record<NotificationType, typeof Info> = {
@@ -72,9 +73,12 @@ export default function NotificationsPage() {
         title="Xabarlar"
         description="Bildirishnomalar markazi va Telegram integratsiyasi."
         action={
-          <Button variant="outline" onClick={markAllRead}>
-            <Check className="size-4" /> Hammasini o&apos;qish
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <SendPaymentRemindersButton label="Qarzdorlarga eslatma yuborish" />
+            <Button variant="outline" onClick={markAllRead}>
+              <Check className="size-4" /> Hammasini o&apos;qish
+            </Button>
+          </div>
         }
       />
 
@@ -88,7 +92,10 @@ export default function NotificationsPage() {
             <EmptyState
               icon={Bell}
               title="Xabarlar yo'q"
-              description="Yangi bildirishnomalar shu yerda paydo bo'ladi."
+              description="Qarzdorlarga to'lov eslatmasi yuborish uchun pastdagi tugmani bosing."
+              action={
+                <SendPaymentRemindersButton label="Qarzdorlarga eslatma yuborish" />
+              }
             />
           ) : (
             data.map((n) => {

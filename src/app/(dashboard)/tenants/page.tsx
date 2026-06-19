@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { SendPaymentRemindersButton } from "@/components/shared/send-payment-reminders-button";
 import { TelegramLink } from "@/components/shared/telegram-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
@@ -72,14 +73,17 @@ export default function TenantsPage() {
         title="Arendatorlar"
         description="Ijarachilar ro'yxati va ularning ma'lumotlari."
         action={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> Arendator qo&apos;shish
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <SendPaymentRemindersButton variant="outline" />
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> Arendator qo&apos;shish
+            </Button>
+          </div>
         }
       />
 

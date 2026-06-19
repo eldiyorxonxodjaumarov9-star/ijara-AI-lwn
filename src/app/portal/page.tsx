@@ -19,6 +19,7 @@ import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useCollection } from "@/hooks/use-collection";
 import { VacantRoomsSection } from "@/components/portal/vacant-rooms-section";
+import { TenantNotificationsSection } from "@/components/portal/tenant-notifications-section";
 import { StatCard } from "@/components/shared/stat-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TelegramLink } from "@/components/shared/telegram-link";
@@ -195,6 +196,8 @@ export default function PortalPage() {
           </div>
         </div>
       )}
+
+      <TenantNotificationsSection />
 
       {!loading && expiringSoon && daysUntilEnd !== null && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">

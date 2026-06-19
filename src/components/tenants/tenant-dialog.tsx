@@ -17,8 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, isApiConfigured } from "@/lib/api/client";
 import { useCollectionActions } from "@/hooks/use-collection";
+import { syncContractFromTenant } from "@/lib/contract-sync";
 import { tenantSchema, type TenantInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
 import type { Tenant } from "@/types";
@@ -61,13 +62,28 @@ export function TenantDialog({
 
   const onSubmit = async (values: TenantInput) => {
     try {
+      let savedId = tenant?.id;
       if (tenant) {
         await update(tenant.id, values);
+        savedId = tenant.id;
         toast.success("Arendator yangilandi");
       } else {
-        await create(values);
+        savedId = await create(values);
         toast.success("Arendator qo'shildi");
       }
+
+      if (!isApiConfigured && savedId) {
+        await syncContractFromTenant({
+          id: savedId,
+          fullName: values.fullName,
+          phone: values.phone,
+          passport: values.passport,
+          rentAmount: values.rentAmount ?? 0,
+          contractDuration: values.contractDuration,
+          createdAt: tenant?.createdAt ?? new Date().toISOString(),
+        });
+      }
+
       onOpenChange(false);
     } catch (err) {
       const message =

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { mapTenantCreate } from "@/lib/api-server/tenants";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
+import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -123,6 +124,7 @@ export async function POST(
           data: mapTenantCreate(body),
         });
         await upsertClientFromTenant(created);
+        await upsertContractFromTenant(created);
         return ok(created, 201);
       }
       case "contracts":

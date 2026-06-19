@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Download,
   FileText,
   MoreVertical,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
 } from "lucide-react";
@@ -38,14 +39,46 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
+import { isApiConfigured } from "@/lib/api/client";
+import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CONTRACT_STATUS_MAP } from "@/lib/constants";
 import { generateContractPdf } from "@/lib/pdf";
 import type { Contract } from "@/types";
 
 export default function ContractsPage() {
-  const { data, loading } = useCollection<Contract>("contracts");
+  const { data, loading, api } = useCollection<Contract>("contracts");
   const { remove } = useCollectionActions<Contract>("contracts");
+  const [syncing, setSyncing] = useState(false);
+  const autoSynced = useRef(false);
+
+  const runSync = async (silent = false) => {
+    if (!isApiConfigured) return;
+    setSyncing(true);
+    try {
+      const count = await syncContractsFromTenantsApi();
+      await api.list();
+      if (!silent) {
+        toast.success(
+          count > 0
+            ? `${count} ta shartnoma arendatorlardan yuklandi`
+            : "Shartnomalar yangilandi"
+        );
+      }
+    } catch {
+      if (!silent) toast.error("Sinxronlash xatosi");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isApiConfigured || loading || autoSynced.current) return;
+    if (data.length === 0) {
+      autoSynced.current = true;
+      void runSync(true);
+    }
+  }, [loading, data.length]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
@@ -71,14 +104,28 @@ export default function ContractsPage() {
         title="Shartnomalar"
         description="Ijara shartnomalarini boshqaring va PDF yarating."
         action={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> Shartnoma
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {isApiConfigured && (
+              <Button
+                variant="outline"
+                onClick={() => runSync()}
+                disabled={syncing || loading}
+              >
+                <RefreshCw
+                  className={`mr-1.5 size-4 ${syncing ? "animate-spin" : ""}`}
+                />
+                Arendatorlardan yuklash
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> Shartnoma
+            </Button>
+          </div>
         }
       />
 

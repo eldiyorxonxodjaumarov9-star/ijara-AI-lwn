@@ -47,6 +47,9 @@ export const tenantSchema = z.object({
   fullName: z.string().min(2, "F.I.O kiriting"),
   phone: z.string().min(7, "Telefon raqam kiriting"),
   rentAmount: z.coerce.number().min(0, "Summani kiriting"),
+  entryDate: z.string().min(1, "Arenda kirish sanasini kiriting"),
+  paymentDueDate: z.string().min(1, "To'lov muddatini kiriting"),
+  contractDuration: z.coerce.number().min(1, "Kamida 1 oy"),
 });
 
 export const contractSchema = z.object({

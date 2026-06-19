@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
-import { formatCurrency, getInitials } from "@/lib/utils";
+import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import type { Tenant } from "@/types";
 
 export default function TenantsPage() {
@@ -118,6 +118,9 @@ export default function TenantsPage() {
                 <TableRow>
                   <TableHead>F.I.O</TableHead>
                   <TableHead className="hidden md:table-cell">Telefon</TableHead>
+                  <TableHead className="hidden lg:table-cell">Arenda kirish</TableHead>
+                  <TableHead className="hidden lg:table-cell">To&apos;lov muddati</TableHead>
+                  <TableHead className="hidden xl:table-cell">Shartnoma</TableHead>
                   <TableHead>Ijara</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -144,6 +147,19 @@ export default function TenantsPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {tenant.phone}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell whitespace-nowrap text-muted-foreground">
+                      {tenant.entryDate ? formatDate(tenant.entryDate) : "—"}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell whitespace-nowrap text-muted-foreground">
+                      {tenant.paymentDueDate
+                        ? formatDate(tenant.paymentDueDate)
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell text-muted-foreground">
+                      {tenant.contractDuration
+                        ? `${tenant.contractDuration} oy`
+                        : "—"}
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(tenant.rentAmount)}

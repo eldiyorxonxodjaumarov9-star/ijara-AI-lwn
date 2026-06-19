@@ -3,6 +3,7 @@ import type {
   Expense,
   Payment,
   Property,
+  Tenant,
 } from "@/types";
 
 const MONTHS_UZ = [
@@ -23,9 +24,53 @@ const MONTHS_UZ = [
 export interface DashboardMetrics {
   totalProperties: number;
   monthlyIncome: number;
+  monthlyIncomeActual: number;
+  monthlyIncomeExpected: number;
+  incomeSource: "actual" | "expected";
   overdueContracts: number;
   netIncome: number;
   occupancyRate: number;
+}
+
+function sumActiveContractRent(contracts: Contract[]) {
+  return contracts
+    .filter((c) => c.status === "active")
+    .reduce((sum, c) => sum + (c.monthlyPayment || 0), 0);
+}
+
+function sumTenantRent(tenants: Tenant[]) {
+  return tenants.reduce((sum, t) => sum + (t.rentAmount || 0), 0);
+}
+
+export function getExpectedMonthlyIncome(
+  contracts: Contract[],
+  tenants: Tenant[]
+) {
+  const fromContracts = sumActiveContractRent(contracts);
+  if (fromContracts > 0) return fromContracts;
+  return sumTenantRent(tenants);
+}
+
+function computeOccupancy(
+  properties: Property[],
+  contracts: Contract[],
+  tenants: Tenant[]
+) {
+  const totalRooms = properties.reduce((sum, p) => sum + (p.rooms || 0), 0);
+  if (totalRooms > 0) {
+    const occupiedFromContracts = contracts.filter(
+      (c) => c.status === "active"
+    ).length;
+    const occupiedFromTenants = tenants.filter((t) => (t.rentAmount || 0) > 0)
+      .length;
+    const occupied = occupiedFromContracts || occupiedFromTenants;
+    return Math.min(100, Math.round((occupied / totalRooms) * 100));
+  }
+
+  const rented = properties.filter((p) => p.status === "rented").length;
+  return properties.length > 0
+    ? Math.round((rented / properties.length) * 100)
+    : 0;
 }
 
 function isSameMonth(date: Date, ref: Date) {
@@ -40,17 +85,25 @@ export function computeMetrics({
   contracts,
   payments,
   expenses,
+  tenants = [],
 }: {
   properties: Property[];
   contracts: Contract[];
   payments: Payment[];
   expenses: Expense[];
+  tenants?: Tenant[];
 }): DashboardMetrics {
   const now = new Date();
 
-  const monthlyIncome = payments
+  const monthlyIncomeActual = payments
     .filter((p) => isSameMonth(new Date(p.date), now))
     .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+  const monthlyIncomeExpected = getExpectedMonthlyIncome(contracts, tenants);
+  const incomeSource =
+    monthlyIncomeActual > 0 ? ("actual" as const) : ("expected" as const);
+  const monthlyIncome =
+    monthlyIncomeActual > 0 ? monthlyIncomeActual : monthlyIncomeExpected;
 
   const monthlyExpenses = expenses
     .filter((e) => isSameMonth(new Date(e.date), now))
@@ -62,14 +115,14 @@ export function computeMetrics({
   }).length;
 
   const netIncome = monthlyIncome - monthlyExpenses;
-
-  const rented = properties.filter((p) => p.status === "rented").length;
-  const occupancyRate =
-    properties.length > 0 ? Math.round((rented / properties.length) * 100) : 0;
+  const occupancyRate = computeOccupancy(properties, contracts, tenants);
 
   return {
     totalProperties: properties.length,
     monthlyIncome,
+    monthlyIncomeActual,
+    monthlyIncomeExpected,
+    incomeSource,
     overdueContracts,
     netIncome,
     occupancyRate,
@@ -85,20 +138,28 @@ export interface RevenuePoint {
 export function buildRevenueSeries({
   payments,
   expenses,
+  contracts = [],
+  tenants = [],
   months = 6,
 }: {
   payments: Payment[];
   expenses: Expense[];
+  contracts?: Contract[];
+  tenants?: Tenant[];
   months?: number;
 }): RevenuePoint[] {
   const now = new Date();
+  const expectedMonthly = getExpectedMonthlyIncome(contracts, tenants);
   const series: RevenuePoint[] = [];
 
   for (let i = months - 1; i >= 0; i--) {
     const ref = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const daromad = payments
+    let daromad = payments
       .filter((p) => isSameMonth(new Date(p.date), ref))
       .reduce((sum, p) => sum + (p.amount || 0), 0);
+    if (daromad === 0 && isSameMonth(ref, now) && expectedMonthly > 0) {
+      daromad = expectedMonthly;
+    }
     const xarajat = expenses
       .filter((e) => isSameMonth(new Date(e.date), ref))
       .reduce((sum, e) => sum + (e.amount || 0), 0);

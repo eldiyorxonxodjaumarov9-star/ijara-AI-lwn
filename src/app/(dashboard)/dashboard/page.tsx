@@ -66,13 +66,14 @@ export default function DashboardPage() {
   const loading = lp || lt || lcl || lc || lpay || le;
 
   const metrics = useMemo(
-    () => computeMetrics({ properties, contracts, payments, expenses }),
-    [properties, contracts, payments, expenses]
+    () =>
+      computeMetrics({ properties, contracts, payments, expenses, tenants }),
+    [properties, contracts, payments, expenses, tenants]
   );
 
   const revenueSeries = useMemo(
-    () => buildRevenueSeries({ payments, expenses }),
-    [payments, expenses]
+    () => buildRevenueSeries({ payments, expenses, contracts, tenants }),
+    [payments, expenses, contracts, tenants]
   );
 
   const statusSeries = useMemo(() => {
@@ -132,6 +133,13 @@ export default function DashboardPage() {
           icon={Banknote}
           tone="blue"
           loading={loading}
+          subtitle={
+            metrics.incomeSource === "expected"
+              ? t("dashboard.expectedIncomeHint")
+              : metrics.monthlyIncomeActual > 0
+                ? t("dashboard.actualIncomeHint")
+                : undefined
+          }
         />
         <StatCard
           index={4}
@@ -148,6 +156,11 @@ export default function DashboardPage() {
           icon={TrendingUp}
           tone="primary"
           loading={loading}
+          subtitle={
+            metrics.incomeSource === "expected"
+              ? t("dashboard.expectedIncomeHint")
+              : undefined
+          }
         />
         <StatCard
           index={6}

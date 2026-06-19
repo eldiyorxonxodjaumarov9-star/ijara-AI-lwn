@@ -24,6 +24,7 @@ export function StatCard({
   tone = "primary",
   trend,
   trendLabel,
+  subtitle,
   loading,
   index = 0,
 }: {
@@ -33,6 +34,7 @@ export function StatCard({
   tone?: Tone;
   trend?: number;
   trendLabel?: string;
+  subtitle?: string;
   loading?: boolean;
   index?: number;
 }) {
@@ -85,6 +87,9 @@ export function StatCard({
                 <span className="text-muted-foreground">{trendLabel}</span>
               )}
             </div>
+          )}
+          {subtitle && !loading && (
+            <p className="mt-2 text-xs text-muted-foreground">{subtitle}</p>
           )}
         </CardContent>
       </Card>

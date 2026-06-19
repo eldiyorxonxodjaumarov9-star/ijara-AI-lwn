@@ -13,7 +13,6 @@ import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { SendPaymentRemindersButton } from "@/components/shared/send-payment-reminders-button";
-import { TelegramLink } from "@/components/shared/telegram-link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -42,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
-import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
+import { formatCurrency, getInitials } from "@/lib/utils";
 import type { Tenant } from "@/types";
 
 export default function TenantsPage() {
@@ -56,7 +55,7 @@ export default function TenantsPage() {
   const { search, setSearch, page, setPage, totalPages, total, paged } =
     useTableData<Tenant>({
       data,
-      searchFields: ["fullName", "phone", "passport", "telegram", "email"],
+      searchFields: ["fullName", "phone"],
       pageSize: 10,
     });
 
@@ -90,7 +89,7 @@ export default function TenantsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Ism, telefon, passport bo'yicha..."
+          placeholder="Ism yoki telefon bo'yicha..."
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -119,10 +118,6 @@ export default function TenantsPage() {
                 <TableRow>
                   <TableHead>F.I.O</TableHead>
                   <TableHead className="hidden md:table-cell">Telefon</TableHead>
-                  <TableHead className="hidden lg:table-cell">Passport</TableHead>
-                  <TableHead className="hidden lg:table-cell">Telegram</TableHead>
-                  <TableHead className="hidden xl:table-cell">Kirish</TableHead>
-                  <TableHead className="hidden xl:table-cell">To&apos;lov</TableHead>
                   <TableHead>Ijara</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -149,24 +144,6 @@ export default function TenantsPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {tenant.phone}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {tenant.passport}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {tenant.telegram ? (
-                        <TelegramLink value={tenant.telegram} />
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell whitespace-nowrap text-muted-foreground">
-                      {tenant.entryDate ? formatDate(tenant.entryDate) : "—"}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell whitespace-nowrap text-muted-foreground">
-                      {tenant.paymentDueDate
-                        ? formatDate(tenant.paymentDueDate)
-                        : "—"}
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(tenant.rentAmount)}

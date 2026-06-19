@@ -29,18 +29,22 @@ const today = () => new Date().toISOString().slice(0, 10);
 const defaults = (): TenantInput => ({
   fullName: "",
   phone: "",
-  passport: "",
-  telegram: "",
-  email: "",
-  entryDate: today(),
-  paymentDueDate: today(),
-  contractDuration: 12,
   rentAmount: 0,
 });
 
-function toDateInput(value?: string) {
-  if (!value) return today();
-  return value.slice(0, 10);
+function buildTenantPayload(values: TenantInput, existing?: Tenant | null) {
+  const entryDate = existing?.entryDate?.slice(0, 10) ?? today();
+  return {
+    fullName: values.fullName,
+    phone: values.phone,
+    rentAmount: values.rentAmount ?? 0,
+    passport: existing?.passport ?? "",
+    telegram: existing?.telegram,
+    email: existing?.email,
+    entryDate,
+    paymentDueDate: existing?.paymentDueDate?.slice(0, 10) ?? entryDate,
+    contractDuration: existing?.contractDuration ?? 12,
+  };
 }
 
 export function TenantDialog({
@@ -69,11 +73,9 @@ export function TenantDialog({
     if (!open) return;
     if (tenant) {
       reset({
-        ...defaults(),
-        ...tenant,
-        email: tenant.email ?? "",
-        entryDate: toDateInput(tenant.entryDate),
-        paymentDueDate: toDateInput(tenant.paymentDueDate),
+        fullName: tenant.fullName,
+        phone: tenant.phone,
+        rentAmount: tenant.rentAmount ?? 0,
       });
     } else {
       reset(defaults());
@@ -82,10 +84,7 @@ export function TenantDialog({
 
   const onSubmit = async (values: TenantInput) => {
     try {
-      const payload = {
-        ...values,
-        email: values.email?.trim() || undefined,
-      };
+      const payload = buildTenantPayload(values, tenant);
       let savedId = tenant?.id;
       if (tenant) {
         await update(tenant.id, payload);
@@ -101,11 +100,11 @@ export function TenantDialog({
           id: savedId,
           fullName: values.fullName,
           phone: values.phone,
-          passport: values.passport,
+          passport: payload.passport,
           rentAmount: values.rentAmount ?? 0,
-          contractDuration: values.contractDuration,
-          entryDate: values.entryDate,
-          paymentDueDate: values.paymentDueDate,
+          contractDuration: payload.contractDuration,
+          entryDate: payload.entryDate,
+          paymentDueDate: payload.paymentDueDate,
           createdAt: tenant?.createdAt ?? new Date().toISOString(),
         });
       }
@@ -120,94 +119,46 @@ export function TenantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
             {tenant ? "Arendatorni tahrirlash" : "Yangi arendator"}
           </DialogTitle>
-          <DialogDescription>Arendator ma&apos;lumotlari.</DialogDescription>
+          <DialogDescription>
+            Asosiy ma&apos;lumotlarni kiriting.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>F.I.O</Label>
-              <Input placeholder="To'liq ism" {...register("fullName")} />
-              {errors.fullName && (
-                <p className="text-xs text-destructive">
-                  {errors.fullName.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Telefon</Label>
-              <Input placeholder="+998..." {...register("phone")} />
-              {errors.phone && (
-                <p className="text-xs text-destructive">{errors.phone.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Passport</Label>
-              <Input placeholder="AA1234567" {...register("passport")} />
-              {errors.passport && (
-                <p className="text-xs text-destructive">
-                  {errors.passport.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Telegram</Label>
-              <Input placeholder="@username" {...register("telegram")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email (ixtiyoriy)</Label>
-              <Input
-                type="email"
-                placeholder="email@example.com"
-                {...register("email")}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Kirish sanasi</Label>
-              <Input type="date" {...register("entryDate")} />
-              {errors.entryDate && (
-                <p className="text-xs text-destructive">
-                  {errors.entryDate.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>To&apos;lov qilish sanasi</Label>
-              <Input type="date" {...register("paymentDueDate")} />
-              {errors.paymentDueDate && (
-                <p className="text-xs text-destructive">
-                  {errors.paymentDueDate.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Shartnoma muddati (oy)</Label>
-              <Input type="number" {...register("contractDuration")} />
-              {errors.contractDuration && (
-                <p className="text-xs text-destructive">
-                  {errors.contractDuration.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Ijara summasi (so&apos;m)</Label>
-              <MoneyInput
-                value={watch("rentAmount") ?? 0}
-                onChange={(v) =>
-                  setValue("rentAmount", v, { shouldValidate: true })
-                }
-              />
-              {errors.rentAmount && (
-                <p className="text-xs text-destructive">
-                  {errors.rentAmount.message}
-                </p>
-              )}
-            </div>
+          <div className="space-y-1.5">
+            <Label>F.I.O</Label>
+            <Input placeholder="To'liq ism" {...register("fullName")} />
+            {errors.fullName && (
+              <p className="text-xs text-destructive">
+                {errors.fullName.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Telefon</Label>
+            <Input placeholder="+998..." {...register("phone")} />
+            {errors.phone && (
+              <p className="text-xs text-destructive">{errors.phone.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ijara summasi (so&apos;m)</Label>
+            <MoneyInput
+              value={watch("rentAmount") ?? 0}
+              onChange={(v) =>
+                setValue("rentAmount", v, { shouldValidate: true })
+              }
+            />
+            {errors.rentAmount && (
+              <p className="text-xs text-destructive">
+                {errors.rentAmount.message}
+              </p>
+            )}
           </div>
 
           <DialogFooter>

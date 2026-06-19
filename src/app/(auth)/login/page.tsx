@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Bot, Loader2, Lock, LogOut, Mail, Phone, User } from "lucide-react";
+import { Loader2, Lock, LogOut, Mail, Phone, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { toast } from "sonner";
@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { InstagramAnalyzeForm } from "@/components/analyze/instagram-analyze-form";
 import { useAuth } from "@/context/auth-context";
 import {
   loginSchema,
@@ -26,7 +25,7 @@ import {
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const defaultTab = searchParams.get("tab") === "analyze" ? "analyze" : "owner";
+  const defaultTab = searchParams.get("tab") === "tenant" ? "tenant" : "owner";
   const { login, loginTenant, logout, user, demoMode } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -122,13 +121,9 @@ function LoginPageContent() {
       )}
 
       <Tabs defaultValue={defaultTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="owner">Arenda egasi</TabsTrigger>
           <TabsTrigger value="tenant">Ijarachi</TabsTrigger>
-          <TabsTrigger value="analyze">
-            <Bot className="mr-1 size-3.5" />
-            AI Demo
-          </TabsTrigger>
         </TabsList>
 
         {/* ===== Arenda egasi ===== */}
@@ -264,11 +259,6 @@ function LoginPageContent() {
               Kirish
             </Button>
           </form>
-        </TabsContent>
-
-        {/* ===== Instagram AI Demo ===== */}
-        <TabsContent value="analyze">
-          <InstagramAnalyzeForm />
         </TabsContent>
       </Tabs>
     </div>

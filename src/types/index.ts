@@ -24,6 +24,7 @@ export interface Property {
   address: string;
   region: string;
   district: string;
+  building?: string;
   price: number;
   status: PropertyStatus;
   description?: string;

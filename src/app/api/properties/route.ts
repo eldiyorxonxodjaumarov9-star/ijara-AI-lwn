@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
         rentPrice: Number(body.rentPrice ?? body.price ?? 0),
         rooms: Number(body.rooms ?? 0),
         area: Number(body.area ?? 0),
+        building: body.building ? String(body.building) : undefined,
         description: body.description ? String(body.description) : undefined,
         status: (body.status as Prisma.PropertyCreateInput["status"]) ?? "AVAILABLE",
         images: (body.images as string[]) ?? [],

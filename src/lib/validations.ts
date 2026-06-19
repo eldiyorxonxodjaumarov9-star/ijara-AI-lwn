@@ -41,6 +41,16 @@ export const propertySchema = z.object({
   area: z.coerce.number().min(0),
   description: z.string().optional(),
   images: z.array(z.string()).default([]),
+  building: z.string().optional(),
+});
+
+export const lwnRoomSchema = z.object({
+  name: z.string().min(1, "Xona raqamini kiriting"),
+  price: z.coerce.number().min(0, "Narx kiriting"),
+  area: z.coerce.number().min(1, "Kv metr kiriting"),
+  status: z.enum(["available", "rented", "maintenance", "reserved"]),
+  images: z.array(z.string()).default([]),
+  description: z.string().optional(),
 });
 
 export const tenantSchema = z.object({
@@ -97,6 +107,7 @@ export const maintenanceSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type PropertyInput = z.infer<typeof propertySchema>;
+export type LwnRoomInput = z.infer<typeof lwnRoomSchema>;
 export type TenantInput = z.infer<typeof tenantSchema>;
 export type ContractInput = z.infer<typeof contractSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;

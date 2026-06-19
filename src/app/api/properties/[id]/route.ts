@@ -36,6 +36,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       ...(body.address != null ? { address: String(body.address) } : {}),
       ...(body.region != null ? { region: String(body.region) } : {}),
       ...(body.district != null ? { district: String(body.district) } : {}),
+      ...(body.building != null
+        ? { building: String(body.building) || null }
+        : {}),
       ...(body.rentPrice != null || body.price != null
         ? { rentPrice: Number(body.rentPrice ?? body.price) }
         : {}),

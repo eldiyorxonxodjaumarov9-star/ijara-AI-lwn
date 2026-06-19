@@ -11,6 +11,10 @@ import type {
 
 export const APP_NAME = "ArendaAi";
 
+/** Live Work Network binosi */
+export const LWN_BUILDING = "LWN";
+export const LWN_ADDRESS = "Live Work Network";
+
 /** Ijarachilar uchun ijara egasi bilan bog'lanish (demo) */
 export const LANDLORD_CONTACT = {
   name: "UmarxonMedia Studio",

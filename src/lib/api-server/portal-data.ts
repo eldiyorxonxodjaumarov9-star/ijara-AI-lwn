@@ -14,6 +14,11 @@ export async function resolveTenantByCredentials(
   return match ? stripTenantSecret(match) : null;
 }
 
+export async function resolveTenantById(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  return tenant ? stripTenantSecret(tenant) : null;
+}
+
 export async function getPortalDataForTenant(tenantId: string) {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return null;

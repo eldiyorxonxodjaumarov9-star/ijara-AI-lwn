@@ -39,11 +39,8 @@ export function TenantNotificationsSection() {
     }
 
     try {
-      if (isApiConfigured && user.displayName && user.phone) {
-        const remote = await fetchTenantNotifications(
-          user.displayName,
-          user.phone
-        );
+      if (isApiConfigured) {
+        const remote = await fetchTenantNotifications(user.tenantId);
         setItems(remote);
       } else {
         setItems(readTenantLocalNotifications(user.tenantId));
@@ -53,7 +50,7 @@ export function TenantNotificationsSection() {
     } finally {
       setLoading(false);
     }
-  }, [user?.tenantId, user?.displayName, user?.phone]);
+  }, [user?.tenantId]);
 
   useEffect(() => {
     void load();

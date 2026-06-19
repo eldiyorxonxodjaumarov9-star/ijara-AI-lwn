@@ -98,7 +98,7 @@ export function usePortalData(): PortalDataState {
   const [remoteLoading, setRemoteLoading] = useState(isApiConfigured);
 
   const loadRemote = useCallback(async () => {
-    if (!isApiConfigured || !user?.displayName || !user?.phone) {
+    if (!isApiConfigured || !tenantId) {
       setRemoteLoading(false);
       return;
     }
@@ -113,7 +113,7 @@ export function usePortalData(): PortalDataState {
       }>("/portal/data", {
         method: "POST",
         auth: false,
-        body: { fullName: user.displayName, phone: user.phone },
+        body: { tenantId },
       });
       setRemote(mapPortalResponse(raw));
     } catch {
@@ -121,7 +121,7 @@ export function usePortalData(): PortalDataState {
     } finally {
       setRemoteLoading(false);
     }
-  }, [user?.displayName, user?.phone]);
+  }, [tenantId]);
 
   useEffect(() => {
     void loadRemote();

@@ -93,7 +93,7 @@ export async function sendPaymentRemindersLocal(
   return { sent };
 }
 
-export async function fetchTenantNotifications(fullName: string, phone: string) {
+export async function fetchTenantNotifications(tenantId: string) {
   if (!isApiConfigured) return [];
   const raw = await apiFetch<
     Array<{
@@ -107,7 +107,7 @@ export async function fetchTenantNotifications(fullName: string, phone: string) 
   >("/notifications/tenant", {
     method: "POST",
     auth: false,
-    body: { fullName, phone },
+    body: { tenantId },
   });
 
   return raw.map((n) => ({

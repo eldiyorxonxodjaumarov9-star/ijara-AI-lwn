@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { MoneyInput } from "@/components/shared/money-input";
@@ -22,6 +22,10 @@ import { ApiError } from "@/lib/api/client";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { filterLwnRooms } from "@/lib/lwn-rooms";
 import {
+  generateTenantPassword,
+  suggestTenantLogin,
+} from "@/lib/tenant-credentials";
+import {
   assignTenantToRoom,
   getTenantContract,
   type TenantPaymentStatus,
@@ -35,6 +39,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 const defaults = (): TenantInput => ({
   fullName: "",
   phone: "",
+  login: "",
+  password: "",
   rentAmount: 0,
   entryDate: today(),
   paymentDueDate: today(),
@@ -50,6 +56,8 @@ function buildTenantPayload(values: TenantInput, existing?: Tenant | null) {
   return {
     fullName: values.fullName,
     phone: values.phone,
+    login: values.login,
+    password: values.password?.trim() ? values.password : undefined,
     rentAmount: values.rentAmount ?? 0,
     passport: existing?.passport ?? "",
     telegram: existing?.telegram,
@@ -108,6 +116,7 @@ export function TenantDialog({
 
   const selectedRoom = lwnRooms.find((r) => r.id === roomId);
   const rentAmount = watch("rentAmount") ?? 0;
+  const phone = watch("phone") ?? "";
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +124,8 @@ export function TenantDialog({
       reset({
         fullName: tenant.fullName,
         phone: tenant.phone,
+        login: tenant.login ?? "",
+        password: "",
         rentAmount: tenant.rentAmount ?? 0,
         entryDate: toDateInput(tenant.entryDate),
         paymentDueDate: toDateInput(tenant.paymentDueDate),
@@ -122,13 +133,25 @@ export function TenantDialog({
       });
       setRoomId(existingContract?.propertyId ?? "");
     } else {
-      reset(defaults());
+      const password = generateTenantPassword();
+      reset({
+        ...defaults(),
+        password,
+      });
       setRoomId(selectableRooms[0]?.id ?? "");
     }
     setPaymentStatus("debt");
     setPaymentMethod("cash");
     setPaymentDate(today());
   }, [open, tenant, reset, existingContract?.propertyId, selectableRooms]);
+
+  useEffect(() => {
+    if (tenant || !open) return;
+    const suggested = suggestTenantLogin(phone);
+    if (suggested) {
+      setValue("login", suggested, { shouldValidate: true });
+    }
+  }, [phone, tenant, open, setValue]);
 
   useEffect(() => {
     if (!selectedRoom || selectedRoom.price <= 0) return;
@@ -138,6 +161,10 @@ export function TenantDialog({
   const onSubmit = async (values: TenantInput) => {
     if (!tenant && !roomId) {
       toast.error("LWN xonani tanlang");
+      return;
+    }
+    if (!tenant && (!values.password || values.password.length < 6)) {
+      toast.error("Parol kamida 6 ta belgi bo'lishi kerak");
       return;
     }
 
@@ -155,6 +182,7 @@ export function TenantDialog({
         id: savedId!,
         fullName: values.fullName,
         phone: values.phone,
+        login: values.login,
         passport: payload.passport,
         rentAmount: values.rentAmount ?? 0,
         entryDate: payload.entryDate,
@@ -179,7 +207,13 @@ export function TenantDialog({
         });
       }
 
-      toast.success(tenant ? "Arendator yangilandi" : "Arendator qo'shildi");
+      if (!tenant) {
+        toast.success(
+          `Arendator qo'shildi. Login: ${values.login}, Parol: ${values.password}`
+        );
+      } else {
+        toast.success("Arendator yangilandi");
+      }
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -196,7 +230,7 @@ export function TenantDialog({
             {tenant ? "Arendatorni tahrirlash" : "Yangi arendator"}
           </DialogTitle>
           <DialogDescription>
-            Arendator ma&apos;lumotlari va LWN xonasini kiriting.
+            Arendator ma&apos;lumotlari, login/parol va LWN xonasini kiriting.
           </DialogDescription>
         </DialogHeader>
 
@@ -229,6 +263,41 @@ export function TenantDialog({
               {errors.rentAmount && (
                 <p className="text-xs text-destructive">
                   {errors.rentAmount.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Login</Label>
+              <Input placeholder="user901234567" {...register("login")} />
+              {errors.login && (
+                <p className="text-xs text-destructive">{errors.login.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>{tenant ? "Yangi parol (ixtiyoriy)" : "Parol"}</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="••••••"
+                  {...register("password")}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="Yangi parol"
+                  onClick={() =>
+                    setValue("password", generateTenantPassword(), {
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  <RefreshCw className="size-4" />
+                </Button>
+              </div>
+              {!tenant && errors.password && (
+                <p className="text-xs text-destructive">
+                  {errors.password.message}
                 </p>
               )}
             </div>

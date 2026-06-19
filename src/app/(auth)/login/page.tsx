@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Lock, LogOut, Mail, Phone, User } from "lucide-react";
+import { Loader2, Lock, LogOut, Mail, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ function LoginPageContent() {
 
   const tenantForm = useForm<TenantLoginInput>({
     resolver: zodResolver(tenantLoginSchema),
-    defaultValues: { fullName: "", phone: "" },
+    defaultValues: { login: "", password: "" },
   });
 
   const onOwnerSubmit = async (values: LoginInput) => {
@@ -58,7 +58,7 @@ function LoginPageContent() {
   const onTenantSubmit = async (values: TenantLoginInput) => {
     try {
       setSubmitting(true);
-      await loginTenant(values.fullName, values.phone);
+      await loginTenant(values.login, values.password);
       toast.success("Xush kelibsiz!");
       router.push("/portal");
     } catch (error) {
@@ -208,9 +208,7 @@ function LoginPageContent() {
         {/* ===== Arenda turgan odam ===== */}
         <TabsContent value="tenant">
           <div className="mb-5 rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
-            Ism familiyangiz va telefon raqamingiz orqali kiring. Ma&apos;lumotlar
-            arenda egasi sizni ro&apos;yxatga qo&apos;shgani bilan bir xil
-            bo&apos;lishi kerak.
+            Arenda egasi bergan login va parol orqali kiring.
           </div>
 
           <form
@@ -218,38 +216,38 @@ function LoginPageContent() {
             className="space-y-4"
           >
             <div className="space-y-1.5">
-              <Label htmlFor="fullName">Ism familiya</Label>
+              <Label htmlFor="tenantLogin">Login</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="fullName"
-                  placeholder="Alisher Karimov"
+                  id="tenantLogin"
+                  placeholder="user901234567"
                   className="pl-9"
-                  {...tenantForm.register("fullName")}
+                  {...tenantForm.register("login")}
                 />
               </div>
-              {tenantForm.formState.errors.fullName && (
+              {tenantForm.formState.errors.login && (
                 <p className="text-xs text-destructive">
-                  {tenantForm.formState.errors.fullName.message}
+                  {tenantForm.formState.errors.login.message}
                 </p>
               )}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Telefon raqam</Label>
+              <Label htmlFor="tenantPassword">Parol</Label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+998 90 123 45 67"
+                  id="tenantPassword"
+                  type="password"
+                  placeholder="••••••"
                   className="pl-9"
-                  {...tenantForm.register("phone")}
+                  {...tenantForm.register("password")}
                 />
               </div>
-              {tenantForm.formState.errors.phone && (
+              {tenantForm.formState.errors.password && (
                 <p className="text-xs text-destructive">
-                  {tenantForm.formState.errors.phone.message}
+                  {tenantForm.formState.errors.password.message}
                 </p>
               )}
             </div>

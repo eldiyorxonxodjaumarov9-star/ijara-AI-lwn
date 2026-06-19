@@ -24,8 +24,8 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const tenantLoginSchema = z.object({
-  fullName: z.string().min(2, "Ism familiyangizni kiriting"),
-  phone: z.string().min(7, "Telefon raqamingizni kiriting"),
+  login: z.string().min(3, "Login kiriting"),
+  password: z.string().min(6, "Parol kamida 6 ta belgi"),
 });
 
 export type TenantLoginInput = z.infer<typeof tenantLoginSchema>;
@@ -56,6 +56,8 @@ export const lwnRoomSchema = z.object({
 export const tenantSchema = z.object({
   fullName: z.string().min(2, "F.I.O kiriting"),
   phone: z.string().min(7, "Telefon raqam kiriting"),
+  login: z.string().min(3, "Login kamida 3 belgi"),
+  password: z.string().optional(),
   rentAmount: z.coerce.number().min(0, "Summani kiriting"),
   entryDate: z.string().min(1, "Arenda kirish sanasini kiriting"),
   paymentDueDate: z.string().min(1, "To'lov muddatini kiriting"),

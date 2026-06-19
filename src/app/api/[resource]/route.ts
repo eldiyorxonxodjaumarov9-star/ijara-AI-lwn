@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { mapTenantCreate } from "@/lib/api-server/tenants";
+import { mapTenantCreate, stripTenantSecret } from "@/lib/api-server/tenants";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
@@ -39,10 +39,11 @@ export async function GET(
 
   switch (name) {
     case "tenants": {
-      const [data, total] = await Promise.all([
+      const [rows, total] = await Promise.all([
         prisma.tenant.findMany({ skip, take: limit, orderBy: { [sortBy]: order } }),
         prisma.tenant.count(),
       ]);
+      const data = rows.map(stripTenantSecret);
       return ok(paginated(data, total, page, limit));
     }
     case "contracts": {
@@ -122,11 +123,11 @@ export async function POST(
     switch (name) {
       case "tenants": {
         const created = await prisma.tenant.create({
-          data: mapTenantCreate(body),
+          data: await mapTenantCreate(body),
         });
         await upsertClientFromTenant(created);
         await upsertContractFromTenant(created);
-        return ok(created, 201);
+        return ok(stripTenantSecret(created), 201);
       }
       case "contracts":
         return ok(

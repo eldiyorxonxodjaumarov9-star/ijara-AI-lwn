@@ -1,15 +1,17 @@
 import { prisma } from "@/lib/api-server/prisma";
+import { stripTenantSecret } from "@/lib/api-server/tenants";
 import {
-  findTenantByCredentials,
+  findTenantByLogin,
   normalizePhone,
 } from "@/lib/api-server/tenant-lookup";
 
 export async function resolveTenantByCredentials(
-  fullName: string,
-  phone: string
+  login: string,
+  password: string
 ) {
   const tenants = await prisma.tenant.findMany();
-  return findTenantByCredentials(tenants, fullName, phone);
+  const match = await findTenantByLogin(tenants, login, password);
+  return match ? stripTenantSecret(match) : null;
 }
 
 export async function getPortalDataForTenant(tenantId: string) {
@@ -50,7 +52,7 @@ export async function getPortalDataForTenant(tenantId: string) {
   );
 
   return {
-    tenant,
+    tenant: stripTenantSecret(tenant),
     contracts,
     payments,
     maintenance,
@@ -58,4 +60,4 @@ export async function getPortalDataForTenant(tenantId: string) {
   };
 }
 
-export { normalizePhone, findTenantByCredentials };
+export { normalizePhone, findTenantByLogin };

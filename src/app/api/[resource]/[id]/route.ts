@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { mapTenantBody } from "@/lib/api-server/tenants";
+import { mapTenantBody, stripTenantSecret } from "@/lib/api-server/tenants";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { requireUser } from "@/lib/api-server/auth";
@@ -31,6 +31,7 @@ export async function GET(
   switch (resource) {
     case "tenants":
       found = await prisma.tenant.findUnique({ where: { id } });
+      if (found) found = stripTenantSecret(found);
       break;
     case "contracts":
       found = await prisma.contract.findUnique({
@@ -79,11 +80,11 @@ export async function PATCH(
       case "tenants": {
         const updated = await prisma.tenant.update({
           where: { id },
-          data: mapTenantBody(body),
+          data: await mapTenantBody(body),
         });
         await upsertClientFromTenant(updated);
         await upsertContractFromTenant(updated);
-        return ok(updated);
+        return ok(stripTenantSecret(updated));
       }
       case "contracts":
         return ok(

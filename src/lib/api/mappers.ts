@@ -138,6 +138,7 @@ const tenant: MapperConfig = {
     fullName: String(i.fullName ?? ""),
     phone: String(i.phone ?? ""),
     passport: String(i.passport ?? ""),
+    login: s(i.login),
     telegram: s(i.telegram),
     email: s(i.email),
     rentAmount: n(i.rentAmount),
@@ -151,6 +152,8 @@ const tenant: MapperConfig = {
     fullName: d.fullName,
     phone: d.phone,
     passport: d.passport,
+    login: d.login,
+    password: (d as { password?: string }).password,
     telegram: d.telegram || undefined,
     email: d.email || undefined,
     address: d.address || undefined,
@@ -161,7 +164,9 @@ const tenant: MapperConfig = {
     paymentDueDate: d.paymentDueDate,
   }),
   toUpdate(d) {
-    return this.toCreate(d);
+    const payload = this.toCreate(d) as Record<string, unknown>;
+    if (!payload.password) delete payload.password;
+    return payload;
   },
 };
 

@@ -40,6 +40,7 @@ export interface Tenant {
   fullName: string;
   phone: string;
   passport: string;
+  login?: string;
   telegram?: string;
   email?: string;
   contractDuration?: number;

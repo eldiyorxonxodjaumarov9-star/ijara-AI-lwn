@@ -92,7 +92,7 @@ interface AuthContextValue {
   loading: boolean;
   demoMode: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginTenant: (fullName: string, phone: string) => Promise<void>;
+  loginTenant: (login: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -281,51 +281,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const loginTenant = useCallback(
-    async (fullName: string, phone: string) => {
-      const wantedName = fullName.trim().toLowerCase();
-      const wantedPhone = normalizePhone(phone);
-
-      let match: Tenant | undefined;
+    async (login: string, password: string) => {
+      const wantedLogin = login.trim().toLowerCase();
+      let match: (Tenant & { password?: string }) | undefined;
 
       if (isApiConfigured) {
         try {
           const raw = await apiFetch<Record<string, unknown>>("/portal/lookup", {
             method: "POST",
             auth: false,
-            body: { fullName, phone },
+            body: { login, password },
           });
           match = MAPPERS.tenants!.fromApi(raw) as Tenant;
         } catch {
           match = undefined;
         }
       } else {
-        let tenants: Tenant[] = [];
+        let tenants: (Tenant & { password?: string })[] = [];
         try {
-          tenants = await getCollectionApi<Tenant>("tenants").list();
+          tenants = (await getCollectionApi<Tenant>("tenants").list()) as (Tenant & {
+            password?: string;
+          })[];
         } catch {
           throw new Error("Ijarachilar ro'yxatini olishda xatolik");
         }
 
         match = tenants.find(
           (t) =>
-            t.fullName.trim().toLowerCase() === wantedName &&
-            normalizePhone(t.phone) === wantedPhone
+            t.login?.trim().toLowerCase() === wantedLogin &&
+            t.password === password
         );
       }
 
       if (!match) {
-        await recordClientLead(fullName, phone);
-        throw new Error(
-          "Bunday ijarachi topilmadi. Ism familiya va telefonni tekshiring."
-        );
+        throw new Error("Login yoki parol noto'g'ri");
       }
 
-      await recordClientLead(fullName, phone, match.id);
+      await recordClientLead(match.fullName, match.phone, match.id);
 
       const tenantUser: AppUser = {
         id: match.id,
         uid: match.id,
-        email: match.email ?? "",
+        email: match.email ?? match.login ?? "",
         displayName: match.fullName,
         phone: match.phone,
         role: "tenant",

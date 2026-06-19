@@ -141,6 +141,8 @@ model Tenant {
   fullName         String
   phone            String
   passport         String
+  login            String?  @unique
+  password         String?
   telegram         String?
   email            String?
   address          String?

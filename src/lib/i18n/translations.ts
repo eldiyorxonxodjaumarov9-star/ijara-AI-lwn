@@ -157,6 +157,13 @@ export const translations = {
     "portal.noMaintenanceDesc": "Mulk bo'yicha ta'mirlash so'rovlari shu yerda ko'rinadi.",
     "portal.loading": "Yuklanmoqda...",
     "portal.logout": "Chiqish",
+    "portal.vacantRooms": "Bo'sh xonalar",
+    "portal.vacantRoomsDesc":
+      "Hozir ijaraga mavjud bo'sh joylar. Barcha arendatorlar bu ro'yxatni ko'radi.",
+    "portal.noVacantRooms": "Bo'sh xona yo'q",
+    "portal.noVacantRoomsDesc": "Hozircha ijaraga bo'sh joy mavjud emas.",
+    "portal.vacantContact": "Band qilish",
+    "portal.vacantInquiry": "bo'sh xona haqida ma'lumot olmoqchiman",
   },
   ru: {
     "nav.section.main": "Основное",
@@ -305,6 +312,13 @@ export const translations = {
     "portal.noMaintenanceDesc": "Заявки на ремонт по объекту будут здесь.",
     "portal.loading": "Загрузка...",
     "portal.logout": "Выйти",
+    "portal.vacantRooms": "Свободные помещения",
+    "portal.vacantRoomsDesc":
+      "Сейчас доступны для аренды. Все арендаторы видят этот список.",
+    "portal.noVacantRooms": "Свободных помещений нет",
+    "portal.noVacantRoomsDesc": "Пока нет свободных помещений для аренды.",
+    "portal.vacantContact": "Забронировать",
+    "portal.vacantInquiry": "хочу узнать о свободном помещении",
   },
   en: {
     "nav.section.main": "Main",
@@ -451,6 +465,13 @@ export const translations = {
     "portal.noMaintenanceDesc": "Property maintenance requests appear here.",
     "portal.loading": "Loading...",
     "portal.logout": "Log out",
+    "portal.vacantRooms": "Vacant rooms",
+    "portal.vacantRoomsDesc":
+      "Currently available for rent. All tenants can see this list.",
+    "portal.noVacantRooms": "No vacant rooms",
+    "portal.noVacantRoomsDesc": "There are no vacant rooms available right now.",
+    "portal.vacantContact": "Reserve",
+    "portal.vacantInquiry": "I would like info about a vacant room",
   },
   kk: {
     "nav.section.main": "Негізгі",
@@ -599,5 +620,12 @@ export const translations = {
     "portal.noMaintenanceDesc": "Мүлік бойынша жөндеу сұраулары мұнда көрінеді.",
     "portal.loading": "Жүктелуде...",
     "portal.logout": "Шығу",
+    "portal.vacantRooms": "Бос бөлмелер",
+    "portal.vacantRoomsDesc":
+      "Қазір жалға беруге қолжетімді бос орындар. Барлық жалға алушылар бұл тізімді көреді.",
+    "portal.noVacantRooms": "Бос бөлме жоқ",
+    "portal.noVacantRoomsDesc": "Қазіргі уақытта бос бөлме жоқ.",
+    "portal.vacantContact": "Брондау",
+    "portal.vacantInquiry": "бос бөлме туралы ақпарат алғым келеді",
   },
 } satisfies Record<Language, Record<string, string>>;

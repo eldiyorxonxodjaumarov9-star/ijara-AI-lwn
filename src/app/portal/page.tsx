@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useCollection } from "@/hooks/use-collection";
+import { VacantRoomsSection } from "@/components/portal/vacant-rooms-section";
 import { StatCard } from "@/components/shared/stat-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TelegramLink } from "@/components/shared/telegram-link";
@@ -235,6 +236,8 @@ export default function PortalPage() {
           index={2}
         />
       </div>
+
+      <VacantRoomsSection properties={properties} loading={loading} />
 
       {primaryContract && (
         <div className="grid gap-4 md:grid-cols-2">

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookUser,
   FileDown,
   MoreVertical,
+  RefreshCw,
   Search,
   Trash2,
 } from "lucide-react";
@@ -35,15 +36,47 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
+import { isApiConfigured } from "@/lib/api/client";
 import { CLIENT_STATUS_MAP } from "@/lib/constants";
+import { syncClientsFromTenants } from "@/lib/clients";
 import { exportToPdf } from "@/lib/export";
 import { formatDate } from "@/lib/utils";
 import type { Client } from "@/types";
 
 export default function ClientsPage() {
-  const { data, loading } = useCollection<Client>("clients");
+  const { data, loading, api } = useCollection<Client>("clients");
   const { remove } = useCollectionActions<Client>("clients");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const autoSynced = useRef(false);
+
+  const runSync = async (silent = false) => {
+    if (!isApiConfigured) return;
+    setSyncing(true);
+    try {
+      const count = await syncClientsFromTenants();
+      await api.list();
+      if (!silent) {
+        toast.success(
+          count > 0
+            ? `${count} ta klient arendatorlardan yuklandi`
+            : "Klientlar yangilandi"
+        );
+      }
+    } catch {
+      if (!silent) toast.error("Sinxronlash xatosi");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isApiConfigured || loading || autoSynced.current) return;
+    if (data.length === 0) {
+      autoSynced.current = true;
+      void runSync(true);
+    }
+  }, [loading, data.length]);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
     useTableData<Client>({
@@ -93,10 +126,24 @@ export default function ClientsPage() {
         title="Klientlar"
         description="Portal orqali ism va telefon bilan kirganlar. CRM uchun saqlanadi."
         action={
-          <Button variant="outline" onClick={exportPdf} disabled={loading}>
-            <FileDown className="mr-1.5 size-4" />
-            PDF yuklab olish
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {isApiConfigured && (
+              <Button
+                variant="outline"
+                onClick={() => runSync()}
+                disabled={syncing || loading}
+              >
+                <RefreshCw
+                  className={`mr-1.5 size-4 ${syncing ? "animate-spin" : ""}`}
+                />
+                Arendatorlardan yuklash
+              </Button>
+            )}
+            <Button variant="outline" onClick={exportPdf} disabled={loading}>
+              <FileDown className="mr-1.5 size-4" />
+              PDF yuklab olish
+            </Button>
+          </div>
         }
       />
 

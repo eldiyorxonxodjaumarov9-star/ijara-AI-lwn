@@ -2,6 +2,8 @@ import type { CollectionName } from "@/lib/data/store";
 import type {
   CollectionEntity,
   AppNotification,
+  Client,
+  ClientStatus,
   Contract,
   ContractStatus,
   Expense,
@@ -78,6 +80,13 @@ const notifTypeFromApi = (v: unknown): NotificationType => {
       return "info";
   }
 };
+
+const CLIENT_STATUS_TO_API: Record<ClientStatus, string> = {
+  new: "NEW",
+  matched: "MATCHED",
+};
+const clientStatusFromApi = (v: unknown): ClientStatus =>
+  String(v ?? "NEW").toLowerCase() as ClientStatus;
 
 // ===== Per-entity mapper config =====
 export interface MapperConfig {
@@ -285,6 +294,42 @@ const notification: MapperConfig = {
   toUpdate: (d) => ({ ...d }),
 };
 
+const client: MapperConfig = {
+  path: "/clients",
+  fromApi: (i): Client => ({
+    id: String(i.id),
+    fullName: String(i.fullName ?? ""),
+    phone: String(i.phone ?? ""),
+    status: clientStatusFromApi(i.status),
+    tenantId: s(i.tenantId),
+    loginCount: n(i.loginCount) || 1,
+    firstLoginAt: String(i.firstLoginAt ?? i.createdAt ?? new Date().toISOString()),
+    lastLoginAt: String(i.lastLoginAt ?? i.createdAt ?? new Date().toISOString()),
+    createdAt: String(i.createdAt ?? new Date().toISOString()),
+  }),
+  toCreate: (d) => ({
+    fullName: d.fullName,
+    phone: d.phone,
+    status: CLIENT_STATUS_TO_API[d.status as ClientStatus] ?? "NEW",
+    tenantId: d.tenantId || undefined,
+    loginCount: n(d.loginCount) || 1,
+    firstLoginAt: d.firstLoginAt,
+    lastLoginAt: d.lastLoginAt,
+  }),
+  toUpdate(d) {
+    return {
+      fullName: d.fullName,
+      phone: d.phone,
+      status: d.status
+        ? CLIENT_STATUS_TO_API[d.status as ClientStatus]
+        : undefined,
+      tenantId: d.tenantId,
+      loginCount: d.loginCount != null ? n(d.loginCount) : undefined,
+      lastLoginAt: d.lastLoginAt,
+    };
+  },
+};
+
 export const MAPPERS: Partial<Record<CollectionName, MapperConfig>> = {
   properties: property,
   tenants: tenant,
@@ -293,4 +338,5 @@ export const MAPPERS: Partial<Record<CollectionName, MapperConfig>> = {
   expenses: expense,
   maintenance,
   notifications: notification,
+  clients: client,
 };

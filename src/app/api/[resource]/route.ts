@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { mapTenantCreate } from "@/lib/api-server/tenants";
+import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -117,13 +118,13 @@ export async function POST(
 
   try {
     switch (name) {
-      case "tenants":
-        return ok(
-          await prisma.tenant.create({
-            data: mapTenantCreate(body),
-          }),
-          201
-        );
+      case "tenants": {
+        const created = await prisma.tenant.create({
+          data: mapTenantCreate(body),
+        });
+        await upsertClientFromTenant(created);
+        return ok(created, 201);
+      }
       case "contracts":
         return ok(
           await prisma.contract.create({

@@ -316,8 +316,8 @@ export function getCollectionApi<T extends CollectionEntity>(
   name: CollectionName
 ): CrudApi<T> {
   if (!cache[name]) {
-    // CRM klientlar hozircha faqat lokal (demo) rejimda
-    if (name === "clients" || name === "analyses") {
+    // AI tahlillar hozircha faqat lokal rejimda
+    if (name === "analyses") {
       cache[name] = createLocalApi<CollectionEntity>(name);
       return cache[name] as unknown as CrudApi<T>;
     }

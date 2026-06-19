@@ -63,6 +63,11 @@ enum NotificationType {
   LATE_PAYMENT
 }
 
+enum ClientStatus {
+  NEW
+  MATCHED
+}
+
 // ===================== MODELS =====================
 
 model User {
@@ -143,6 +148,7 @@ model Tenant {
   updatedAt        DateTime @updatedAt
 
   contracts Contract[]
+  clients   Client[]
 
   @@map("tenants")
 }
@@ -254,4 +260,24 @@ model AuditLog {
   @@index([userId])
   @@index([entity])
   @@map("audit_logs")
+}
+
+model Client {
+  id          String       @id @default(uuid())
+  fullName    String
+  phone       String
+  status      ClientStatus @default(NEW)
+  tenantId    String?
+  loginCount  Int          @default(1)
+  firstLoginAt DateTime     @default(now())
+  lastLoginAt  DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([phone])
+  @@index([status])
+  @@index([tenantId])
+  @@map("clients")
 }

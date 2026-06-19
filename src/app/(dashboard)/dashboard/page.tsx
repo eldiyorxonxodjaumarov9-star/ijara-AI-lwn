@@ -5,8 +5,10 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Banknote,
+  BookUser,
   Building2,
   TrendingUp,
+  Users,
   Wallet,
 } from "lucide-react";
 
@@ -39,24 +41,29 @@ import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import {
   PAYMENT_METHOD_MAP,
   PROPERTY_STATUS_MAP,
+  CLIENT_STATUS_MAP,
 } from "@/lib/constants";
 import { useAuth } from "@/context/auth-context";
 import type {
+  Client,
   Contract,
   Expense,
   Payment,
   Property,
+  Tenant,
 } from "@/types";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { data: properties, loading: lp } = useCollection<Property>("properties");
+  const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
+  const { data: clients, loading: lcl } = useCollection<Client>("clients");
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lpay } = useCollection<Payment>("payments");
   const { data: expenses, loading: le } = useCollection<Expense>("expenses");
 
-  const loading = lp || lc || lpay || le;
+  const loading = lp || lt || lcl || lc || lpay || le;
 
   const metrics = useMemo(
     () => computeMetrics({ properties, contracts, payments, expenses }),
@@ -80,6 +87,8 @@ export default function DashboardPage() {
   }, [properties]);
 
   const recentPayments = payments.slice(0, 5);
+  const recentTenants = tenants.slice(0, 5);
+  const recentClients = clients.slice(0, 5);
   const overdue = useMemo(() => getOverdueContracts(contracts), [contracts]);
 
   return (
@@ -102,6 +111,22 @@ export default function DashboardPage() {
         />
         <StatCard
           index={1}
+          title={t("dashboard.totalTenants")}
+          value={String(tenants.length)}
+          icon={Users}
+          tone="blue"
+          loading={loading}
+        />
+        <StatCard
+          index={2}
+          title={t("dashboard.totalClients")}
+          value={String(clients.length)}
+          icon={BookUser}
+          tone="violet"
+          loading={loading}
+        />
+        <StatCard
+          index={3}
           title={t("dashboard.monthlyIncome")}
           value={formatCurrency(metrics.monthlyIncome)}
           icon={Banknote}
@@ -109,7 +134,7 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
-          index={2}
+          index={4}
           title={t("dashboard.overdueContracts")}
           value={String(metrics.overdueContracts)}
           icon={AlertTriangle}
@@ -117,7 +142,7 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
-          index={3}
+          index={5}
           title={t("dashboard.netIncome")}
           value={formatCurrency(metrics.netIncome)}
           icon={TrendingUp}
@@ -125,13 +150,103 @@ export default function DashboardPage() {
           loading={loading}
         />
         <StatCard
-          index={4}
+          index={6}
           title={t("dashboard.occupancy")}
           value={`${metrics.occupancyRate}%`}
           icon={Wallet}
           tone="violet"
           loading={loading}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>{t("dashboard.recentTenants")}</CardTitle>
+              <CardDescription>{t("dashboard.recentTenantsDesc")}</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/tenants">{t("dashboard.all")}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))
+            ) : recentTenants.length > 0 ? (
+              recentTenants.map((tenant) => (
+                <div
+                  key={tenant.id}
+                  className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50"
+                >
+                  <Avatar>
+                    <AvatarFallback>{getInitials(tenant.fullName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{tenant.fullName}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {tenant.phone}
+                      {tenant.telegram ? ` • ${tenant.telegram}` : ""}
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-primary">
+                    {formatCurrency(tenant.rentAmount)}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {t("dashboard.noTenants")}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>{t("dashboard.recentClients")}</CardTitle>
+              <CardDescription>{t("dashboard.recentClientsDesc")}</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/clients">{t("dashboard.all")}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))
+            ) : recentClients.length > 0 ? (
+              recentClients.map((client) => {
+                const st = CLIENT_STATUS_MAP[client.status];
+                return (
+                  <div
+                    key={client.id}
+                    className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50"
+                  >
+                    <Avatar>
+                      <AvatarFallback>{getInitials(client.fullName)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{client.fullName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {client.phone} • {formatDate(client.lastLoginAt)}
+                      </p>
+                    </div>
+                    <Badge variant={st?.variant}>{st?.label}</Badge>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {t("dashboard.noClients")}
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

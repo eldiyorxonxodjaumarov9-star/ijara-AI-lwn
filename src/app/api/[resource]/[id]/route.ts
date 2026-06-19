@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { mapTenantBody } from "@/lib/api-server/tenants";
+import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -74,13 +75,14 @@ export async function PATCH(
 
   try {
     switch (resource) {
-      case "tenants":
-        return ok(
-          await prisma.tenant.update({
-            where: { id },
-            data: mapTenantBody(body),
-          })
-        );
+      case "tenants": {
+        const updated = await prisma.tenant.update({
+          where: { id },
+          data: mapTenantBody(body),
+        });
+        await upsertClientFromTenant(updated);
+        return ok(updated);
+      }
       case "contracts":
         return ok(
           await prisma.contract.update({

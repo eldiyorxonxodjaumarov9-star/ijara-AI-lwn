@@ -1,3 +1,4 @@
+import { apiFetch, isApiConfigured } from "@/lib/api/client";
 import { getCollectionApi } from "@/lib/data/store";
 import type { Client } from "@/types";
 
@@ -10,13 +11,22 @@ export async function recordClientLead(
   phone: string,
   tenantId?: string
 ) {
-  const api = getCollectionApi<Client>("clients");
   const trimmedName = fullName.trim();
   const trimmedPhone = phone.trim();
   const normName = trimmedName.toLowerCase();
   const normPhone = normalizePhone(trimmedPhone);
   const now = new Date().toISOString();
 
+  if (isApiConfigured) {
+    await apiFetch("/clients/lead", {
+      method: "POST",
+      auth: false,
+      body: { fullName: trimmedName, phone: trimmedPhone, tenantId },
+    });
+    return tenantId ?? trimmedPhone;
+  }
+
+  const api = getCollectionApi<Client>("clients");
   const list = await api.list();
   const existing = list.find(
     (c) =>
@@ -43,4 +53,12 @@ export async function recordClientLead(
     firstLoginAt: now,
     lastLoginAt: now,
   });
+}
+
+export async function syncClientsFromTenants() {
+  if (!isApiConfigured) return 0;
+  const res = await apiFetch<{ synced: number }>("/clients", {
+    method: "PUT",
+  });
+  return res.synced ?? 0;
 }

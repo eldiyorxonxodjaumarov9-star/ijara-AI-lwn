@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Banknote,
   MoreVertical,
   Pencil,
   Plus,
-  RefreshCw,
   Search,
   Trash2,
 } from "lucide-react";
@@ -39,51 +38,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
-import { isApiConfigured } from "@/lib/api/client";
-import {
-  syncAllPaymentsFromContractsLocal,
-  syncPaymentsFromContractsApi,
-} from "@/lib/payment-sync";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
-import type { Contract, Payment } from "@/types";
+import type { Payment } from "@/types";
 
 export default function PaymentsPage() {
-  const { data, loading, api } = useCollection<Payment>("payments");
-  const { data: contracts, loading: loadingContracts } =
-    useCollection<Contract>("contracts");
+  const { data, loading } = useCollection<Payment>("payments");
   const { remove } = useCollectionActions<Payment>("payments");
-  const [syncing, setSyncing] = useState(false);
-  const autoSynced = useRef(false);
-
-  const runSync = async (silent = false) => {
-    setSyncing(true);
-    try {
-      const count = isApiConfigured
-        ? await syncPaymentsFromContractsApi()
-        : await syncAllPaymentsFromContractsLocal();
-      await api.list();
-      if (!silent) {
-        toast.success(
-          count > 0
-            ? `${count} ta to'lov shartnomalardan yuklandi`
-            : "To'lovlar yangilandi"
-        );
-      }
-    } catch {
-      if (!silent) toast.error("Sinxronlash xatosi");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (loading || loadingContracts || autoSynced.current) return;
-    if (data.length === 0 && contracts.length > 0) {
-      autoSynced.current = true;
-      void runSync(true);
-    }
-  }, [loading, loadingContracts, data.length, contracts.length]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
@@ -93,7 +54,6 @@ export default function PaymentsPage() {
     () => data.reduce((s, p) => s + (p.amount || 0), 0),
     [data]
   );
-
   const thisMonth = useMemo(() => {
     const now = new Date();
     return data
@@ -107,41 +67,6 @@ export default function PaymentsPage() {
       .reduce((s, p) => s + (p.amount || 0), 0);
   }, [data]);
 
-  const expectedThisMonth = useMemo(
-    () =>
-      contracts
-        .filter((c) => c.status === "active" && (c.monthlyPayment ?? 0) > 0)
-        .reduce((s, c) => s + (c.monthlyPayment ?? 0), 0),
-    [contracts]
-  );
-
-  const displayTotal = total > 0 ? total : expectedThisMonth;
-  const displayThisMonth = thisMonth > 0 ? thisMonth : expectedThisMonth;
-  const displayCount =
-    data.length > 0
-      ? data.length
-      : contracts.filter(
-          (c) => c.status === "active" && (c.monthlyPayment ?? 0) > 0
-        ).length;
-  const usingExpected = data.length === 0 && expectedThisMonth > 0;
-
-  const tableRows = useMemo(() => {
-    if (data.length > 0) return data;
-    return contracts
-      .filter((c) => c.status === "active" && (c.monthlyPayment ?? 0) > 0)
-      .map((c) => ({
-        id: `expected-${c.id}`,
-        contractId: c.id,
-        tenantName: c.tenantName,
-        propertyName: c.propertyName,
-        amount: c.monthlyPayment,
-        date: new Date().toISOString(),
-        method: "cash" as const,
-        note: "Kutilayotgan (shartnoma)",
-        createdAt: c.createdAt ?? new Date().toISOString(),
-      }));
-  }, [data, contracts]);
-
   const {
     search,
     setSearch,
@@ -151,7 +76,7 @@ export default function PaymentsPage() {
     total: count,
     paged,
   } = useTableData<Payment>({
-    data: tableRows,
+    data,
     searchFields: ["tenantName", "propertyName", "note"],
     pageSize: 10,
   });
@@ -169,57 +94,39 @@ export default function PaymentsPage() {
         title="To'lovlar"
         description="Barcha kirim to'lovlarini kuzating."
         action={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => runSync()}
-              disabled={syncing || loading || loadingContracts}
-            >
-              <RefreshCw
-                className={`mr-1.5 size-4 ${syncing ? "animate-spin" : ""}`}
-              />
-              Shartnomalardan yuklash
-            </Button>
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="size-4" /> To&apos;lov qo&apos;shish
-            </Button>
-          </div>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="size-4" /> To&apos;lov qo&apos;shish
+          </Button>
         }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="Jami tushum"
-          value={formatCurrency(displayTotal)}
+          value={formatCurrency(total)}
           icon={Banknote}
           tone="primary"
-          loading={loading || loadingContracts}
-          subtitle={
-            usingExpected ? "Kutilayotgan ijara (shartnomalar)" : undefined
-          }
+          loading={loading}
         />
         <StatCard
           title="Bu oy"
-          value={formatCurrency(displayThisMonth)}
+          value={formatCurrency(thisMonth)}
           icon={Banknote}
           tone="blue"
-          loading={loading || loadingContracts}
+          loading={loading}
           index={1}
-          subtitle={
-            usingExpected ? "Kutilayotgan ijara (shartnomalar)" : undefined
-          }
         />
         <StatCard
           title="Tranzaksiyalar"
-          value={String(displayCount)}
+          value={String(data.length)}
           icon={Banknote}
           tone="violet"
-          loading={loading || loadingContracts}
+          loading={loading}
           index={2}
         />
       </div>
@@ -236,7 +143,7 @@ export default function PaymentsPage() {
 
       <Card>
         <CardContent className="p-0">
-          {loading || loadingContracts ? (
+          {loading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
@@ -247,7 +154,7 @@ export default function PaymentsPage() {
               <EmptyState
                 icon={Banknote}
                 title="To'lovlar yo'q"
-                description="Avval shartnoma yarating yoki to'lov qo'shing."
+                description="Birinchi to'lovni qo'shing."
               />
             </div>
           ) : (
@@ -263,9 +170,7 @@ export default function PaymentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paged.map((p) => {
-                  const isExpected = p.id.startsWith("expected-");
-                  return (
+                {paged.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">
                       {p.tenantName ?? "—"}
@@ -277,17 +182,14 @@ export default function PaymentsPage() {
                       {formatDate(p.date)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={isExpected ? "outline" : "secondary"}>
-                        {isExpected
-                          ? "Kutilmoqda"
-                          : PAYMENT_METHOD_MAP[p.method]}
+                      <Badge variant="secondary">
+                        {PAYMENT_METHOD_MAP[p.method]}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-semibold text-primary">
                       {formatCurrency(p.amount)}
                     </TableCell>
                     <TableCell>
-                      {!isExpected && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="icon" variant="ghost">
@@ -311,11 +213,9 @@ export default function PaymentsPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      )}
                     </TableCell>
                   </TableRow>
-                  );
-                })}
+                ))}
               </TableBody>
             </Table>
           )}

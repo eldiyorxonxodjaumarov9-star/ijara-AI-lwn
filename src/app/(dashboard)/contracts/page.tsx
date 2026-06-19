@@ -41,7 +41,6 @@ import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
 import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
-import { syncPaymentsFromContractsApi } from "@/lib/payment-sync";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CONTRACT_STATUS_MAP } from "@/lib/constants";
 import { generateContractPdf } from "@/lib/pdf";
@@ -58,7 +57,6 @@ export default function ContractsPage() {
     setSyncing(true);
     try {
       const count = await syncContractsFromTenantsApi();
-      await syncPaymentsFromContractsApi();
       await api.list();
       if (!silent) {
         toast.success(

@@ -20,9 +20,6 @@ import {
 import { ApiError, isApiConfigured } from "@/lib/api/client";
 import { useCollectionActions } from "@/hooks/use-collection";
 import { syncContractFromTenant } from "@/lib/contract-sync";
-import { syncPaymentFromContract } from "@/lib/payment-sync";
-import type { Contract } from "@/types";
-import { getCollectionApi } from "@/lib/data/store";
 import { tenantSchema, type TenantInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
 import type { Tenant } from "@/types";
@@ -85,10 +82,6 @@ export function TenantDialog({
           contractDuration: values.contractDuration,
           createdAt: tenant?.createdAt ?? new Date().toISOString(),
         });
-        const contract = (await getCollectionApi<Contract>("contracts").list()).find(
-          (c) => c.tenantId === savedId
-        );
-        if (contract) await syncPaymentFromContract(contract);
       }
 
       onOpenChange(false);

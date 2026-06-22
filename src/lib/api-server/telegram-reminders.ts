@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/api-server/prisma";
 import {
   buildPaymentReminderMessage,
+  formatUzs,
   groupDebtsByTenant,
   type DebtReminderInput,
 } from "@/lib/payment-reminder-utils";
@@ -51,19 +52,111 @@ export async function getTenantDebtSummary(tenantId: string) {
   return grouped[0] ?? null;
 }
 
-export async function linkTenantTelegramChat(
-  chatId: string,
-  phoneNumber: string
-) {
+function formatDateUz(value?: Date | string | null) {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toISOString().slice(0, 10);
+}
+
+function looksLikePhone(text: string) {
+  const digits = normalizePhone(text);
+  return digits.length >= 9;
+}
+
+export async function findTenantByPhone(phoneNumber: string) {
   const norm = normalizePhone(phoneNumber);
   const tenants = await prisma.tenant.findMany();
-  const tenant = tenants.find((t) => normalizePhone(t.phone) === norm);
+  return tenants.find((t) => normalizePhone(t.phone) === norm) ?? null;
+}
+
+async function getTenantRentalInfo(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) return null;
+
+  const contract = await prisma.contract.findFirst({
+    where: {
+      tenantId,
+      status: { in: ["ACTIVE", "PENDING"] },
+    },
+    include: { property: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const debt = await getTenantDebtSummary(tenantId);
+  const contractMonths =
+    tenant.contractDuration ??
+    (contract
+      ? Math.max(
+          1,
+          monthsBetween(new Date(contract.startDate), new Date(contract.endDate))
+        )
+      : null);
+
+  return { tenant, contract, debt, contractMonths };
+}
+
+export async function buildTenantInfoMessage(tenantId: string, linked = false) {
+  const info = await getTenantRentalInfo(tenantId);
+  if (!info) {
+    return "Ma'lumot topilmadi.";
+  }
+
+  const { tenant, contract, debt, contractMonths } = info;
+  const roomName = contract?.property.title ?? "—";
+  const lines: string[] = [];
+
+  if (linked) {
+    lines.push("✅ <b>Siz bazada topildingiz!</b>\n");
+  } else {
+    lines.push(`Salom, <b>${tenant.fullName}</b>!\n`);
+  }
+
+  lines.push(`👤 <b>Ism:</b> ${tenant.fullName}`);
+  lines.push(`📱 <b>Telefon:</b> ${tenant.phone}`);
+
+  if (contract) {
+    lines.push(`\n🏠 <b>Xona:</b> ${roomName} xonada arenda olgansiz`);
+    lines.push(`📅 <b>Arenda kirish:</b> ${formatDateUz(contract.startDate)}`);
+    if (contractMonths) {
+      lines.push(`📋 <b>Shartnoma muddati:</b> ${contractMonths} oy`);
+    }
+    lines.push(`📆 <b>Shartnoma tugashi:</b> ${formatDateUz(contract.endDate)}`);
+    lines.push(`💰 <b>Oylik ijara:</b> ${formatUzs(contract.monthlyRent)}`);
+    if (tenant.paymentDueDate) {
+      lines.push(
+        `⏰ <b>To'lov muddati:</b> ${formatDateUz(tenant.paymentDueDate)}`
+      );
+    }
+  } else {
+    lines.push("\n⚠️ Faol shartnoma topilmadi. Admin bilan bog'laning.");
+  }
+
+  if (debt && debt.debt > 0) {
+    lines.push(`\n⚠️ <b>Qarzdorlik:</b> ${formatUzs(debt.debt)}`);
+  } else {
+    lines.push("\n✅ Hozircha qarzdorlik yo'q.");
+  }
+
+  if (linked) {
+    lines.push(
+      "\nKelishdik! To'lov eslatmalari shu bot orqali avtomatik yuboriladi."
+    );
+  }
+
+  return lines.join("\n");
+}
+
+export async function processPhoneForBot(chatId: string, phoneNumber: string) {
+  const tenant = await findTenantByPhone(phoneNumber);
 
   if (!tenant) {
     return {
       ok: false as const,
       message:
-        "Bu telefon raqam arendatorlar ro'yxatida topilmadi. Admin bilan bog'laning.",
+        "❌ <b>Bu telefon raqam bazada yo'q.</b>\n\n" +
+        "Raqamni tekshirib qayta yuboring yoki admin bilan bog'laning.\n\n" +
+        "Misol: +998901234567",
     };
   }
 
@@ -71,22 +164,11 @@ export async function linkTenantTelegramChat(
     where: { id: tenant.id },
     data: {
       telegramChatId: chatId,
-      telegram: tenant.telegram ?? `@${chatId}`,
+      telegram: tenant.telegram ?? undefined,
     },
   });
 
-  const debt = await getTenantDebtSummary(tenant.id);
-  let message =
-    `✅ <b>Ro'yxatdan o'tdingiz!</b>\n\n` +
-    `Ism: ${tenant.fullName}\n` +
-    `Endi to'lov eslatmalari shu bot orqali yuboriladi.`;
-
-  if (debt) {
-    message += "\n\n⚠️ " + buildPaymentReminderMessage(debt);
-  } else {
-    message += "\n\n✅ Hozircha qarzdorlik yo'q.";
-  }
-
+  const message = await buildTenantInfoMessage(tenant.id, true);
   return { ok: true as const, tenant, message };
 }
 
@@ -144,15 +226,7 @@ export async function handleTelegramUpdate(update: {
       where: { telegramChatId: chatId },
     });
     if (linked) {
-      const debt = await getTenantDebtSummary(linked.id);
-      let reply =
-        `Salom, <b>${linked.fullName}</b>! Siz allaqachon ulangansiz.\n` +
-        `To'lov eslatmalari avtomatik yuboriladi.`;
-      if (debt) {
-        reply += "\n\n⚠️ " + buildPaymentReminderMessage(debt);
-      } else {
-        reply += "\n\n✅ Hozircha qarzdorlik yo'q.";
-      }
+      const reply = await buildTenantInfoMessage(linked.id, false);
       await sendTelegramMessage(chatId, reply, {
         reply_markup: { remove_keyboard: true },
       });
@@ -163,10 +237,15 @@ export async function handleTelegramUpdate(update: {
   }
 
   if (message.contact?.phone_number) {
-    const result = await linkTenantTelegramChat(
-      chatId,
-      message.contact.phone_number
-    );
+    const result = await processPhoneForBot(chatId, message.contact.phone_number);
+    await sendTelegramMessage(chatId, result.message, {
+      reply_markup: { remove_keyboard: true },
+    });
+    return;
+  }
+
+  if (looksLikePhone(text)) {
+    const result = await processPhoneForBot(chatId, text);
     await sendTelegramMessage(chatId, result.message, {
       reply_markup: { remove_keyboard: true },
     });
@@ -177,9 +256,20 @@ export async function handleTelegramUpdate(update: {
     await sendTelegramMessage(
       chatId,
       "<b>ArendaAi bot</b>\n\n" +
-        "/start — ro'yxatdan o'tish va eslatmalarni yoqish\n" +
-        "Telefon raqamingiz arendatorlar bazasida bo'lishi kerak.\n\n" +
-        "Qarzdorlik bo'lsa, bot va platforma avtomatik eslatma yuboradi."
+        "/start — telefon raqamni yuborish\n" +
+        "Raqam bazada bo'lsa, xona va shartnoma ma'lumotlari chiqadi.\n" +
+        "Raqamni yozishingiz yoki tugma orqali yuborishingiz mumkin.\n\n" +
+        "Qarzdorlik bo'lsa, bot avtomatik eslatma yuboradi."
+    );
+    return;
+  }
+
+  if (text && !text.startsWith("/")) {
+    await sendTelegramMessage(
+      chatId,
+      "Telefon raqamingizni yuboring.\n\n" +
+        "Tugmani bosing yoki raqamni yozing: <code>+998901234567</code>\n\n" +
+        "/start — qayta boshlash"
     );
   }
 }

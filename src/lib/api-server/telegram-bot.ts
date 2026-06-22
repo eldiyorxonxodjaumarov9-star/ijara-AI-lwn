@@ -45,9 +45,11 @@ export async function sendContactRequest(chatId: string | number) {
   return sendTelegramMessage(
     chatId,
     "Assalomu alaykum! 👋\n\n" +
-      "<b>ArendaAi</b> to'lov eslatma botiga xush kelibsiz.\n\n" +
-      "To'lov eslatmalarini olish uchun quyidagi tugma orqali telefon raqamingizni yuboring. " +
-      "Raqam arendatorlar ro'yxatidagi ma'lumot bilan mos kelishi kerak.",
+      "<b>ArendaAi</b> botiga xush kelibsiz.\n\n" +
+      "Telefon raqamingizni yuboring — bazada bormi tekshiramiz.\n" +
+      "Topilsa, xona, shartnoma va to'lov ma'lumotlari chiqadi.\n\n" +
+      "📱 Tugma orqali yuboring yoki raqamni yozing:\n" +
+      "<code>+998901234567</code>",
     {
       reply_markup: {
         keyboard: [[{ text: "📱 Telefon raqamni yuborish", request_contact: true }]],

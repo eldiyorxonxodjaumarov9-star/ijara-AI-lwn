@@ -2,48 +2,15 @@ import { NextRequest } from "next/server";
 
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
-import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
   buildPaymentReminderMessage,
   sendPaymentReminders,
   type DebtReminderInput,
 } from "@/lib/api-server/payment-reminders";
-
-function monthsBetween(from: Date, to: Date) {
-  if (to < from) return 0;
-  return (
-    (to.getFullYear() - from.getFullYear()) * 12 +
-    (to.getMonth() - from.getMonth())
-  );
-}
-
-function computeServerDebts(): Promise<DebtReminderInput[]> {
-  return prisma.contract
-    .findMany({
-      where: { status: { in: ["ACTIVE", "EXPIRED"] } },
-      include: { property: true, tenant: true, payments: true },
-    })
-    .then((contracts) => {
-      const now = new Date();
-      return contracts
-        .map((c) => {
-          const start = new Date(c.startDate);
-          const end = new Date(c.endDate);
-          const until = now < end ? now : end;
-          const monthsDue = Math.max(1, monthsBetween(start, until) + 1);
-          const expected = monthsDue * c.monthlyRent;
-          const paid = c.payments.reduce((sum, p) => sum + p.amount, 0);
-          return {
-            contractId: c.id,
-            tenantId: c.tenantId,
-            tenantName: c.tenant.fullName,
-            propertyName: c.property.title,
-            debt: expected - paid,
-          };
-        })
-        .filter((d) => d.debt > 0);
-    });
-}
+import {
+  computeServerDebts,
+} from "@/lib/api-server/telegram-reminders";
 
 function parseClientDebts(body: Record<string, unknown>): DebtReminderInput[] | null {
   if (!Array.isArray(body.debts)) return null;

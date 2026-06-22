@@ -5,6 +5,7 @@ import {
   type DebtReminderInput,
 } from "@/lib/payment-reminder-utils";
 import { getTenantNotifications } from "@/lib/api-server/tenant-notifications";
+import { sendTelegramPaymentReminders } from "@/lib/api-server/telegram-reminders";
 
 export type { DebtReminderInput };
 export { buildPaymentReminderMessage, groupDebtsByTenant, getTenantNotifications };
@@ -49,6 +50,8 @@ export async function sendPaymentReminders(
     });
     results.unshift(summary);
   }
+
+  await sendTelegramPaymentReminders(debts);
 
   return results;
 }

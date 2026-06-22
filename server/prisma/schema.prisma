@@ -144,6 +144,7 @@ model Tenant {
   login            String?  @unique
   password         String?
   telegram         String?
+  telegramChatId   String?  @unique
   email            String?
   address          String?
   rentAmount       Float    @default(0)

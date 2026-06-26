@@ -1,3 +1,10 @@
+import {
+  createPendingLandlordAccess,
+  deleteLandlordAccess,
+  isLandlordAccessGranted,
+  renameLandlordAccess,
+} from "@/lib/landlord-access";
+
 export const PROPERTY_TYPES = [
   "Kvartira / uy",
   "Ofis",
@@ -165,11 +172,12 @@ export function getLandlordProfile(): LandlordProfile | null {
   migrateLegacyProfile();
   const login = getSessionLogin();
   if (!login) return null;
+  if (!isLandlordAccessGranted(login)) return null;
   return getAccounts()[login] ?? null;
 }
 
 export type SaveLandlordResult =
-  | { ok: true; profile: LandlordProfile }
+  | { ok: true; profile: LandlordProfile; needsApproval?: boolean }
   | { ok: false; error: string };
 
 export function saveLandlordProfile(form: LandlordProfileForm): SaveLandlordResult {
@@ -202,21 +210,34 @@ export function saveLandlordProfile(form: LandlordProfileForm): SaveLandlordResu
   const profile = toProfile(form, existing);
   accounts[login] = profile;
   saveAccounts(accounts);
+  if (!sessionLogin) {
+    createPendingLandlordAccess(login);
+    return { ok: true, profile, needsApproval: true };
+  }
   setSession(login);
   return { ok: true, profile };
 }
 
+export type LoginLandlordResult =
+  | { ok: true; profile: LandlordProfile }
+  | { ok: false; reason: "invalid" | "no_access" };
+
 export function loginLandlord(
   login: string,
   password: string
-): LandlordProfile | null {
+): LoginLandlordResult {
   migrateLegacyProfile();
   const key = normalizeLogin(login);
-  if (!key) return null;
+  if (!key) return { ok: false, reason: "invalid" };
   const account = getAccounts()[key];
-  if (!account || account.password !== password) return null;
+  if (!account || account.password !== password) {
+    return { ok: false, reason: "invalid" };
+  }
+  if (!isLandlordAccessGranted(key)) {
+    return { ok: false, reason: "no_access" };
+  }
   setSession(key);
-  return account;
+  return { ok: true, profile: account };
 }
 
 /** Sessiyadan chiqish (profil saqlanadi) */
@@ -231,4 +252,92 @@ export function getAllLandlordAccounts(): LandlordProfile[] {
   return Object.values(getAccounts()).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
+}
+
+export function getLandlordAccountByLogin(login: string): LandlordProfile | null {
+  migrateLegacyProfile();
+  return getAccounts()[normalizeLogin(login)] ?? null;
+}
+
+export type AdminUpdateLandlordResult =
+  | { ok: true; profile: LandlordProfile }
+  | { ok: false; error: string };
+
+/** Dashboard admin: login, email, parol va boshqa maydonlarni yangilash */
+export function adminUpdateLandlordAccount(
+  login: string,
+  data: {
+    login?: string;
+    email?: string;
+    password?: string;
+    phone?: string;
+    fullName?: string;
+  }
+): AdminUpdateLandlordResult {
+  migrateLegacyProfile();
+  const key = normalizeLogin(login);
+  const accounts = getAccounts();
+  const existing = accounts[key];
+  if (!existing) {
+    return { ok: false, error: "Akkaunt topilmadi" };
+  }
+
+  const newLoginRaw = data.login?.replace(/^@/, "").trim();
+  const newKey = newLoginRaw ? normalizeLogin(newLoginRaw) : key;
+
+  if (newKey.length < 3) {
+    return { ok: false, error: "Login kamida 3 belgidan iborat bo'lsin" };
+  }
+  if (newKey !== key && accounts[newKey]) {
+    return { ok: false, error: "Bu login band. Boshqa nom tanlang" };
+  }
+  if (data.email !== undefined && !data.email.trim()) {
+    return { ok: false, error: "Email bo'sh bo'lmasin" };
+  }
+  if (
+    data.password !== undefined &&
+    data.password.length > 0 &&
+    data.password.length < 4
+  ) {
+    return { ok: false, error: "Parol kamida 4 belgidan iborat bo'lsin" };
+  }
+
+  const updated: LandlordProfile = {
+    ...existing,
+    login: newKey,
+    email: data.email?.trim() ?? existing.email,
+    password:
+      data.password && data.password.length >= 4
+        ? data.password
+        : existing.password,
+    phone: data.phone?.trim() ?? existing.phone,
+    fullName: data.fullName?.trim() ?? existing.fullName,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (newKey !== key) {
+    delete accounts[key];
+    renameLandlordAccess(key, newKey);
+    if (getSessionLogin() === key) {
+      setSession(newKey);
+    }
+  }
+  accounts[newKey] = updated;
+  saveAccounts(accounts);
+  return { ok: true, profile: updated };
+}
+
+/** Dashboard admin: akkauntni butunlay o'chirish */
+export function deleteLandlordAccount(login: string): boolean {
+  migrateLegacyProfile();
+  const key = normalizeLogin(login);
+  const accounts = getAccounts();
+  if (!accounts[key]) return false;
+  delete accounts[key];
+  saveAccounts(accounts);
+  if (getSessionLogin() === key) {
+    clearLandlordProfile();
+  }
+  deleteLandlordAccess(key);
+  return true;
 }

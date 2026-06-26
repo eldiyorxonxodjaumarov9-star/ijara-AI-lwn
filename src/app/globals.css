@@ -101,6 +101,15 @@
   --sidebar-ring: oklch(0.68 0.15 152);
 }
 
+/* Arenda CRM premium theme */
+.arenda-crm {
+  --crm-primary: #2563EB;
+  --crm-secondary: #0F172A;
+  --crm-accent: #38BDF8;
+  --crm-success: #22C55E;
+  --crm-warning: #F59E0B;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

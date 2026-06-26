@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { LandlordPortal } from "@/components/landing/landlord-portal";
 
 export const metadata: Metadata = {
-  title: "Ijara egalari — Arenda AI",
+  title: "Arenda CRM — Ijara egalari platformasi",
   description:
-    "Ijara egalari uchun shaxsiy profil: mulk ma'lumotlari, kontakt va boshqaruv kabineti.",
+    "AI-powered rental management CRM: mulklar, mijozlar, bronlash, reklama, to'lovlar va hisobotlar.",
 };
 
 export default function IjaraEgalariPage() {

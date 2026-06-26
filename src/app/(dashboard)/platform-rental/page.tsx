@@ -27,7 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/context/auth-context";
 import { useCollection } from "@/hooks/use-collection";
+import { LandlordAccessPanel } from "@/components/platform-rental/landlord-access-panel";
 import { getLandlordListings, type LandlordListing } from "@/lib/landlord-crm";
 import {
   getAllLandlordAccounts,
@@ -57,6 +59,7 @@ import { PROPERTY_STATUS_MAP } from "@/lib/constants";
 import type { Property } from "@/types";
 
 export default function PlatformRentalPage() {
+  const { user } = useAuth();
   const { data: properties, loading } = useCollection<Property>("properties");
   const [publishedIds, setPublishedIds] = useState<string[]>([]);
   const [landlordListings, setLandlordListings] = useState<LandlordListing[]>([]);
@@ -204,10 +207,8 @@ export default function PlatformRentalPage() {
 
         <TabsContent value="landlords" className="mt-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            <Link href="/ijara-egalari" className="text-primary underline" target="_blank">
-              Ijara egalari
-            </Link>{" "}
-            portalidagi profil va e&apos;lonlar.
+            Ijara egalari profillari: email, parol, modul ruxsatlari va akkauntni
+            boshqarish. Parol esdan chiqsa — yangisini kiriting va saqlang.
           </p>
           {landlords.length === 0 ? (
             <EmptyState
@@ -216,31 +217,16 @@ export default function PlatformRentalPage() {
               description="Hali /ijara-egalari da profil yaratilmagan."
             />
           ) : (
-            <div className="overflow-x-auto rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ism</TableHead>
-                    <TableHead>Login</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Hudud</TableHead>
-                    <TableHead>Mulklar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {landlords.map((l) => (
-                    <TableRow key={l.login}>
-                      <TableCell className="font-medium">{l.fullName}</TableCell>
-                      <TableCell className="text-muted-foreground">@{l.login}</TableCell>
-                      <TableCell>{l.email}</TableCell>
-                      <TableCell>{l.phone}</TableCell>
-                      <TableCell>{l.city}</TableCell>
-                      <TableCell>{l.propertyCount}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              {landlords.map((l) => (
+                <LandlordAccessPanel
+                  key={l.login}
+                  landlord={l}
+                  grantedBy={user?.displayName ?? user?.email ?? "admin"}
+                  onChange={reloadPlatform}
+                  onDeleted={() => reloadPlatform()}
+                />
+              ))}
             </div>
           )}
           <h3 className="font-semibold">E&apos;lonlar ({landlordListings.length})</h3>

@@ -108,6 +108,8 @@ export async function upsertLocalClientFromTenant(tenant: Tenant) {
       phone: tenant.phone,
       tenantId: tenant.id,
       status: "matched",
+      depositPaid: tenant.depositPaid ?? false,
+      depositAmount: tenant.depositAmount ?? 0,
     });
     return existing.id;
   }
@@ -117,6 +119,8 @@ export async function upsertLocalClientFromTenant(tenant: Tenant) {
     phone: tenant.phone,
     tenantId: tenant.id,
     status: "matched",
+    depositPaid: tenant.depositPaid ?? false,
+    depositAmount: tenant.depositAmount ?? 0,
     loginCount: 1,
     firstLoginAt: now,
     lastLoginAt: now,

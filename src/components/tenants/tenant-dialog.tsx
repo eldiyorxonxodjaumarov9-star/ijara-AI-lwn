@@ -46,6 +46,8 @@ const defaults = (): TenantInput => ({
   entryDate: today(),
   paymentDueDate: today(),
   contractDuration: 12,
+  depositPaid: false,
+  depositAmount: 0,
 });
 
 function toDateInput(value?: string) {
@@ -66,6 +68,8 @@ function buildTenantPayload(values: TenantInput, existing?: Tenant | null) {
     entryDate: values.entryDate,
     paymentDueDate: values.paymentDueDate,
     contractDuration: values.contractDuration,
+    depositPaid: values.depositPaid ?? false,
+    depositAmount: values.depositAmount ?? 0,
   };
 }
 
@@ -131,6 +135,8 @@ export function TenantDialog({
         entryDate: toDateInput(tenant.entryDate),
         paymentDueDate: toDateInput(tenant.paymentDueDate),
         contractDuration: tenant.contractDuration ?? 12,
+        depositPaid: tenant.depositPaid ?? false,
+        depositAmount: tenant.depositAmount ?? 0,
       });
       setRoomId(existingContract?.propertyId ?? "");
     } else {
@@ -189,6 +195,8 @@ export function TenantDialog({
         entryDate: payload.entryDate,
         paymentDueDate: payload.paymentDueDate,
         contractDuration: payload.contractDuration,
+        depositPaid: values.depositPaid ?? false,
+        depositAmount: values.depositAmount ?? 0,
         createdAt: tenant?.createdAt ?? new Date().toISOString(),
       };
 
@@ -333,6 +341,39 @@ export function TenantDialog({
                 </p>
               )}
             </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Depozit</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={watch("depositPaid") ? "default" : "outline"}
+                  onClick={() => setValue("depositPaid", true, { shouldValidate: true })}
+                >
+                  Berilgan
+                </Button>
+                <Button
+                  type="button"
+                  variant={!watch("depositPaid") ? "default" : "outline"}
+                  onClick={() => {
+                    setValue("depositPaid", false, { shouldValidate: true });
+                    setValue("depositAmount", 0);
+                  }}
+                >
+                  Berilmagan
+                </Button>
+              </div>
+            </div>
+            {watch("depositPaid") && (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Depozit summasi (so&apos;m)</Label>
+                <MoneyInput
+                  value={watch("depositAmount") ?? 0}
+                  onChange={(v) =>
+                    setValue("depositAmount", v, { shouldValidate: true })
+                  }
+                />
+              </div>
+            )}
           </div>
 
           <TenantRoomFields

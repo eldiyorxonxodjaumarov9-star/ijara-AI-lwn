@@ -139,6 +139,7 @@ export async function POST(
               endDate: new Date(String(body.endDate)),
               monthlyRent: Number(body.monthlyRent ?? body.monthlyPayment ?? 0),
               deposit: Number(body.deposit ?? 0),
+              depositPaid: Boolean(body.depositPaid ?? false),
               status: (body.status as never) ?? "ACTIVE",
               notes: body.notes ? String(body.notes) : undefined,
             },

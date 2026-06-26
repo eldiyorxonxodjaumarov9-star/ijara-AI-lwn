@@ -13,6 +13,8 @@ import {
   Users,
   Wrench,
   PieChart,
+  Send,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,7 +70,19 @@ export const navigation: NavSection[] = [
     labelKey: "nav.section.management",
     items: [
       { titleKey: "nav.maintenance", href: "/maintenance", icon: Wrench },
+      {
+        titleKey: "nav.platformRental",
+        href: "/platform-rental",
+        icon: Store,
+        roles: ["admin", "manager"],
+      },
       { titleKey: "nav.notifications", href: "/notifications", icon: Bell },
+      {
+        titleKey: "nav.telegramBotUsers",
+        href: "/telegram-bot-users",
+        icon: Send,
+        roles: ["admin", "manager"],
+      },
       { titleKey: "nav.settings", href: "/settings", icon: Settings },
     ],
   },

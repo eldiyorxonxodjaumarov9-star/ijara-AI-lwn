@@ -6,7 +6,7 @@ import {
   isTelegramBotConfigured,
   type TelegramUpdate,
 } from "@/lib/api-server/telegram-bot";
-import { handleTelegramUpdate } from "@/lib/api-server/telegram-reminders";
+import { handleTelegramUpdate } from "@/lib/api-server/telegram-handler";
 
 export async function POST(req: NextRequest) {
   if (!isTelegramBotConfigured()) {

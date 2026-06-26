@@ -62,6 +62,8 @@ export const tenantSchema = z.object({
   entryDate: z.string().min(1, "Arenda kirish sanasini kiriting"),
   paymentDueDate: z.string().min(1, "To'lov muddatini kiriting"),
   contractDuration: z.coerce.number().min(1, "Kamida 1 oy"),
+  depositPaid: z.coerce.boolean().optional(),
+  depositAmount: z.coerce.number().min(0).optional(),
 });
 
 export const contractSchema = z.object({
@@ -71,6 +73,7 @@ export const contractSchema = z.object({
   endDate: z.string().min(1, "Tugash sanasi"),
   monthlyPayment: z.coerce.number().min(0, "Oylik to'lov"),
   deposit: z.coerce.number().min(0).optional(),
+  depositPaid: z.coerce.boolean().optional(),
   status: z.enum(["active", "expired", "terminated", "pending"]),
   notes: z.string().optional(),
 });

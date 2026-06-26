@@ -33,6 +33,8 @@ export function mapClientUpdate(body: Record<string, unknown>) {
   }
   if (body.loginCount != null) data.loginCount = Number(body.loginCount);
   if (body.lastLoginAt != null) data.lastLoginAt = new Date(String(body.lastLoginAt));
+  if (body.depositPaid != null) data.depositPaid = Boolean(body.depositPaid);
+  if (body.depositAmount != null) data.depositAmount = Number(body.depositAmount);
   return data;
 }
 
@@ -91,12 +93,24 @@ export async function upsertClientFromTenant(tenant: {
   id: string;
   fullName: string;
   phone: string;
+  depositPaid?: boolean;
+  depositAmount?: number;
 }) {
-  return upsertClientLead({
+  const row = await upsertClientLead({
     fullName: tenant.fullName,
     phone: tenant.phone,
     tenantId: tenant.id,
   });
+  if (tenant.depositPaid != null || tenant.depositAmount != null) {
+    return prisma.client.update({
+      where: { id: row.id },
+      data: {
+        depositPaid: tenant.depositPaid ?? false,
+        depositAmount: tenant.depositAmount ?? 0,
+      },
+    });
+  }
+  return row;
 }
 
 export async function deleteClientsByTenantId(tenantId: string) {

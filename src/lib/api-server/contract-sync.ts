@@ -45,6 +45,8 @@ export async function upsertContractFromTenant(tenant: Tenant) {
       data: {
         propertyId,
         monthlyRent,
+        deposit: tenant.depositAmount ?? 0,
+        depositPaid: tenant.depositPaid ?? false,
         startDate,
         endDate: addMonths(startDate, durationMonths),
         status: monthlyRent > 0 ? "ACTIVE" : existing.status,
@@ -61,7 +63,8 @@ export async function upsertContractFromTenant(tenant: Tenant) {
       startDate,
       endDate,
       monthlyRent,
-      deposit: 0,
+      deposit: tenant.depositAmount ?? 0,
+      depositPaid: tenant.depositPaid ?? false,
       status: "ACTIVE",
       notes,
     },

@@ -84,11 +84,13 @@ model User {
   resetToken       String?
   resetTokenExp    DateTime?
   lastLoginAt      DateTime?
+  telegramAdminChatId String? @unique
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   notifications Notification[]
   auditLogs     AuditLog[]
+  telegramAdminDevices TelegramAdminDevice[]
 
   @@index([role])
   @@map("users")
@@ -151,11 +153,14 @@ model Tenant {
   contractDuration Int?
   entryDate        DateTime?
   paymentDueDate   DateTime?
+  depositPaid      Boolean  @default(false)
+  depositAmount    Float    @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   contracts Contract[]
   clients   Client[]
+  telegramBotUsers TelegramBotUser[]
 
   @@map("tenants")
 }
@@ -168,6 +173,7 @@ model Contract {
   endDate     DateTime
   monthlyRent Float          @default(0)
   deposit     Float          @default(0)
+  depositPaid Boolean        @default(false)
   status      ContractStatus @default(ACTIVE)
   notes       String?
   createdAt   DateTime       @default(now())
@@ -275,6 +281,8 @@ model Client {
   phone       String
   status      ClientStatus @default(NEW)
   tenantId    String?
+  depositPaid Boolean      @default(false)
+  depositAmount Float      @default(0)
   loginCount  Int          @default(1)
   firstLoginAt DateTime     @default(now())
   lastLoginAt  DateTime     @default(now())
@@ -287,4 +295,56 @@ model Client {
   @@index([status])
   @@index([tenantId])
   @@map("clients")
+}
+
+model TelegramSession {
+  chatId        String    @id
+  mode          String    @default("menu")
+  pendingEmail  String?
+  ownerUserId   String?
+  pendingUserId String?
+  pendingOtp    String?
+  otpExpiresAt  DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@map("telegram_sessions")
+}
+
+model TelegramAdminDevice {
+  id        String   @id @default(uuid())
+  userId    String
+  chatId    String   @unique
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("telegram_admin_devices")
+}
+
+/// Botda /start bosgan foydalanuvchilar
+model TelegramBotUser {
+  id              String    @id @default(uuid())
+  chatId          String    @unique
+  telegramUserId  String?
+  firstName       String?
+  lastName        String?
+  username        String?
+  phone           String?
+  selectedRole    String?
+  tenantId        String?
+  startCount      Int       @default(1)
+  firstStartAt    DateTime  @default(now())
+  lastStartAt     DateTime  @default(now())
+  phoneVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([phone])
+  @@index([tenantId])
+  @@index([lastStartAt])
+  @@map("telegram_bot_users")
 }

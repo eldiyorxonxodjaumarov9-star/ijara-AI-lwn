@@ -42,11 +42,19 @@ export async function POST(req: NextRequest) {
       return ok({ sent: 0, message: "Qarzdorlar topilmadi" });
     }
 
-    const sent = await sendPaymentReminders(debts, auth.user.id);
-    const tenantCount = sent.filter(
+    const { notifications, telegram } = await sendPaymentReminders(
+      debts,
+      auth.user.id
+    );
+    const tenantCount = notifications.filter(
       (n) => n.type === "LATE_PAYMENT"
     ).length;
-    return ok({ sent: tenantCount, data: sent });
+    return ok({
+      sent: tenantCount,
+      telegramSent: telegram.sent,
+      telegramSkipped: telegram.skipped,
+      data: notifications,
+    });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Xabar yuborish xatosi";

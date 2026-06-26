@@ -45,6 +45,12 @@ export async function mapTenantBody(body: Record<string, unknown>) {
     ...(body.paymentDueDate != null
       ? { paymentDueDate: parseDate(body.paymentDueDate) ?? null }
       : {}),
+    ...(body.depositPaid != null
+      ? { depositPaid: Boolean(body.depositPaid) }
+      : {}),
+    ...(body.depositAmount != null
+      ? { depositAmount: Number(body.depositAmount) }
+      : {}),
   };
 
   if (body.password != null && String(body.password).trim() !== "") {
@@ -74,5 +80,7 @@ export async function mapTenantCreate(body: Record<string, unknown>) {
         : undefined,
     entryDate: parseDate(body.entryDate),
     paymentDueDate: parseDate(body.paymentDueDate),
+    depositPaid: Boolean(body.depositPaid ?? false),
+    depositAmount: Number(body.depositAmount ?? 0),
   };
 }

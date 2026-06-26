@@ -1,8 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron/payment-reminders",
-      "schedule": "0 4 * * *"
+      "path": "/api/cron/payment-reminders?slot=morning",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/payment-reminders?slot=lunch",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/payment-reminders?slot=evening",
+      "schedule": "0 15 * * *"
     }
   ]
 }

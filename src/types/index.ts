@@ -47,6 +47,8 @@ export interface Tenant {
   rentAmount: number;
   entryDate?: string;
   paymentDueDate?: string;
+  depositPaid?: boolean;
+  depositAmount?: number;
   createdAt: string;
 }
 
@@ -62,6 +64,7 @@ export interface Contract {
   endDate: string;
   monthlyPayment: number;
   deposit?: number;
+  depositPaid?: boolean;
   status: ContractStatus;
   signaturePlaceholder?: boolean;
   notes?: string;
@@ -134,6 +137,8 @@ export interface Client {
   phone: string;
   status: ClientStatus;
   tenantId?: string;
+  depositPaid?: boolean;
+  depositAmount?: number;
   loginCount: number;
   firstLoginAt: string;
   lastLoginAt: string;

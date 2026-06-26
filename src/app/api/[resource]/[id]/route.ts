@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { syncDepositForTenant } from "@/lib/api-server/deposit-sync";
 import { mapTenantBody, stripTenantSecret } from "@/lib/api-server/tenants";
 import { deleteTenantAndLinkedClients } from "@/lib/api-server/clients";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
@@ -85,6 +86,13 @@ export async function PATCH(
         });
         await upsertClientFromTenant(updated);
         await upsertContractFromTenant(updated);
+        if (body.depositPaid != null || body.depositAmount != null) {
+          await syncDepositForTenant(
+            id,
+            Boolean(body.depositPaid ?? updated.depositPaid),
+            Number(body.depositAmount ?? updated.depositAmount)
+          );
+        }
         return ok(stripTenantSecret(updated));
       }
       case "contracts":

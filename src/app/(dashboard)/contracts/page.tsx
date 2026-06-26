@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ContractDialog } from "@/components/contracts/contract-dialog";
+import { ClientDepositDialog } from "@/components/clients/client-deposit-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -44,10 +45,11 @@ import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CONTRACT_STATUS_MAP } from "@/lib/constants";
 import { generateContractPdf } from "@/lib/pdf";
-import type { Contract } from "@/types";
+import type { Client, Contract } from "@/types";
 
 export default function ContractsPage() {
   const { data, loading, api } = useCollection<Contract>("contracts");
+  const { data: clients, loading: loadingClients } = useCollection<Client>("clients");
   const { remove } = useCollectionActions<Contract>("contracts");
   const [syncing, setSyncing] = useState(false);
   const autoSynced = useRef(false);
@@ -83,6 +85,7 @@ export default function ContractsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [depositClient, setDepositClient] = useState<Client | null>(null);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
     useTableData<Contract>({
@@ -163,6 +166,7 @@ export default function ContractsPage() {
                   <TableHead>Arendator</TableHead>
                   <TableHead className="hidden md:table-cell">Muddat</TableHead>
                   <TableHead>Oylik</TableHead>
+                  <TableHead className="hidden lg:table-cell">Depozit</TableHead>
                   <TableHead>Holat</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -181,6 +185,17 @@ export default function ContractsPage() {
                       </TableCell>
                       <TableCell className="font-medium">
                         {formatCurrency(c.monthlyPayment)}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {c.depositPaid ? (
+                          <span className="text-sm">
+                            ✅ {formatCurrency(c.deposit ?? 0)}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            Berilmagan
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={status.variant}>{status.label}</Badge>
@@ -231,10 +246,76 @@ export default function ContractsPage() {
         onPageChange={setPage}
       />
 
+      <Card>
+        <CardContent className="p-0">
+          <div className="border-b px-4 py-3">
+            <h3 className="font-semibold">Klientlar ro&apos;yxati</h3>
+            <p className="text-sm text-muted-foreground">
+              Klient ustiga bosing — depozit holati va qo&apos;shish
+            </p>
+          </div>
+          {loadingClients ? (
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : clients.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              Klientlar yo&apos;q
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ism</TableHead>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Depozit holati</TableHead>
+                  <TableHead>Summa</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((client) => (
+                  <TableRow
+                    key={client.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setDepositClient(client)}
+                  >
+                    <TableCell className="font-medium">
+                      {client.fullName}
+                    </TableCell>
+                    <TableCell>{client.phone}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={client.depositPaid ? "default" : "secondary"}
+                      >
+                        {client.depositPaid
+                          ? "Berilgan"
+                          : "Berilmagan"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {client.depositPaid
+                        ? formatCurrency(client.depositAmount ?? 0)
+                        : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
       <ContractDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         contract={editing}
+      />
+      <ClientDepositDialog
+        open={!!depositClient}
+        onOpenChange={(o) => !o && setDepositClient(null)}
+        client={depositClient}
       />
       <ConfirmDialog
         open={!!deleteId}

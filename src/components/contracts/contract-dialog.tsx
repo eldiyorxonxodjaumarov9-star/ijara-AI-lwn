@@ -40,6 +40,7 @@ const defaults: ContractInput = {
   endDate: today,
   monthlyPayment: 0,
   deposit: 0,
+  depositPaid: false,
   status: "active",
   notes: "",
 };
@@ -80,6 +81,7 @@ export function ContractDialog({
               endDate: contract.endDate.slice(0, 10),
               monthlyPayment: contract.monthlyPayment,
               deposit: contract.deposit ?? 0,
+              depositPaid: contract.depositPaid ?? false,
               status: contract.status,
               notes: contract.notes ?? "",
             }
@@ -196,11 +198,33 @@ export function ContractDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label>Garov (so&apos;m)</Label>
+              <Label>Garov / depozit (so&apos;m)</Label>
               <MoneyInput
                 value={watch("deposit") ?? 0}
                 onChange={(v) => setValue("deposit", v)}
               />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Depozit holati</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={watch("depositPaid") ? "default" : "outline"}
+                  onClick={() => setValue("depositPaid", true)}
+                >
+                  Berilgan
+                </Button>
+                <Button
+                  type="button"
+                  variant={!watch("depositPaid") ? "default" : "outline"}
+                  onClick={() => {
+                    setValue("depositPaid", false);
+                    setValue("deposit", 0);
+                  }}
+                >
+                  Berilmagan
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">

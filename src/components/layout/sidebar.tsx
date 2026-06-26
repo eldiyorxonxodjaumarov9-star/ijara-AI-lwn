@@ -17,7 +17,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-sidebar">
       <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" onClick={onNavigate}>
+        <Link href="/" onClick={onNavigate} title="Asosiy sayt">
           <BrandLogo />
         </Link>
       </div>

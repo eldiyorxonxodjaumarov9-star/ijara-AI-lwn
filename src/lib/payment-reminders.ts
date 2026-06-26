@@ -41,8 +41,12 @@ export async function sendPaymentRemindersApi(
     debt: number;
   }>
 ) {
-  if (!isApiConfigured) return { sent: 0 };
-  return apiFetch<{ sent: number }>("/notifications/payment-reminders", {
+  if (!isApiConfigured) return { sent: 0, telegramSent: 0, telegramSkipped: 0 };
+  return apiFetch<{
+    sent: number;
+    telegramSent?: number;
+    telegramSkipped?: number;
+  }>("/notifications/payment-reminders", {
     method: "POST",
     body: debts ? { debts } : {},
   });
@@ -65,6 +69,18 @@ export async function sendPaymentRemindersLocal(
 
   const grouped = groupDebtsByTenant(debts);
   const api = getCollectionApi<AppNotification>("notifications");
+
+  const existing = await api.list();
+  await Promise.all(
+    existing
+      .filter(
+        (n) =>
+          n.title === "To'lov eslatmasi" ||
+          n.title === "To'lov eslatmalari yuborildi"
+      )
+      .map((n) => api.remove(n.id))
+  );
+
   let sent = 0;
 
   for (const d of grouped) {

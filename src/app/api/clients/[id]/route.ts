@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { requireUser } from "@/lib/api-server/auth";
 import { mapClientUpdate, deleteTenantAndClientsForClient } from "@/lib/api-server/clients";
+import { syncDepositFromClient } from "@/lib/api-server/deposit-sync";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
@@ -16,9 +17,23 @@ export async function PATCH(
   const { id } = await ctx.params;
   try {
     const body = (await req.json()) as Record<string, unknown>;
-    return ok(
-      await prisma.client.update({ where: { id }, data: mapClientUpdate(body) })
-    );
+    const updated = await prisma.client.update({
+      where: { id },
+      data: mapClientUpdate(body),
+    });
+
+    if (body.depositPaid != null || body.depositAmount != null) {
+      await syncDepositFromClient(
+        id,
+        Boolean(body.depositPaid ?? updated.depositPaid),
+        Number(body.depositAmount ?? updated.depositAmount)
+      );
+      return ok(
+        await prisma.client.findUniqueOrThrow({ where: { id } })
+      );
+    }
+
+    return ok(updated);
   } catch {
     return fail("Yangilash xatosi", 500);
   }

@@ -51,7 +51,8 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
     monthlyPayment,
-    deposit: 0,
+    deposit: tenant.depositAmount ?? 0,
+    depositPaid: tenant.depositPaid ?? false,
     status: "active" as const,
     notes: `LWN xonaga biriktirildi (${room.name})`,
   };

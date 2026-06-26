@@ -78,12 +78,30 @@ export function SendPaymentRemindersButton({
 
       await refreshCollection("notifications");
 
+      const tgSent =
+        "telegramSent" in result ? Number(result.telegramSent ?? 0) : 0;
+      const tgSkipped =
+        "telegramSkipped" in result ? Number(result.telegramSkipped ?? 0) : 0;
+
       if (result.sent === 0) {
         toast.warning("Qarzdorlar topilmadi — xabar yuborilmadi");
       } else {
-        toast.success(
-          `${result.sent} ta arendatorga to'lov eslatmasi yuborildi. Xabarlar bo'limini oching.`
-        );
+        if (tgSent > 0) {
+          toast.success(
+            `${result.sent} ta qarzdorga eslatma yuborildi. Telegram bot: ${tgSent} ta.`
+          );
+        } else {
+          toast.success(
+            `${result.sent} ta qarzdorga panel xabari yuborildi. Telegram: 0 ta (arendator botda /start qilmagan).`,
+            { duration: 6000 }
+          );
+        }
+        if (tgSkipped > 0 && tgSent > 0) {
+          toast.info(
+            `${tgSkipped} ta arendator botga ulanmagan — faqat panelda eslatma.`,
+            { duration: 5000 }
+          );
+        }
       }
     } catch (e) {
       toast.error(

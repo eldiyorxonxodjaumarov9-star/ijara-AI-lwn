@@ -4,11 +4,12 @@ import {
   formatUzs,
   groupDebtsByTenant,
   type DebtReminderInput,
+  type ReminderTimeSlot,
 } from "@/lib/payment-reminder-utils";
 import { normalizePhone } from "@/lib/api-server/tenant-lookup";
+import { updateBotUserPhone } from "@/lib/api-server/telegram-bot-users";
 import {
   isTelegramBotConfigured,
-  sendContactRequest,
   sendTelegramMessage,
 } from "@/lib/api-server/telegram-bot";
 
@@ -57,11 +58,6 @@ function formatDateUz(value?: Date | string | null) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toISOString().slice(0, 10);
-}
-
-function looksLikePhone(text: string) {
-  const digits = normalizePhone(text);
-  return digits.length >= 9;
 }
 
 export async function findTenantByPhone(phoneNumber: string) {
@@ -147,7 +143,16 @@ export async function buildTenantInfoMessage(tenantId: string, linked = false) {
   return lines.join("\n");
 }
 
+async function unlinkTelegramChat(chatId: string) {
+  await prisma.tenant.updateMany({
+    where: { telegramChatId: chatId },
+    data: { telegramChatId: null },
+  });
+}
+
 export async function processPhoneForBot(chatId: string, phoneNumber: string) {
+  await updateBotUserPhone(chatId, phoneNumber);
+
   const tenant = await findTenantByPhone(phoneNumber);
 
   if (!tenant) {
@@ -160,6 +165,7 @@ export async function processPhoneForBot(chatId: string, phoneNumber: string) {
     };
   }
 
+  await unlinkTelegramChat(chatId);
   await prisma.tenant.update({
     where: { id: tenant.id },
     data: {
@@ -168,11 +174,16 @@ export async function processPhoneForBot(chatId: string, phoneNumber: string) {
     },
   });
 
+  await updateBotUserPhone(chatId, phoneNumber, tenant.id);
+
   const message = await buildTenantInfoMessage(tenant.id, true);
   return { ok: true as const, tenant, message };
 }
 
-export async function sendTelegramPaymentReminders(debts?: DebtReminderInput[]) {
+export async function sendTelegramPaymentReminders(
+  debts?: DebtReminderInput[],
+  slot?: ReminderTimeSlot
+) {
   if (!isTelegramBotConfigured()) {
     return { sent: 0, skipped: 0, reason: "bot_not_configured" };
   }
@@ -196,7 +207,7 @@ export async function sendTelegramPaymentReminders(debts?: DebtReminderInput[]) 
       continue;
     }
 
-    const text = buildPaymentReminderMessage(debt);
+    const text = buildPaymentReminderMessage(debt, slot);
     try {
       await sendTelegramMessage(tenant.telegramChatId, text);
       sent += 1;
@@ -206,70 +217,4 @@ export async function sendTelegramPaymentReminders(debts?: DebtReminderInput[]) 
   }
 
   return { sent, skipped };
-}
-
-export async function handleTelegramUpdate(update: {
-  message?: {
-    chat: { id: number };
-    text?: string;
-    contact?: { phone_number: string };
-  };
-}) {
-  const message = update.message;
-  if (!message) return;
-
-  const chatId = String(message.chat.id);
-  const text = message.text?.trim() ?? "";
-
-  if (text.startsWith("/start")) {
-    const linked = await prisma.tenant.findFirst({
-      where: { telegramChatId: chatId },
-    });
-    if (linked) {
-      const reply = await buildTenantInfoMessage(linked.id, false);
-      await sendTelegramMessage(chatId, reply, {
-        reply_markup: { remove_keyboard: true },
-      });
-      return;
-    }
-    await sendContactRequest(chatId);
-    return;
-  }
-
-  if (message.contact?.phone_number) {
-    const result = await processPhoneForBot(chatId, message.contact.phone_number);
-    await sendTelegramMessage(chatId, result.message, {
-      reply_markup: { remove_keyboard: true },
-    });
-    return;
-  }
-
-  if (looksLikePhone(text)) {
-    const result = await processPhoneForBot(chatId, text);
-    await sendTelegramMessage(chatId, result.message, {
-      reply_markup: { remove_keyboard: true },
-    });
-    return;
-  }
-
-  if (text.startsWith("/help") || text.startsWith("/yordam")) {
-    await sendTelegramMessage(
-      chatId,
-      "<b>ArendaAi bot</b>\n\n" +
-        "/start — telefon raqamni yuborish\n" +
-        "Raqam bazada bo'lsa, xona va shartnoma ma'lumotlari chiqadi.\n" +
-        "Raqamni yozishingiz yoki tugma orqali yuborishingiz mumkin.\n\n" +
-        "Qarzdorlik bo'lsa, bot avtomatik eslatma yuboradi."
-    );
-    return;
-  }
-
-  if (text && !text.startsWith("/")) {
-    await sendTelegramMessage(
-      chatId,
-      "Telefon raqamingizni yuboring.\n\n" +
-        "Tugmani bosing yoki raqamni yozing: <code>+998901234567</code>\n\n" +
-        "/start — qayta boshlash"
-    );
-  }
 }

@@ -146,6 +146,8 @@ const tenant: MapperConfig = {
       i.contractDuration != null ? n(i.contractDuration) : undefined,
     entryDate: String(i.entryDate ?? i.createdAt ?? ""),
     paymentDueDate: s(i.paymentDueDate),
+    depositPaid: Boolean(i.depositPaid),
+    depositAmount: n(i.depositAmount),
     createdAt: String(i.createdAt ?? new Date().toISOString()),
   }),
   toCreate: (d) => ({
@@ -162,6 +164,8 @@ const tenant: MapperConfig = {
       d.contractDuration != null ? n(d.contractDuration) : undefined,
     entryDate: d.entryDate,
     paymentDueDate: d.paymentDueDate,
+    depositPaid: Boolean(d.depositPaid),
+    depositAmount: n(d.depositAmount),
   }),
   toUpdate(d) {
     const payload = this.toCreate(d) as Record<string, unknown>;
@@ -185,6 +189,7 @@ const contract: MapperConfig = {
       endDate: String(i.endDate ?? ""),
       monthlyPayment: n(i.monthlyRent),
       deposit: n(i.deposit),
+      depositPaid: Boolean(i.depositPaid),
       status: contractStatusFromApi(i.status),
       notes: s(i.notes),
       createdAt: String(i.createdAt ?? new Date().toISOString()),
@@ -197,6 +202,7 @@ const contract: MapperConfig = {
     endDate: new Date(d.endDate as string).toISOString(),
     monthlyRent: n(d.monthlyPayment),
     deposit: n(d.deposit),
+    depositPaid: Boolean(d.depositPaid),
     status: CONTRACT_STATUS_TO_API[d.status as ContractStatus] ?? "ACTIVE",
     notes: d.notes || undefined,
   }),
@@ -313,6 +319,8 @@ const client: MapperConfig = {
     phone: String(i.phone ?? ""),
     status: clientStatusFromApi(i.status),
     tenantId: s(i.tenantId),
+    depositPaid: Boolean(i.depositPaid),
+    depositAmount: n(i.depositAmount),
     loginCount: n(i.loginCount) || 1,
     firstLoginAt: String(i.firstLoginAt ?? i.createdAt ?? new Date().toISOString()),
     lastLoginAt: String(i.lastLoginAt ?? i.createdAt ?? new Date().toISOString()),
@@ -323,6 +331,8 @@ const client: MapperConfig = {
     phone: d.phone,
     status: CLIENT_STATUS_TO_API[d.status as ClientStatus] ?? "NEW",
     tenantId: d.tenantId || undefined,
+    depositPaid: d.depositPaid != null ? Boolean(d.depositPaid) : undefined,
+    depositAmount: d.depositAmount != null ? n(d.depositAmount) : undefined,
     loginCount: n(d.loginCount) || 1,
     firstLoginAt: d.firstLoginAt,
     lastLoginAt: d.lastLoginAt,
@@ -335,6 +345,10 @@ const client: MapperConfig = {
         ? CLIENT_STATUS_TO_API[d.status as ClientStatus]
         : undefined,
       tenantId: d.tenantId,
+      depositPaid:
+        d.depositPaid != null ? Boolean(d.depositPaid) : undefined,
+      depositAmount:
+        d.depositAmount != null ? n(d.depositAmount) : undefined,
       loginCount: d.loginCount != null ? n(d.loginCount) : undefined,
       lastLoginAt: d.lastLoginAt,
     };

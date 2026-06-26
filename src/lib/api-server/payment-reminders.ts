@@ -10,10 +10,24 @@ import { sendTelegramPaymentReminders } from "@/lib/api-server/telegram-reminder
 export type { DebtReminderInput };
 export { buildPaymentReminderMessage, groupDebtsByTenant, getTenantNotifications };
 
+/** Eski to'lov eslatmalarini tozalash (yangi yuborishdan oldin) */
+export async function clearPreviousPaymentReminderNotifications() {
+  await prisma.notification.deleteMany({
+    where: {
+      OR: [
+        { type: "LATE_PAYMENT" },
+        { type: "INFO", title: "To'lov eslatmalari yuborildi" },
+      ],
+    },
+  });
+}
+
 export async function sendPaymentReminders(
   debts: DebtReminderInput[],
   adminUserId?: string
 ) {
+  await clearPreviousPaymentReminderNotifications();
+
   const grouped = groupDebtsByTenant(debts);
   const results = [];
 
@@ -51,7 +65,7 @@ export async function sendPaymentReminders(
     results.unshift(summary);
   }
 
-  await sendTelegramPaymentReminders(debts);
+  const telegram = await sendTelegramPaymentReminders(debts);
 
-  return results;
+  return { notifications: results, telegram };
 }

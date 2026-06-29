@@ -21,6 +21,21 @@ const MONTHS_UZ = [
   "Dek",
 ];
 
+export const MONTHS_UZ_FULL = [
+  "Yanvar",
+  "Fevral",
+  "Mart",
+  "Aprel",
+  "May",
+  "Iyun",
+  "Iyul",
+  "Avgust",
+  "Sentabr",
+  "Oktabr",
+  "Noyabr",
+  "Dekabr",
+];
+
 export interface DashboardMetrics {
   totalProperties: number;
   monthlyIncome: number;
@@ -141,16 +156,35 @@ export function buildRevenueSeries({
   contracts = [],
   tenants = [],
   months = 6,
+  year,
+  month,
 }: {
   payments: Payment[];
   expenses: Expense[];
   contracts?: Contract[];
   tenants?: Tenant[];
   months?: number;
+  year?: number;
+  /** 0 = Yanvar … 11 = Dekabr */
+  month?: number;
 }): RevenuePoint[] {
   const now = new Date();
   const expectedMonthly = getExpectedMonthlyIncome(contracts, tenants);
   const series: RevenuePoint[] = [];
+
+  if (year !== undefined && month !== undefined) {
+    const ref = new Date(year, month, 1);
+    let daromad = payments
+      .filter((p) => isSameMonth(new Date(p.date), ref))
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+    if (daromad === 0 && isSameMonth(ref, now) && expectedMonthly > 0) {
+      daromad = expectedMonthly;
+    }
+    const xarajat = expenses
+      .filter((e) => isSameMonth(new Date(e.date), ref))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    return [{ month: MONTHS_UZ[month], daromad, xarajat }];
+  }
 
   for (let i = months - 1; i >= 0; i--) {
     const ref = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -231,14 +265,16 @@ export function computeDebts(
 export function buildPaymentReportRows({
   payments,
   tenants = [],
-  months = 6,
+  year,
+  month,
 }: {
   payments: Payment[];
   tenants?: Tenant[];
-  months?: number;
+  year: number;
+  /** 0 = Yanvar … 11 = Dekabr */
+  month: number;
 }) {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+  const ref = new Date(year, month, 1);
 
   const resolveName = (p: Payment) => {
     if (p.tenantName?.trim()) return p.tenantName.trim();
@@ -247,7 +283,7 @@ export function buildPaymentReportRows({
   };
 
   return payments
-    .filter((p) => new Date(p.date) >= start)
+    .filter((p) => isSameMonth(new Date(p.date), ref))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .map((p, index) => ({
       index: index + 1,

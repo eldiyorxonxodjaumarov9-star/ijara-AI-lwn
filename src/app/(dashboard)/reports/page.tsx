@@ -38,7 +38,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCollection } from "@/hooks/use-collection";
-import { buildPaymentReportRows, buildRevenueSeries } from "@/lib/analytics";
+import {
+  buildPaymentReportRows,
+  buildRevenueSeries,
+  MONTHS_UZ_FULL,
+} from "@/lib/analytics";
 import { exportToExcel, exportToPdf } from "@/lib/export";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -48,18 +52,40 @@ function ReportsContent() {
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
   const { data: expenses, loading: le } = useCollection<Expense>("expenses");
   const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
-  const [range, setRange] = useState("6");
+  const now = new Date();
+  const [month, setMonth] = useState(String(now.getMonth()));
+  const [year, setYear] = useState(String(now.getFullYear()));
   const loading = lp || le || lt;
 
-  const months = Number(range);
+  const monthIndex = Number(month);
+  const yearNum = Number(year);
+  const periodLabel = `${MONTHS_UZ_FULL[monthIndex]} ${yearNum}`;
+
+  const yearOptions = useMemo(() => {
+    const current = new Date().getFullYear();
+    return Array.from({ length: 6 }, (_, i) => current - i);
+  }, []);
+
   const series = useMemo(
-    () => buildRevenueSeries({ payments, expenses, months }),
-    [payments, expenses, months]
+    () =>
+      buildRevenueSeries({
+        payments,
+        expenses,
+        year: yearNum,
+        month: monthIndex,
+      }),
+    [payments, expenses, yearNum, monthIndex]
   );
 
   const paymentRows = useMemo(
-    () => buildPaymentReportRows({ payments, tenants, months }),
-    [payments, tenants, months]
+    () =>
+      buildPaymentReportRows({
+        payments,
+        tenants,
+        year: yearNum,
+        month: monthIndex,
+      }),
+    [payments, tenants, yearNum, monthIndex]
   );
 
   const totals = useMemo(() => {
@@ -112,7 +138,7 @@ function ReportsContent() {
 
   const handlePdf = () => {
     exportToPdf({
-      title: `To'lovlar hisoboti (${months} oy)`,
+      title: `To'lovlar hisoboti (${periodLabel})`,
       head: reportHead,
       body: reportBody.length
         ? reportBody
@@ -129,14 +155,28 @@ function ReportsContent() {
         description="To'lovlar ro'yxati, ism-familiya va umumiy summa."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Oy" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="3">3 oy</SelectItem>
-                <SelectItem value="6">6 oy</SelectItem>
-                <SelectItem value="12">12 oy</SelectItem>
+                {MONTHS_UZ_FULL.map((name, i) => (
+                  <SelectItem key={name} value={String(i)}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="Yil" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={handleExcel}>
@@ -179,7 +219,7 @@ function ReportsContent() {
         <CardHeader>
           <CardTitle>To&apos;lovlar ro&apos;yxati</CardTitle>
           <CardDescription>
-            Har bir arendatorning ism-familiyasi va berilgan summa ({months} oy)
+            Har bir arendatorning ism-familiyasi va berilgan summa ({periodLabel})
           </CardDescription>
         </CardHeader>
         <CardContent>

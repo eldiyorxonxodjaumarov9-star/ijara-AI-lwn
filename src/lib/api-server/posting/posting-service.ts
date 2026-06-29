@@ -151,7 +151,7 @@ async function publishListingDb(
         listing.id,
         {
           ...listingInputFromRow(listing),
-          region: listing.region,
+          region: listing.region ?? undefined,
         },
         { immediate: true }
       );

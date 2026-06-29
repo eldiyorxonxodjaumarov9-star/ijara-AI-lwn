@@ -228,6 +228,38 @@ export function computeDebts(
     .sort((a, b) => b.debt - a.debt);
 }
 
+export function buildPaymentReportRows({
+  payments,
+  tenants = [],
+  months = 6,
+}: {
+  payments: Payment[];
+  tenants?: Tenant[];
+  months?: number;
+}) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+
+  const resolveName = (p: Payment) => {
+    if (p.tenantName?.trim()) return p.tenantName.trim();
+    const tenant = tenants.find((t) => t.id === p.tenantId);
+    return tenant?.fullName?.trim() || "Noma'lum";
+  };
+
+  return payments
+    .filter((p) => new Date(p.date) >= start)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .map((p, index) => ({
+      index: index + 1,
+      tenantName: resolveName(p),
+      propertyName: p.propertyName?.trim() || "—",
+      date: p.date,
+      amount: p.amount || 0,
+      method: p.method,
+      note: p.note?.trim() || "—",
+    }));
+}
+
 export function getOverdueContracts(contracts: Contract[]) {
   const now = new Date();
   return contracts.filter((c) => {

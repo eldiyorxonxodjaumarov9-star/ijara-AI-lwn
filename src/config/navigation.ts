@@ -8,6 +8,7 @@ import {
   DoorOpen,
   FileText,
   LayoutDashboard,
+  Megaphone,
   Receipt,
   Settings,
   Users,
@@ -40,6 +41,7 @@ export const navigation: NavSection[] = [
     items: [
       { titleKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
       { titleKey: "nav.properties", href: "/properties", icon: Building2 },
+      { titleKey: "nav.postListing", href: "/elon-joylash", icon: Megaphone },
       { titleKey: "nav.lwnRooms", href: "/lwn-rooms", icon: DoorOpen },
       { titleKey: "nav.tenants", href: "/tenants", icon: Users },
       { titleKey: "nav.clients", href: "/clients", icon: BookUser },

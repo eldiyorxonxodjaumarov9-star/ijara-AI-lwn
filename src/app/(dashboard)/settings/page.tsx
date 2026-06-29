@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Building2, Cloud, Globe, Loader2, Moon, User } from "lucide-react";
+import { Building2, Cloud, Globe, Loader2, Moon, Radio, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
@@ -35,8 +36,20 @@ import {
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
 import type { Language } from "@/types";
+import { PostingChannelsPanel } from "@/components/listings/posting-channels-panel";
+import { InstagramSettingsPanel } from "@/components/listings/instagram-settings-panel";
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-muted-foreground">Yuklanmoqda...</div>}>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+function SettingsPageContent() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") ?? "profile";
   const { user, updateUser, demoMode } = useAuth();
   const { t, setLanguage: setAppLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
@@ -51,7 +64,13 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [cloudAvailable, setCloudAvailable] = useState<boolean | null>(null);
 
+  const [activeTab, setActiveTab] = useState(initialTab);
+
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
   useEffect(() => {
     if (!demoMode) return;
     void checkCloudSyncAvailable().then(setCloudAvailable);
@@ -123,7 +142,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader title={t("settings.title")} description={t("settings.desc")} />
 
-      <Tabs defaultValue="profile">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="profile">
             <User className="mr-1.5 size-4" /> {t("settings.profile")}
@@ -133,6 +152,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="appearance">
             <Moon className="mr-1.5 size-4" /> {t("settings.appearance")}
+          </TabsTrigger>
+          <TabsTrigger value="posting">
+            <Radio className="mr-1.5 size-4" /> Posting sozlamalari
           </TabsTrigger>
         </TabsList>
 
@@ -237,6 +259,19 @@ export default function SettingsPage() {
                 />
               </div>
               <Button onClick={saveCompany}>{t("common.save")}</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="posting" className="space-y-6">
+          <InstagramSettingsPanel />
+          <Card>
+            <CardHeader>
+              <CardTitle>Boshqa tarqatish kanallari</CardTitle>
+              <CardDescription>Telegram, OLX, Joymee va boshqalar</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PostingChannelsPanel hideInstagram />
             </CardContent>
           </Card>
         </TabsContent>

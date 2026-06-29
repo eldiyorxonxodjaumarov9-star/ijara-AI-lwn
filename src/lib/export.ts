@@ -20,11 +20,13 @@ export function exportToPdf({
   title,
   head,
   body,
+  foot,
   fileName,
 }: {
   title: string;
   head: string[];
   body: (string | number)[][];
+  foot?: (string | number)[][];
   fileName: string;
 }) {
   const doc = new jsPDF();
@@ -41,9 +43,11 @@ export function exportToPdf({
   autoTable(doc, {
     head: [head],
     body: body.map((r) => r.map((c) => String(c))),
+    foot: foot?.map((r) => r.map((c) => String(c))),
     startY: 38,
     styles: { fontSize: 9, cellPadding: 3 },
     headStyles: { fillColor: [22, 132, 90], textColor: 255 },
+    footStyles: { fillColor: [230, 245, 238], textColor: [22, 100, 70], fontStyle: "bold" },
     alternateRowStyles: { fillColor: [245, 248, 246] },
   });
 

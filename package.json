@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate --schema=server/prisma/schema.prisma",
-    "db:push": "prisma db push --schema=server/prisma/schema.prisma",
+    "db:push": "node scripts/prisma-env.mjs db push --schema=server/prisma/schema.prisma",
     "db:seed": "npm run prisma:seed --prefix server"
   },
   "prisma": {

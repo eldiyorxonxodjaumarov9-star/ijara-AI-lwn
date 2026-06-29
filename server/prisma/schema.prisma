@@ -348,3 +348,115 @@ model TelegramBotUser {
   @@index([lastStartAt])
   @@map("telegram_bot_users")
 }
+
+// ===================== MULTI-PLATFORM LISTING POSTING =====================
+
+enum RentalListingStatus {
+  ACTIVE
+  DRAFT
+  RENTED
+  ARCHIVED
+}
+
+enum PostingPlatform {
+  ARENDA_INTERNAL
+  TELEGRAM
+  INSTAGRAM
+  OLX
+  JOYMEE
+  EGASI
+  BESTE
+}
+
+enum PostingJobStatus {
+  PENDING
+  POSTED
+  FAILED
+  MANUAL_REQUIRED
+}
+
+model RentalListing {
+  id            String              @id @default(uuid())
+  title         String
+  district      String
+  propertyType  String
+  rooms         Int                 @default(1)
+  area          Float               @default(0)
+  price         Float
+  description   String?
+  status        RentalListingStatus @default(ACTIVE)
+  landlordEmail String
+  landlordName  String?
+  legacyLocalId String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  images RentalListingImage[]
+  jobs   PostingJob[]
+
+  @@index([landlordEmail])
+  @@index([status])
+  @@map("rental_listings")
+}
+
+model RentalListingImage {
+  id        String   @id @default(uuid())
+  listingId String
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  listing RentalListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("rental_listing_images")
+}
+
+model PostingChannel {
+  id        String          @id @default(uuid())
+  platform  PostingPlatform @unique
+  enabled   Boolean         @default(false)
+  settings  Json            @default("{}")
+  secrets   Json            @default("{}")
+  updatedAt DateTime        @updatedAt
+
+  @@map("posting_channels")
+}
+
+model PostingJob {
+  id             String           @id @default(uuid())
+  listingId      String
+  platform       PostingPlatform
+  status         PostingJobStatus @default(PENDING)
+  generatedText  String?
+  manualPackage  Json?
+  externalPostId String?
+  postUrl        String?
+  channelName    String?
+  errorMessage   String?
+  retryCount     Int              @default(0)
+  postedAt       DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  listing RentalListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  logs    PostingLog[]
+
+  @@unique([listingId, platform])
+  @@index([status])
+  @@map("posting_jobs")
+}
+
+model PostingLog {
+  id        String   @id @default(uuid())
+  jobId     String
+  level     String   @default("info")
+  message   String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  job PostingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("posting_logs")
+}

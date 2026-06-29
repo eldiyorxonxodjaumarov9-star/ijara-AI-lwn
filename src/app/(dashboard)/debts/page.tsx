@@ -19,18 +19,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCollection } from "@/hooks/use-collection";
+import { useTashkentClock } from "@/hooks/use-tashkent-clock";
 import { computeDebts } from "@/lib/analytics";
 import { formatCurrency } from "@/lib/utils";
-import type { Contract, Payment } from "@/types";
+import type { Contract, Payment, Tenant } from "@/types";
 
 export default function DebtsPage() {
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
-  const loading = lc || lp;
+  const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
+  const tashkentNow = useTashkentClock();
+  const loading = lc || lp || lt;
 
   const debts = useMemo(
-    () => computeDebts(contracts, payments),
-    [contracts, payments]
+    () => computeDebts(contracts, payments, tenants, tashkentNow),
+    [contracts, payments, tenants, tashkentNow]
   );
   const totalDebt = debts.reduce((s, d) => s + d.debt, 0);
 
@@ -38,7 +41,7 @@ export default function DebtsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Qarzdorliklar"
-        description="Kechikkan to'lovlar avtomatik hisoblanadi."
+        description="To'lov muddati o'tgach (Toshkent vaqti) avtomatik qarzga o'tkaziladi."
         action={
           <SendPaymentRemindersButton label="Barchaga eslatma yuborish" />
         }
@@ -118,7 +121,10 @@ export default function DebtsPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="destructive">
-                        <AlertTriangle className="mr-1 size-3" /> Qarzdor
+                        <AlertTriangle className="mr-1 size-3" />
+                        {d.overdueDays > 0
+                          ? `${d.overdueDays} kun kechikkan`
+                          : "Qarzdor"}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -130,8 +136,9 @@ export default function DebtsPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        * Qarzdorlik shartnoma boshlanish sanasidan hozirgacha o&apos;tgan oylar
-        soni va kutilayotgan oylik to&apos;lovlar asosida hisoblanadi.
+        * Qarzdorlik Toshkent vaqti bo&apos;yicha hisoblanadi: har oyning belgilangan
+        to&apos;lov kunidan keyin to&apos;lanmagan summa avtomatik qarz bo&apos;limiga
+        tushadi. Soat yarim tunda va har daqiqada yangilanadi.
       </p>
     </div>
   );

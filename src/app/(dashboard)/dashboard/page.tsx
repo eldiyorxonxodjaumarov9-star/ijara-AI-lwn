@@ -32,6 +32,7 @@ import {
 import { RevenueChart } from "@/components/charts/revenue-chart";
 import { StatusChart } from "@/components/charts/status-chart";
 import { useCollection } from "@/hooks/use-collection";
+import { useTashkentClock } from "@/hooks/use-tashkent-clock";
 import { useLanguage } from "@/context/language-context";
 import {
   buildRevenueSeries,
@@ -66,6 +67,7 @@ export default function DashboardPage() {
   const { data: expenses, loading: le } = useCollection<Expense>("expenses");
 
   const loading = lp || lt || lcl || lc || lpay || le;
+  const tashkentNow = useTashkentClock();
 
   const metrics = useMemo(
     () =>
@@ -92,7 +94,10 @@ export default function DashboardPage() {
   const recentPayments = payments.slice(0, 5);
   const recentTenants = tenants.slice(0, 5);
   const recentClients = clients.slice(0, 5);
-  const overdue = useMemo(() => getOverdueContracts(contracts), [contracts]);
+  const overdue = useMemo(
+    () => getOverdueContracts(contracts, tashkentNow),
+    [contracts, tashkentNow]
+  );
 
   const roomStats = useMemo(
     () => getLwnRoomStats(properties),

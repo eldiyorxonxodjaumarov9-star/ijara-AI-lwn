@@ -2,14 +2,21 @@ const TASHKENT_TZ = "Asia/Tashkent";
 
 export type TashkentDateParts = { year: number; month: number; day: number };
 
-export function getTashkentDateParts(date = new Date()): TashkentDateParts {
+export type TashkentDateTimeParts = TashkentDateParts & {
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+export function getTashkentDateParts(date: string | Date = new Date()): TashkentDateParts {
+  const d = typeof date === "string" ? new Date(date) : date;
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: TASHKENT_TZ,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  const raw = formatter.format(date);
+  const raw = formatter.format(d);
   const [year, month, day] = raw.split("-").map(Number);
   return { year, month, day };
 }
@@ -17,6 +24,37 @@ export function getTashkentDateParts(date = new Date()): TashkentDateParts {
 export function formatTashkentDate(parts: TashkentDateParts) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
+export function getTashkentDateTimeParts(date = new Date()): TashkentDateTimeParts {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TASHKENT_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+    second: get("second"),
+  };
+}
+
+export function msUntilTashkentMidnight(from = new Date()) {
+  const p = getTashkentDateTimeParts(from);
+  const elapsed =
+    (p.hour * 3600 + p.minute * 60 + p.second) * 1000;
+  return 24 * 3600 * 1000 - elapsed;
 }
 
 export function formatTashkentDateTime(date = new Date()) {
@@ -27,6 +65,19 @@ export function formatTashkentDateTime(date = new Date()) {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+  });
+  return formatter.format(date);
+}
+
+export function formatTashkentClock(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("uz-UZ", {
+    timeZone: TASHKENT_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
   return formatter.format(date);
 }

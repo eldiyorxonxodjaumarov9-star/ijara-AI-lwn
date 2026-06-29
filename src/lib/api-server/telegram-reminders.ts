@@ -6,12 +6,15 @@ import {
   type DebtReminderInput,
   type ReminderTimeSlot,
 } from "@/lib/payment-reminder-utils";
+import { computeContractDebt } from "@/lib/debt-calculator";
+import type { Contract, Payment, Tenant } from "@/types";
 import { normalizePhone } from "@/lib/api-server/tenant-lookup";
 import { updateBotUserPhone } from "@/lib/api-server/telegram-bot-users";
 import {
   isTelegramBotConfigured,
   sendTelegramMessage,
 } from "@/lib/api-server/telegram-bot";
+import type { ContractStatus } from "@/types";
 
 function monthsBetween(from: Date, to: Date) {
   if (to < from) return 0;
@@ -30,18 +33,47 @@ export async function computeServerDebts(): Promise<DebtReminderInput[]> {
 
   return contracts
     .map((c) => {
-      const start = new Date(c.startDate);
-      const end = new Date(c.endDate);
-      const until = now < end ? now : end;
-      const monthsDue = Math.max(1, monthsBetween(start, until) + 1);
-      const expected = monthsDue * c.monthlyRent;
-      const paid = c.payments.reduce((sum, p) => sum + p.amount, 0);
+      const contract: Contract = {
+        id: c.id,
+        propertyId: c.propertyId,
+        tenantId: c.tenantId,
+        propertyName: c.property.title,
+        tenantName: c.tenant.fullName,
+        startDate: c.startDate.toISOString(),
+        endDate: c.endDate.toISOString(),
+        monthlyPayment: c.monthlyRent,
+        deposit: c.deposit ?? undefined,
+        depositPaid: c.depositPaid,
+        status: c.status.toLowerCase() as ContractStatus,
+        notes: c.notes ?? undefined,
+        createdAt: c.createdAt.toISOString(),
+      };
+      const tenant: Tenant = {
+        id: c.tenant.id,
+        fullName: c.tenant.fullName,
+        phone: c.tenant.phone,
+        passport: c.tenant.passport,
+        rentAmount: c.tenant.rentAmount,
+        paymentDueDate: c.tenant.paymentDueDate?.toISOString(),
+        createdAt: c.tenant.createdAt.toISOString(),
+      };
+      const payments: Payment[] = c.payments.map((p) => ({
+        id: p.id,
+        contractId: p.contractId,
+        tenantId: c.tenantId,
+        amount: p.amount,
+        date: p.paymentDate.toISOString(),
+        method: p.paymentMethod.toLowerCase() as Payment["method"],
+        note: p.notes ?? undefined,
+        createdAt: p.createdAt.toISOString(),
+      }));
+      const result = computeContractDebt(contract, payments, tenant, now);
       return {
         contractId: c.id,
         tenantId: c.tenantId,
         tenantName: c.tenant.fullName,
         propertyName: c.property.title,
-        debt: expected - paid,
+        debt: result.debt,
       };
     })
     .filter((d) => d.debt > 0);

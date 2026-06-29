@@ -26,6 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TashkentClock } from "@/components/layout/tashkent-clock";
 import { SidebarContent } from "@/components/layout/sidebar";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
@@ -72,6 +73,7 @@ export function Header() {
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <TashkentClock />
         <ThemeToggle />
 
         <Button

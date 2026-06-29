@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo } from "react";
+import Image from "next/image";
 import {
   AlertTriangle,
   CalendarDays,
@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { usePortalData } from "@/hooks/use-portal-data";
+import { useTashkentClock } from "@/hooks/use-tashkent-clock";
 import { VacantRoomsSection } from "@/components/portal/vacant-rooms-section";
 import { TenantNotificationsSection } from "@/components/portal/tenant-notifications-section";
 import { StatCard } from "@/components/shared/stat-card";
@@ -86,6 +87,7 @@ export default function PortalPage() {
     maintenance: myMaintenance,
     loading,
   } = usePortalData();
+  const tashkentNow = useTashkentClock();
 
   const propertyMap = useMemo(
     () => new Map(properties.map((p) => [p.id, p])),
@@ -98,8 +100,14 @@ export default function PortalPage() {
   );
 
   const debtRows = useMemo(
-    () => computeDebts(myContracts, myPayments),
-    [myContracts, myPayments]
+    () =>
+      computeDebts(
+        myContracts,
+        myPayments,
+        myTenant ? [myTenant] : [],
+        tashkentNow
+      ),
+    [myContracts, myPayments, myTenant, tashkentNow]
   );
 
   const totalDebt = useMemo(

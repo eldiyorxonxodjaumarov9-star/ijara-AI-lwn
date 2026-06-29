@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useCollection } from "@/hooks/use-collection";
+import { useTashkentClock } from "@/hooks/use-tashkent-clock";
 import { computeDebts } from "@/lib/analytics";
 import { isApiConfigured } from "@/lib/api/client";
 import { refreshCollection } from "@/lib/data/store";
@@ -13,13 +14,15 @@ import {
   sendPaymentRemindersApi,
   sendPaymentRemindersLocal,
 } from "@/lib/payment-reminders";
-import type { Contract, Payment } from "@/types";
+import type { Contract, Payment, Tenant } from "@/types";
 
 export function buildPaymentReminderPayload(
   contracts: Contract[],
-  payments: Payment[]
+  payments: Payment[],
+  tenants: Tenant[] = [],
+  now = new Date()
 ) {
-  return computeDebts(contracts, payments).map((d) => {
+  return computeDebts(contracts, payments, tenants, now).map((d) => {
     const c = contracts.find((x) => x.id === d.contractId);
     return {
       contractId: d.contractId,
@@ -34,9 +37,11 @@ export function buildPaymentReminderPayload(
 export function usePaymentReminderCount() {
   const { data: contracts } = useCollection<Contract>("contracts");
   const { data: payments } = useCollection<Payment>("payments");
+  const { data: tenants } = useCollection<Tenant>("tenants");
+  const tashkentNow = useTashkentClock();
   return useMemo(
-    () => buildPaymentReminderPayload(contracts, payments).length,
-    [contracts, payments]
+    () => buildPaymentReminderPayload(contracts, payments, tenants, tashkentNow).length,
+    [contracts, payments, tenants, tashkentNow]
   );
 }
 
@@ -55,11 +60,13 @@ export function SendPaymentRemindersButton({
 }) {
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
+  const { data: tenants } = useCollection<Tenant>("tenants");
+  const tashkentNow = useTashkentClock();
   const [sending, setSending] = useState(false);
 
   const payload = useMemo(
-    () => buildPaymentReminderPayload(contracts, payments),
-    [contracts, payments]
+    () => buildPaymentReminderPayload(contracts, payments, tenants, tashkentNow),
+    [contracts, payments, tenants, tashkentNow]
   );
 
   const handleSend = async () => {
@@ -74,7 +81,7 @@ export function SendPaymentRemindersButton({
     try {
       const result = isApiConfigured
         ? await sendPaymentRemindersApi(payload)
-        : await sendPaymentRemindersLocal(contracts, payments);
+        : await sendPaymentRemindersLocal(contracts, payments, tenants, tashkentNow);
 
       await refreshCollection("notifications");
 

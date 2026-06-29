@@ -1,6 +1,6 @@
 import { apiFetch, isApiConfigured } from "@/lib/api/client";
 import { getCollectionApi } from "@/lib/data/store";
-import type { AppNotification, Contract, Payment } from "@/types";
+import type { AppNotification, Contract, Payment, Tenant } from "@/types";
 import { computeDebts } from "@/lib/analytics";
 import {
   buildPaymentReminderMessage,
@@ -54,9 +54,11 @@ export async function sendPaymentRemindersApi(
 
 export async function sendPaymentRemindersLocal(
   contracts: Contract[],
-  payments: Payment[]
+  payments: Payment[],
+  tenants: Tenant[] = [],
+  now = new Date()
 ) {
-  const debts = computeDebts(contracts, payments).map((d) => {
+  const debts = computeDebts(contracts, payments, tenants, now).map((d) => {
     const c = contracts.find((x) => x.id === d.contractId);
     return {
       contractId: d.contractId,

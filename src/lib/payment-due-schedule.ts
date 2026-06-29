@@ -86,9 +86,40 @@ function daysInMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/** Bazadagi sana maydonidan oyning to'lov kuni (1–31) */
-export function getPaymentDayOfMonth(paymentDueDate: Date) {
-  return paymentDueDate.getUTCDate();
+/** Bazadagi sana maydonidan oyning to'lov kuni (1–31), Toshkent bo'yicha */
+export function getPaymentDayOfMonth(paymentDueDate: Date | string) {
+  const d =
+    typeof paymentDueDate === "string"
+      ? new Date(paymentDueDate)
+      : paymentDueDate;
+  return getTashkentDateParts(d).day;
+}
+
+export function isSameMonthTashkent(
+  value: string | Date,
+  year: number,
+  month: number
+) {
+  const p = getTashkentDateParts(value);
+  return p.year === year && p.month === month;
+}
+
+/** Toshkent vaqtida shu oyning to'lov muddati o'tganmi (haqiqiy bugungi sana) */
+export function isPaymentMonthOverdue(
+  year: number,
+  month: number,
+  paymentDay: number,
+  now = new Date()
+): boolean {
+  const today = getTashkentDateParts(now);
+  if (year < today.year || (year === today.year && month < today.month)) {
+    return true;
+  }
+  if (year === today.year && month === today.month) {
+    const dueDay = Math.min(paymentDay, daysInMonth(year, month));
+    return today.day > dueDay;
+  }
+  return false;
 }
 
 export type PaymentSchedule = {

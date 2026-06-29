@@ -2,6 +2,8 @@ import type { Contract, Payment, Tenant } from "@/types";
 import {
   getPaymentDayOfMonth,
   getTashkentDateParts,
+  isPaymentMonthOverdue,
+  isSameMonthTashkent,
   type TashkentDateParts,
 } from "@/lib/payment-due-schedule";
 
@@ -10,8 +12,7 @@ function daysInMonth(year: number, month: number) {
 }
 
 function toTashkentParts(value: string | Date): TashkentDateParts {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return getTashkentDateParts(d);
+  return getTashkentDateParts(value);
 }
 
 /** Arendator to'lov kuni (1–31), yo'q bo'lsa shartnoma boshlanish kuni */
@@ -22,7 +23,7 @@ export function resolvePaymentDay(
   if (tenant?.paymentDueDate) {
     const due = new Date(tenant.paymentDueDate);
     if (!Number.isNaN(due.getTime())) {
-      return getPaymentDayOfMonth(due);
+      return getPaymentDayOfMonth(tenant.paymentDueDate);
     }
   }
   if (contract.startDate) {
@@ -31,9 +32,59 @@ export function resolvePaymentDay(
   return 1;
 }
 
+function* eachMonth(
+  from: TashkentDateParts,
+  until: TashkentDateParts
+): Generator<{ year: number; month: number }> {
+  let y = from.year;
+  let m = from.month;
+  while (y < until.year || (y === until.year && m <= until.month)) {
+    yield { year: y, month: m };
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+}
+
+function contractActiveInMonth(
+  start: TashkentDateParts,
+  end: TashkentDateParts,
+  year: number,
+  month: number,
+  today: TashkentDateParts
+): boolean {
+  if (year < start.year || (year === start.year && month < start.month)) {
+    return false;
+  }
+  if (year > end.year || (year === end.year && month > end.month)) {
+    return false;
+  }
+  if (year === start.year && month === start.month && today.day < start.day) {
+    return false;
+  }
+  return true;
+}
+
+function paidInMonth(
+  payments: Payment[],
+  contractId: string,
+  year: number,
+  month: number
+) {
+  return payments
+    .filter(
+      (p) =>
+        p.contractId === contractId &&
+        isSameMonthTashkent(p.date, year, month)
+    )
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+}
+
 /**
  * Toshkent vaqtida qancha oy uchun to'lov muddati o'tgan.
- * Joriy oy faqat to'lov kuni o'tgandan keyin hisobga olinadi.
+ * Har bir oy haqiqiy sanalar bo'yicha tekshiriladi.
  */
 export function countDueMonthsTashkent(
   startDate: string | Date,
@@ -56,37 +107,16 @@ export function countDueMonthsTashkent(
   }
 
   let count = 0;
-  let y = start.year;
-  let m = start.month;
-
-  while (y < untilYear || (y === untilYear && m <= untilMonth)) {
-    const dueDay = Math.min(paymentDay, daysInMonth(y, m));
-    const isPastMonth =
-      y < today.year || (y === today.year && m < today.month);
-    const isCurrentMonth = y === today.year && m === today.month;
-    const isStartMonth = y === start.year && m === start.month;
-
-    if (isPastMonth) {
-      if (!isStartMonth || today.day >= start.day) {
-        count++;
-      }
-    } else if (isCurrentMonth) {
-      const contractStarted =
-        y > start.year ||
-        (y === start.year && m > start.month) ||
-        (isStartMonth && today.day >= start.day);
-      if (contractStarted && today.day > dueDay) {
-        count++;
-      }
-    }
-
-    m += 1;
-    if (m > 12) {
-      m = 1;
-      y += 1;
+  for (const { year, month } of eachMonth(start, {
+    year: untilYear,
+    month: untilMonth,
+    day: 1,
+  })) {
+    if (!contractActiveInMonth(start, end, year, month, today)) continue;
+    if (isPaymentMonthOverdue(year, month, paymentDay, now)) {
+      count += 1;
     }
   }
-
   return count;
 }
 
@@ -105,25 +135,44 @@ export function computeContractDebt(
   now = new Date()
 ): ContractDebtResult {
   const paymentDay = resolvePaymentDay(tenant, contract);
-  const monthsDue = countDueMonthsTashkent(
-    contract.startDate,
-    contract.endDate,
-    paymentDay,
-    now
-  );
+  const start = toTashkentParts(contract.startDate);
+  const end = toTashkentParts(contract.endDate);
+  const today = getTashkentDateParts(now);
+  const monthly = contract.monthlyPayment || 0;
 
-  const paid = payments
-    .filter((p) => p.contractId === contract.id)
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-  if (monthsDue <= 0) {
-    return { monthsDue: 0, expected: 0, paid, debt: 0, overdueDays: 0 };
+  let untilYear = today.year;
+  let untilMonth = today.month;
+  if (
+    end.year < today.year ||
+    (end.year === today.year && end.month < today.month)
+  ) {
+    untilYear = end.year;
+    untilMonth = end.month;
   }
 
-  const expected = monthsDue * (contract.monthlyPayment || 0);
-  const debt = Math.max(0, expected - paid);
+  let monthsDue = 0;
+  let expected = 0;
+  let paidApplied = 0;
+  let debt = 0;
 
-  const today = getTashkentDateParts(now);
+  for (const { year, month } of eachMonth(start, {
+    year: untilYear,
+    month: untilMonth,
+    day: 1,
+  })) {
+    if (!contractActiveInMonth(start, end, year, month, today)) continue;
+    if (!isPaymentMonthOverdue(year, month, paymentDay, now)) continue;
+
+    monthsDue += 1;
+    expected += monthly;
+    const paidThisMonth = paidInMonth(payments, contract.id, year, month);
+    paidApplied += Math.min(paidThisMonth, monthly);
+    const shortfall = monthly - paidThisMonth;
+    if (shortfall > 0) {
+      debt += shortfall;
+    }
+  }
+
   const dueDayThisMonth = Math.min(
     paymentDay,
     daysInMonth(today.year, today.month)
@@ -133,5 +182,11 @@ export function computeContractDebt(
       ? today.day - dueDayThisMonth
       : 0;
 
-  return { monthsDue, expected, paid, debt, overdueDays };
+  return {
+    monthsDue,
+    expected,
+    paid: paidApplied,
+    debt,
+    overdueDays,
+  };
 }

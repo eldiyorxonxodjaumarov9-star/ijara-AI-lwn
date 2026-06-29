@@ -2,11 +2,11 @@
 
 import { Clock } from "lucide-react";
 
-import { useTashkentClock } from "@/hooks/use-tashkent-clock";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { formatTashkentClock } from "@/lib/payment-due-schedule";
 
 export function TashkentClock() {
-  const now = useTashkentClock();
+  const now = useTashkentNow();
 
   return (
     <div

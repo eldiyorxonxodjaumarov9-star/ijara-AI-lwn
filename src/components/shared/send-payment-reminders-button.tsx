@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useCollection } from "@/hooks/use-collection";
-import { useTashkentClock } from "@/hooks/use-tashkent-clock";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { computeDebts } from "@/lib/analytics";
 import { isApiConfigured } from "@/lib/api/client";
 import { refreshCollection } from "@/lib/data/store";
@@ -38,7 +38,7 @@ export function usePaymentReminderCount() {
   const { data: contracts } = useCollection<Contract>("contracts");
   const { data: payments } = useCollection<Payment>("payments");
   const { data: tenants } = useCollection<Tenant>("tenants");
-  const tashkentNow = useTashkentClock();
+  const tashkentNow = useTashkentNow();
   return useMemo(
     () => buildPaymentReminderPayload(contracts, payments, tenants, tashkentNow).length,
     [contracts, payments, tenants, tashkentNow]
@@ -61,7 +61,7 @@ export function SendPaymentRemindersButton({
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
   const { data: tenants } = useCollection<Tenant>("tenants");
-  const tashkentNow = useTashkentClock();
+  const tashkentNow = useTashkentNow();
   const [sending, setSending] = useState(false);
 
   const payload = useMemo(

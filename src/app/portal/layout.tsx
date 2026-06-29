@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Globe, LogOut } from "lucide-react";
 
 import { useAuth } from "@/context/auth-context";
+import { TashkentTimeProvider } from "@/context/tashkent-time-context";
 import { useLanguage } from "@/context/language-context";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand-logo";
@@ -84,7 +85,9 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
           </Button>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4 lg:p-6">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 p-4 lg:p-6">
+        <TashkentTimeProvider>{children}</TashkentTimeProvider>
+      </main>
     </div>
   );
 }

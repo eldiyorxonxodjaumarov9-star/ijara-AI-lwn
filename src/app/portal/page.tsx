@@ -18,7 +18,7 @@ import {
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { usePortalData } from "@/hooks/use-portal-data";
-import { useTashkentClock } from "@/hooks/use-tashkent-clock";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { VacantRoomsSection } from "@/components/portal/vacant-rooms-section";
 import { TenantNotificationsSection } from "@/components/portal/tenant-notifications-section";
 import { StatCard } from "@/components/shared/stat-card";
@@ -87,7 +87,7 @@ export default function PortalPage() {
     maintenance: myMaintenance,
     loading,
   } = usePortalData();
-  const tashkentNow = useTashkentClock();
+  const tashkentNow = useTashkentNow();
 
   const propertyMap = useMemo(
     () => new Map(properties.map((p) => [p.id, p])),

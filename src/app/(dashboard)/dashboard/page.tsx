@@ -32,7 +32,7 @@ import {
 import { RevenueChart } from "@/components/charts/revenue-chart";
 import { StatusChart } from "@/components/charts/status-chart";
 import { useCollection } from "@/hooks/use-collection";
-import { useTashkentClock } from "@/hooks/use-tashkent-clock";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { useLanguage } from "@/context/language-context";
 import {
   buildRevenueSeries,
@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const { data: expenses, loading: le } = useCollection<Expense>("expenses");
 
   const loading = lp || lt || lcl || lc || lpay || le;
-  const tashkentNow = useTashkentClock();
+  const tashkentNow = useTashkentNow();
 
   const metrics = useMemo(
     () =>

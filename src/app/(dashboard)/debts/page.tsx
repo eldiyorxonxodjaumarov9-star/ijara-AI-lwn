@@ -19,8 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCollection } from "@/hooks/use-collection";
-import { useTashkentClock } from "@/hooks/use-tashkent-clock";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { computeDebts } from "@/lib/analytics";
+import { formatTashkentClock } from "@/lib/payment-due-schedule";
 import { formatCurrency } from "@/lib/utils";
 import type { Contract, Payment, Tenant } from "@/types";
 
@@ -28,7 +29,7 @@ export default function DebtsPage() {
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
   const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
-  const tashkentNow = useTashkentClock();
+  const tashkentNow = useTashkentNow();
   const loading = lc || lp || lt;
 
   const debts = useMemo(
@@ -41,7 +42,7 @@ export default function DebtsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Qarzdorliklar"
-        description="To'lov muddati o'tgach (Toshkent vaqti) avtomatik qarzga o'tkaziladi."
+        description={`Haqiqiy sana: ${formatTashkentClock(tashkentNow)} — muddat o'tgach avtomatik ro'yxatga tushadi.`}
         action={
           <SendPaymentRemindersButton label="Barchaga eslatma yuborish" />
         }

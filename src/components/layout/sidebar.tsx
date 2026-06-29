@@ -8,11 +8,13 @@ import { navigation } from "@/config/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
+import { useLiveDebtCount } from "@/hooks/use-live-debt-count";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const liveDebtCount = useLiveDebtCount();
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
@@ -52,7 +54,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                         )}
                       >
                         <item.icon className="size-4 shrink-0" />
-                        {t(item.titleKey)}
+                        <span className="flex-1">{t(item.titleKey)}</span>
+                        {item.href === "/debts" && liveDebtCount > 0 && (
+                          <span className="flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                            {liveDebtCount > 99 ? "99+" : liveDebtCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                   );

@@ -100,8 +100,8 @@ export function TelegramDistributionPanel() {
       name: ch.name,
       username: ch.username ?? "",
       chatId: ch.chatId,
-      regionFilters: ch.regionFilters.join(", "),
-      propertyTypeFilters: ch.propertyTypeFilters.join(", "),
+      regionFilters: ch.regionFilters?.join(", ") ?? "",
+      propertyTypeFilters: ch.propertyTypeFilters?.join(", ") ?? "",
       priority: String(ch.priority),
       enabled: ch.enabled,
     });
@@ -263,10 +263,10 @@ export function TelegramDistributionPanel() {
                     )}
                   </TableCell>
                   <TableCell className="hidden max-w-[140px] truncate text-xs md:table-cell">
-                    {ch.regionFilters.length ? ch.regionFilters.join(", ") : "Barchasi"}
+                    {ch.regionFilters?.length ? ch.regionFilters.join(", ") : "Barchasi"}
                   </TableCell>
                   <TableCell className="hidden max-w-[140px] truncate text-xs lg:table-cell">
-                    {ch.propertyTypeFilters.length
+                    {ch.propertyTypeFilters?.length
                       ? ch.propertyTypeFilters.join(", ")
                       : "Barchasi"}
                   </TableCell>

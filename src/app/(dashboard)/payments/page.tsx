@@ -43,6 +43,7 @@ import { useTableData } from "@/hooks/use-table-data";
 import { computeDebts } from "@/lib/analytics";
 import { isSameMonthTashkent, getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import type { Contract, Payment, Tenant } from "@/types";
 
 type PaymentTableRow = {

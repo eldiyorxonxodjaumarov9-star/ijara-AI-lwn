@@ -103,7 +103,7 @@ export function TelegramDistributionPanel() {
       regionFilters: ch.regionFilters?.join(", ") ?? "",
       propertyTypeFilters: ch.propertyTypeFilters?.join(", ") ?? "",
       priority: String(ch.priority),
-      enabled: ch.enabled,
+      enabled: ch.enabled ?? true,
     });
     setDialogOpen(true);
   };

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ExternalLink, Megaphone, Radio } from "lucide-react";
+import { ExternalLink, Megaphone, Radio, Send } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { ListingPublishPanel } from "@/components/listings/listing-publish-panel";
 import { InstagramSettingsPanel } from "@/components/listings/instagram-settings-panel";
 import { PostingChannelsPanel } from "@/components/listings/posting-channels-panel";
+import { TelegramDistributionPanel } from "@/components/listings/telegram-distribution-panel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth-context";
@@ -47,6 +48,10 @@ export default function ElonJoylashPage() {
               <Megaphone className="size-4" />
               E&apos;lon qo&apos;shish
             </TabsTrigger>
+            <TabsTrigger value="telegram" className="gap-2">
+              <Send className="size-4" />
+              Telegram Distribution
+            </TabsTrigger>
             <TabsTrigger value="channels" className="gap-2">
               <Radio className="size-4" />
               Tarqatish kanallari
@@ -55,6 +60,10 @@ export default function ElonJoylashPage() {
 
           <TabsContent value="listings" className="mt-6">
             <ListingPublishPanel landlordEmail={email} landlordName={name} />
+          </TabsContent>
+
+          <TabsContent value="telegram" className="mt-6">
+            <TelegramDistributionPanel />
           </TabsContent>
 
           <TabsContent value="channels" className="mt-6 space-y-6">

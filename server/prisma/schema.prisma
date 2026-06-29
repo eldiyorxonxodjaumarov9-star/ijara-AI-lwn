@@ -379,6 +379,7 @@ model RentalListing {
   id            String              @id @default(uuid())
   title         String
   district      String
+  region        String?
   propertyType  String
   rooms         Int                 @default(1)
   area          Float               @default(0)
@@ -393,6 +394,7 @@ model RentalListing {
 
   images RentalListingImage[]
   jobs   PostingJob[]
+  telegramJobs TelegramPostingJob[]
 
   @@index([landlordEmail])
   @@index([status])
@@ -459,4 +461,73 @@ model PostingLog {
 
   @@index([jobId])
   @@map("posting_logs")
+}
+
+// ===================== TELEGRAM MULTI-CHANNEL DISTRIBUTION =====================
+
+enum TelegramPostingStatus {
+  PENDING
+  SENDING
+  POSTED
+  FAILED
+}
+
+model TelegramChannel {
+  id                  String   @id @default(uuid())
+  name                String
+  username            String?
+  chatId              String
+  enabled             Boolean  @default(true)
+  regionFilters       String[] @default([])
+  propertyTypeFilters String[] @default([])
+  priority            Int      @default(0)
+  isBotAdmin          Boolean?
+  lastAdminCheckAt    DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  jobs TelegramPostingJob[]
+
+  @@index([enabled, priority])
+  @@map("telegram_channels")
+}
+
+model TelegramPostingJob {
+  id             String                @id @default(uuid())
+  listingId      String
+  channelId      String
+  status         TelegramPostingStatus @default(PENDING)
+  caption        String?
+  scheduledAt    DateTime?
+  postedAt       DateTime?
+  externalPostId String?
+  postUrl        String?
+  errorMessage   String?
+  retryCount     Int                   @default(0)
+  maxRetries     Int                   @default(3)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  listing RentalListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  channel TelegramChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  logs    TelegramPostingLog[]
+
+  @@unique([listingId, channelId])
+  @@index([status, scheduledAt])
+  @@index([listingId])
+  @@map("telegram_posting_jobs")
+}
+
+model TelegramPostingLog {
+  id        String   @id @default(uuid())
+  jobId     String
+  level     String   @default("info")
+  message   String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  job TelegramPostingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("telegram_posting_logs")
 }

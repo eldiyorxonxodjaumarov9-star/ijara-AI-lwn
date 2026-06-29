@@ -38,6 +38,7 @@ function toDbStatus(status: ListingPostInput["status"]): RentalListingStatus {
 function listingInputFromRow(row: {
   title: string;
   district: string;
+  region?: string | null;
   propertyType: string;
   rooms: number;
   area: number;
@@ -52,6 +53,7 @@ function listingInputFromRow(row: {
   return {
     title: row.title,
     district: row.district,
+    region: row.region ?? undefined,
     propertyType: row.propertyType,
     rooms: row.rooms,
     area: row.area,
@@ -114,6 +116,7 @@ async function publishListingDb(
     data: {
       title: input.title,
       district: input.district,
+      region: input.region?.trim() || null,
       propertyType: input.propertyType,
       rooms: input.rooms,
       area: input.area,
@@ -134,7 +137,32 @@ async function publishListingDb(
   });
 
   await createPostingJobs(listing.id, input);
-  const jobs = await runPostingQueue(listing.id, input);
+  await runPostingQueue(listing.id, input);
+
+  try {
+    const { isTelegramDistributionDbReady } = await import(
+      "@/lib/api-server/telegram-distribution/db-ready"
+    );
+    const { enqueueTelegramDistribution } = await import(
+      "@/lib/api-server/telegram-distribution/telegram-distribution-service"
+    );
+    if (await isTelegramDistributionDbReady()) {
+      await enqueueTelegramDistribution(
+        listing.id,
+        {
+          ...listingInputFromRow(listing),
+          region: listing.region,
+        },
+        { immediate: true }
+      );
+    }
+  } catch {
+    // multi-channel optional — single-channel adapter fallback
+  }
+
+  const refreshedJobs = await prisma.postingJob.findMany({
+    where: { listingId: listing.id },
+  });
 
   return {
     id: listing.id,
@@ -149,7 +177,7 @@ async function publishListingDb(
     landlordEmail: listing.landlordEmail,
     legacyLocalId: listing.legacyLocalId ?? undefined,
     images: listing.images.sort((a, b) => a.sortOrder - b.sortOrder).map((i) => i.url),
-    jobs,
+    jobs: refreshedJobs.map(mapJob),
     createdAt: listing.createdAt.toISOString(),
   };
 }

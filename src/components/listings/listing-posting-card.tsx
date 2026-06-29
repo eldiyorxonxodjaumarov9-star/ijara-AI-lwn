@@ -26,6 +26,7 @@ import { InstagramPlatformModal } from "@/components/listings/instagram-platform
 import { PostingPlatformModal } from "@/components/listings/posting-platform-modal";
 import { PostingManualExportModal } from "@/components/listings/posting-manual-export-modal";
 import { PostingLogsModal } from "@/components/listings/posting-logs-modal";
+import { TelegramDistributionModal } from "@/components/listings/telegram-distribution-modal";
 import { ManualPostingDialog } from "@/components/listings/manual-posting-dialog";
 
 const STATUS_LABEL: Record<ListingStatus, string> = {
@@ -49,6 +50,7 @@ export function ListingPostingCard({
   const [manualJob, setManualJob] = useState<PostingJobView | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [telegramOpen, setTelegramOpen] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [redistributing, setRedistributing] = useState(false);
 
@@ -155,7 +157,13 @@ export function ListingPostingCard({
               <PostingStatusBadges
                 jobs={jobs}
                 compact
-                onJobClick={setSelectedJob}
+                onJobClick={(job) => {
+                  if (job.platform === "TELEGRAM") {
+                    setTelegramOpen(true);
+                  } else {
+                    setSelectedJob(job);
+                  }
+                }}
               />
             </>
           )}
@@ -238,6 +246,12 @@ export function ListingPostingCard({
         onOpenChange={setLogsOpen}
         listingId={listing.id}
         listingTitle={listing.title}
+      />
+
+      <TelegramDistributionModal
+        listingId={listing.id}
+        open={telegramOpen}
+        onOpenChange={setTelegramOpen}
       />
     </>
   );

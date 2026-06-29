@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/payment-reminders?slot=evening",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/telegram-distribution",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

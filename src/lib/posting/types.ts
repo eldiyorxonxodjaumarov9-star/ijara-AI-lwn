@@ -19,6 +19,7 @@ export type PostingJobStatus =
 export type ListingPostInput = {
   title: string;
   district: string;
+  region?: string;
   propertyType: string;
   rooms: number;
   area: number;

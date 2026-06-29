@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Banknote,
   MoreVertical,
   Pencil,
@@ -36,36 +37,103 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { PAYMENT_METHOD_MAP } from "@/lib/constants";
-import type { Payment } from "@/types";
+import { computeDebts } from "@/lib/analytics";
+import { isSameMonthTashkent, getTashkentDateParts } from "@/lib/payment-due-schedule";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import type { Contract, Payment, Tenant } from "@/types";
+
+type PaymentTableRow = {
+  id: string;
+  tenantName: string;
+  propertyName: string;
+  dateLabel: string;
+  methodLabel: string;
+  amount: number;
+  isDebtor: boolean;
+  isDebtOnly: boolean;
+  payment?: Payment;
+};
 
 export default function PaymentsPage() {
-  const { data, loading } = useCollection<Payment>("payments");
+  const { data, loading: loadingPayments } = useCollection<Payment>("payments");
+  const { data: contracts, loading: loadingContracts } =
+    useCollection<Contract>("contracts");
+  const { data: tenants, loading: loadingTenants } =
+    useCollection<Tenant>("tenants");
   const { remove } = useCollectionActions<Payment>("payments");
+  const tashkentNow = useTashkentNow();
+  const loading = loadingPayments || loadingContracts || loadingTenants;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const debts = useMemo(
+    () => computeDebts(contracts, data, tenants, tashkentNow),
+    [contracts, data, tenants, tashkentNow]
+  );
+
+  const debtorContractIds = useMemo(
+    () => new Set(debts.map((d) => d.contractId)),
+    [debts]
+  );
+
+  const tableRows = useMemo<PaymentTableRow[]>(() => {
+    const contractsWithPayment = new Set(
+      data.map((p) => p.contractId).filter(Boolean) as string[]
+    );
+
+    const rows: PaymentTableRow[] = [];
+
+    for (const d of debts) {
+      if (!contractsWithPayment.has(d.contractId)) {
+        rows.push({
+          id: `debt-${d.contractId}`,
+          tenantName: d.tenantName,
+          propertyName: d.propertyName,
+          dateLabel:
+            d.overdueDays > 0
+              ? `Kechikkan (${d.overdueDays} kun)`
+              : "Muddati o'tgan",
+          methodLabel: "Qarzdor",
+          amount: d.debt,
+          isDebtor: true,
+          isDebtOnly: true,
+        });
+      }
+    }
+
+    for (const p of data) {
+      const isDebtor = !!p.contractId && debtorContractIds.has(p.contractId);
+      rows.push({
+        id: p.id,
+        tenantName: p.tenantName ?? "—",
+        propertyName: p.propertyName ?? "—",
+        dateLabel: formatDate(p.date),
+        methodLabel: PAYMENT_METHOD_MAP[p.method],
+        amount: p.amount,
+        isDebtor,
+        isDebtOnly: false,
+        payment: p,
+      });
+    }
+
+    return rows.sort((a, b) => Number(b.isDebtor) - Number(a.isDebtor));
+  }, [data, debts, debtorContractIds]);
 
   const total = useMemo(
     () => data.reduce((s, p) => s + (p.amount || 0), 0),
     [data]
   );
   const thisMonth = useMemo(() => {
-    const now = new Date();
+    const today = getTashkentDateParts(tashkentNow);
     return data
-      .filter((p) => {
-        const d = new Date(p.date);
-        return (
-          d.getMonth() === now.getMonth() &&
-          d.getFullYear() === now.getFullYear()
-        );
-      })
+      .filter((p) => isSameMonthTashkent(p.date, today.year, today.month))
       .reduce((s, p) => s + (p.amount || 0), 0);
-  }, [data]);
+  }, [data, tashkentNow]);
 
   const {
     search,
@@ -75,9 +143,9 @@ export default function PaymentsPage() {
     totalPages,
     total: count,
     paged,
-  } = useTableData<Payment>({
-    data,
-    searchFields: ["tenantName", "propertyName", "note"],
+  } = useTableData<PaymentTableRow>({
+    data: tableRows,
+    searchFields: ["tenantName", "propertyName", "dateLabel"],
     pageSize: 10,
   });
 
@@ -92,7 +160,7 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="To'lovlar"
-        description="Barcha kirim to'lovlarini kuzating."
+        description="Qarzdorlar qizil rangda — to'lov muddati o'tgan arendatorlar."
         action={
           <Button
             onClick={() => {
@@ -122,10 +190,10 @@ export default function PaymentsPage() {
           index={1}
         />
         <StatCard
-          title="Tranzaksiyalar"
-          value={String(data.length)}
-          icon={Banknote}
-          tone="violet"
+          title="Qarzdorlar"
+          value={String(debts.length)}
+          icon={AlertTriangle}
+          tone="rose"
           loading={loading}
           index={2}
         />
@@ -170,49 +238,83 @@ export default function PaymentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paged.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {p.tenantName ?? "—"}
+                {paged.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className={cn(
+                      row.isDebtor && "bg-destructive/[0.05]"
+                    )}
+                  >
+                    <TableCell
+                      className={cn(
+                        "font-medium",
+                        row.isDebtor && "text-destructive"
+                      )}
+                    >
+                      {row.tenantName}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {p.propertyName ?? "—"}
+                    <TableCell
+                      className={cn(
+                        "hidden md:table-cell",
+                        row.isDebtor
+                          ? "text-destructive/80"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {row.propertyName}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {formatDate(p.date)}
+                    <TableCell
+                      className={cn(
+                        "whitespace-nowrap",
+                        row.isDebtor && "text-destructive"
+                      )}
+                    >
+                      {row.dateLabel}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
-                        {PAYMENT_METHOD_MAP[p.method]}
-                      </Badge>
+                      {row.isDebtor ? (
+                        <Badge variant="destructive">
+                          <AlertTriangle className="mr-1 size-3" />
+                          {row.isDebtOnly ? "Qarzdor" : "Qarzdorlik"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">{row.methodLabel}</Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="font-semibold text-primary">
-                      {formatCurrency(p.amount)}
+                    <TableCell
+                      className={cn(
+                        "font-semibold",
+                        row.isDebtor ? "text-destructive" : "text-primary"
+                      )}
+                    >
+                      {formatCurrency(row.amount)}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="icon" variant="ghost">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditing(p);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="size-4" /> Tahrirlash
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteId(p.id)}
-                          >
-                            <Trash2 className="size-4" /> O&apos;chirish
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {row.payment ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost">
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditing(row.payment!);
+                                setDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="size-4" /> Tahrirlash
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteId(row.payment!.id)}
+                            >
+                              <Trash2 className="size-4" /> O&apos;chirish
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

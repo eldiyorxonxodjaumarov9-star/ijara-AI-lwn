@@ -26,7 +26,10 @@ import {
 import { getLandlordProfile } from "@/lib/landlord-profile";
 import { PROPERTY_TYPES } from "@/lib/landlord-profile";
 import { formatUzs } from "@/lib/rental-search";
-import { compressImageFile } from "@/lib/image-compress";
+import {
+  compressImageFile,
+  MAX_SOURCE_IMAGE_BYTES,
+} from "@/lib/image-compress";
 import { formatSummaInput, parseSumma } from "@/lib/uzs-input";
 
 const STATUS_LABEL: Record<ListingStatus, string> = {
@@ -36,7 +39,6 @@ const STATUS_LABEL: Record<ListingStatus, string> = {
 };
 
 const MAX_IMAGES = 5;
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 
 const EMPTY_FORM: {
   title: string;
@@ -94,8 +96,8 @@ export function LandlordListingsTab({ refreshKey }: { refreshKey: number }) {
           toast.error("Faqat rasm fayli yuklang");
           continue;
         }
-        if (file.size > MAX_IMAGE_SIZE) {
-          toast.error("Har bir rasm 2 MB dan kichik bo'lsin");
+        if (file.size > MAX_SOURCE_IMAGE_BYTES) {
+          toast.error("Rasm 20 MB dan kichik bo'lsin");
           continue;
         }
         const compressed = await compressImageFile(file);
@@ -210,7 +212,7 @@ export function LandlordListingsTab({ refreshKey }: { refreshKey: number }) {
                 {uploadingImages ? "Yuklanmoqda..." : "Rasm qo'shish"}
               </Button>
               <span className="text-xs text-slate-500">
-                {form.images.length}/{MAX_IMAGES} · har biri 2 MB gacha
+                {form.images.length}/{MAX_IMAGES} · avtomatik siqiladi
               </span>
             </div>
             {form.images.length > 0 && (

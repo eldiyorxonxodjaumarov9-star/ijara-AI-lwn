@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  FileText,
   MoreVertical,
   Pencil,
   Plus,
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
+import { exportToPdf } from "@/lib/export";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { EXPENSE_CATEGORY_MAP } from "@/lib/constants";
 import type { Expense } from "@/types";
@@ -54,6 +56,43 @@ export default function ExpensesPage() {
     () => data.reduce((s, e) => s + (e.amount || 0), 0),
     [data]
   );
+
+  const sortedExpenses = useMemo(
+    () =>
+      [...data].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [data]
+  );
+
+  const handlePdf = () => {
+    if (sortedExpenses.length === 0) {
+      toast.error("Eksport qilish uchun xarajatlar yo'q");
+      return;
+    }
+    exportToPdf({
+      title: "Xarajatlar hisoboti",
+      head: ["№", "Kategoriya", "Izoh", "Sana", "Summa"],
+      body: sortedExpenses.map((e, i) => [
+        i + 1,
+        EXPENSE_CATEGORY_MAP[e.category] ?? e.category,
+        e.note?.trim() || "—",
+        formatDate(e.date),
+        formatCurrency(e.amount),
+      ]),
+      foot: [
+        [
+          "",
+          "JAMI",
+          "",
+          `${sortedExpenses.length} ta yozuv`,
+          formatCurrency(total),
+        ],
+      ],
+      fileName: `xarajatlar-${new Date().toISOString().slice(0, 10)}`,
+    });
+    toast.success("PDF yuklab olindi");
+  };
 
   const {
     search,
@@ -82,14 +121,19 @@ export default function ExpensesPage() {
         title="Xarajatlar"
         description="Operatsion xarajatlarni qayd eting."
         action={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="size-4" /> Xarajat qo&apos;shish
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handlePdf} disabled={loading}>
+              <FileText className="size-4" /> PDF
+            </Button>
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="size-4" /> Xarajat qo&apos;shish
+            </Button>
+          </div>
         }
       />
 

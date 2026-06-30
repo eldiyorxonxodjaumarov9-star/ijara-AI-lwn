@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/client";
+import { tokenStore } from "@/lib/api/client";
 import type {
   DistributeOptions,
   TelegramChannelInput,
@@ -7,14 +7,35 @@ import type {
   TelegramPostingLogView,
 } from "@/lib/telegram-distribution/types";
 
+function authHeaders(): Record<string, string> {
+  const token = tokenStore.access;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function tdFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`/api/telegram-distribution${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+      ...init?.headers,
+    },
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.message ?? "So'rov xatosi");
+  }
+  return (json?.data ?? json) as T;
+}
+
 export async function fetchTelegramChannels() {
-  return apiFetch<TelegramChannelView[]>("/telegram-distribution/channels");
+  return tdFetch<TelegramChannelView[]>("/channels");
 }
 
 export async function createTelegramChannelApi(input: TelegramChannelInput) {
-  return apiFetch<TelegramChannelView>("/telegram-distribution/channels", {
+  return tdFetch<TelegramChannelView>("/channels", {
     method: "POST",
-    body: input,
+    body: JSON.stringify(input),
   });
 }
 
@@ -22,67 +43,60 @@ export async function updateTelegramChannelApi(
   id: string,
   input: Partial<TelegramChannelInput>
 ) {
-  return apiFetch<TelegramChannelView>(`/telegram-distribution/channels/${id}`, {
+  return tdFetch<TelegramChannelView>(`/channels/${id}`, {
     method: "PATCH",
-    body: input,
+    body: JSON.stringify(input),
   });
 }
 
 export async function deleteTelegramChannelApi(id: string) {
-  return apiFetch<{ ok: boolean }>(`/telegram-distribution/channels/${id}`, {
-    method: "DELETE",
-  });
+  return tdFetch<{ ok: boolean }>(`/channels/${id}`, { method: "DELETE" });
 }
 
 export async function testTelegramChannelApi(id: string) {
-  return apiFetch<{ messageId: string }>(
-    `/telegram-distribution/channels/${id}/test`,
-    { method: "POST" }
-  );
+  return tdFetch<{ messageId: string }>(`/channels/${id}/test`, {
+    method: "POST",
+  });
 }
 
 export async function checkTelegramChannelAdminApi(id: string) {
-  return apiFetch<{
+  return tdFetch<{
     isAdmin: boolean;
     status: string;
     botUsername?: string;
     channel: TelegramChannelView;
-  }>(`/telegram-distribution/channels/${id}/check-admin`, { method: "POST" });
+  }>(`/channels/${id}/check-admin`, { method: "POST" });
 }
 
 export async function fetchListingTelegramJobs(listingId: string) {
-  return apiFetch<{
+  return tdFetch<{
     jobs: TelegramPostingJobView[];
     logs: TelegramPostingLogView[];
-  }>(`/telegram-distribution/listings/${listingId}`);
+  }>(`/listings/${listingId}`);
 }
 
 export async function distributeListingTelegramApi(
   listingId: string,
   options?: DistributeOptions
 ) {
-  return apiFetch<TelegramPostingJobView[]>(
-    `/telegram-distribution/listings/${listingId}/distribute`,
-    { method: "POST", body: options ?? {} }
-  );
+  return tdFetch<TelegramPostingJobView[]>(`/listings/${listingId}/distribute`, {
+    method: "POST",
+    body: JSON.stringify(options ?? {}),
+  });
 }
 
 export async function bulkRepostTelegramApi(listingId: string) {
-  return apiFetch<TelegramPostingJobView[]>(
-    `/telegram-distribution/listings/${listingId}/repost`,
-    { method: "POST" }
-  );
+  return tdFetch<TelegramPostingJobView[]>(`/listings/${listingId}/repost`, {
+    method: "POST",
+  });
 }
 
 export async function retryTelegramJobApi(jobId: string) {
-  return apiFetch<TelegramPostingJobView>(
-    `/telegram-distribution/jobs/${jobId}/retry`,
-    { method: "POST" }
-  );
+  return tdFetch<TelegramPostingJobView>(`/jobs/${jobId}/retry`, {
+    method: "POST",
+  });
 }
 
 export async function processTelegramQueueApi() {
-  return apiFetch<{ processed: number }>("/telegram-distribution/queue/process", {
-    method: "POST",
-  });
+  return tdFetch<{ processed: number }>("/queue/process", { method: "POST" });
 }

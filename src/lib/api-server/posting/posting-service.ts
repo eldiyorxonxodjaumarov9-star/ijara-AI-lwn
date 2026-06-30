@@ -21,8 +21,16 @@ import { getPostingChannels } from "@/lib/api-server/posting/channels";
 import { isPostingDbReady } from "@/lib/api-server/posting/db-ready";
 import { saveJobResult } from "@/lib/api-server/posting/save-job-result";
 import { prisma } from "@/lib/api-server/prisma";
+import { isTelegramDistributionDbReady } from "@/lib/api-server/telegram-distribution/db-ready";
+import { enqueueTelegramDistribution } from "@/lib/api-server/telegram-distribution/telegram-distribution-service";
 
 export { generatePostText };
+
+async function hasEnabledTelegramChannels() {
+  if (!(await isTelegramDistributionDbReady())) return false;
+  const count = await prisma.telegramChannel.count({ where: { enabled: true } });
+  return count > 0;
+}
 
 function toDbStatus(status: ListingPostInput["status"]): RentalListingStatus {
   switch (status) {
@@ -37,8 +45,8 @@ function toDbStatus(status: ListingPostInput["status"]): RentalListingStatus {
 
 function listingInputFromRow(row: {
   title: string;
-  district: string;
   region?: string | null;
+  district: string;
   propertyType: string;
   rooms: number;
   area: number;
@@ -52,8 +60,8 @@ function listingInputFromRow(row: {
 }): ListingPostInput {
   return {
     title: row.title,
-    district: row.district,
     region: row.region ?? undefined,
+    district: row.district,
     propertyType: row.propertyType,
     rooms: row.rooms,
     area: row.area,
@@ -115,8 +123,8 @@ async function publishListingDb(
   const listing = await prisma.rentalListing.create({
     data: {
       title: input.title,
+      region: input.region?.trim() || input.district.trim(),
       district: input.district,
-      region: input.region?.trim() || null,
       propertyType: input.propertyType,
       rooms: input.rooms,
       area: input.area,
@@ -137,32 +145,24 @@ async function publishListingDb(
   });
 
   await createPostingJobs(listing.id, input);
-  await runPostingQueue(listing.id, input);
 
-  try {
-    const { isTelegramDistributionDbReady } = await import(
-      "@/lib/api-server/telegram-distribution/db-ready"
+  if (await hasEnabledTelegramChannels()) {
+    const immediate =
+      !input.scheduledAt || new Date(input.scheduledAt) <= new Date();
+    await enqueueTelegramDistribution(
+      listing.id,
+      {
+        ...input,
+        region: input.region ?? input.district,
+      },
+      {
+        immediate,
+        scheduledAt: input.scheduledAt,
+      }
     );
-    const { enqueueTelegramDistribution } = await import(
-      "@/lib/api-server/telegram-distribution/telegram-distribution-service"
-    );
-    if (await isTelegramDistributionDbReady()) {
-      await enqueueTelegramDistribution(
-        listing.id,
-        {
-          ...listingInputFromRow(listing),
-          region: listing.region ?? undefined,
-        },
-        { immediate: true }
-      );
-    }
-  } catch {
-    // multi-channel optional — single-channel adapter fallback
   }
 
-  const refreshedJobs = await prisma.postingJob.findMany({
-    where: { listingId: listing.id },
-  });
+  const jobs = await runPostingQueue(listing.id, input);
 
   return {
     id: listing.id,
@@ -177,7 +177,7 @@ async function publishListingDb(
     landlordEmail: listing.landlordEmail,
     legacyLocalId: listing.legacyLocalId ?? undefined,
     images: listing.images.sort((a, b) => a.sortOrder - b.sortOrder).map((i) => i.url),
-    jobs: refreshedJobs.map(mapJob),
+    jobs,
     createdAt: listing.createdAt.toISOString(),
   };
 }
@@ -290,6 +290,11 @@ async function executePlatformJob(
   channel: PostingChannelConfig | null,
   retryCount: number
 ): Promise<PostingJobView> {
+  if (platform === "TELEGRAM" && (await hasEnabledTelegramChannels())) {
+    const existing = await prisma.postingJob.findUnique({ where: { id: jobId } });
+    if (existing) return mapJob(existing);
+  }
+
   await prisma.postingJob.update({
     where: { id: jobId },
     data: { status: "PENDING", retryCount },

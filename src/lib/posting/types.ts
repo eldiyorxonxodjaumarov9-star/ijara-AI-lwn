@@ -18,8 +18,8 @@ export type PostingJobStatus =
 
 export type ListingPostInput = {
   title: string;
-  district: string;
   region?: string;
+  district: string;
   propertyType: string;
   rooms: number;
   area: number;
@@ -30,6 +30,8 @@ export type ListingPostInput = {
   landlordEmail: string;
   landlordName?: string;
   legacyLocalId?: string;
+  /** ISO datetime — belgilansa rejalashtirilgan yuborish */
+  scheduledAt?: string;
 };
 
 export type ManualPostingPackage = {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ExternalLink, Megaphone, Radio, Send } from "lucide-react";
+import { ExternalLink, Megaphone, Radio } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { ListingPublishPanel } from "@/components/listings/listing-publish-panel";
@@ -48,10 +48,6 @@ export default function ElonJoylashPage() {
               <Megaphone className="size-4" />
               E&apos;lon qo&apos;shish
             </TabsTrigger>
-            <TabsTrigger value="telegram" className="gap-2">
-              <Send className="size-4" />
-              Telegram Distribution
-            </TabsTrigger>
             <TabsTrigger value="channels" className="gap-2">
               <Radio className="size-4" />
               Tarqatish kanallari
@@ -62,11 +58,8 @@ export default function ElonJoylashPage() {
             <ListingPublishPanel landlordEmail={email} landlordName={name} />
           </TabsContent>
 
-          <TabsContent value="telegram" className="mt-6">
-            <TelegramDistributionPanel />
-          </TabsContent>
-
           <TabsContent value="channels" className="mt-6 space-y-6">
+            <TelegramDistributionPanel />
             <InstagramSettingsPanel />
             <PostingChannelsPanel hideInstagram />
           </TabsContent>

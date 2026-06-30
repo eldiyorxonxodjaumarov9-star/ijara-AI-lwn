@@ -9,27 +9,6 @@ export async function telegramPoster(
 ): Promise<AdapterResult> {
   const text = generatedText ?? generatePostText(listing, "TELEGRAM");
 
-  try {
-    const { isTelegramDistributionDbReady } = await import(
-      "@/lib/api-server/telegram-distribution/db-ready"
-    );
-    const { listTelegramChannels } = await import(
-      "@/lib/api-server/telegram-distribution/telegram-distribution-service"
-    );
-    if (await isTelegramDistributionDbReady()) {
-      const multi = await listTelegramChannels();
-      if (multi.some((c) => c.enabled)) {
-        return {
-          status: "PENDING",
-          generatedText: text,
-          channelName: `${multi.filter((c) => c.enabled).length} ta kanal navbatida`,
-        };
-      }
-    }
-  } catch {
-    // fallback to single-channel
-  }
-
   if (!channel?.enabled) {
     return { status: "PENDING", generatedText: text, errorMessage: "Telegram o'chirilgan" };
   }

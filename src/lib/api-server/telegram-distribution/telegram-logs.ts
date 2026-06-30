@@ -8,7 +8,7 @@ export async function appendTelegramLog(
   meta?: Record<string, unknown>
 ) {
   const row = await prisma.telegramPostingLog.create({
-    data: { jobId, level, message, meta: meta ?? undefined },
+    data: { jobId, level, message, meta: meta as object | undefined },
   });
   return mapLog(row);
 }

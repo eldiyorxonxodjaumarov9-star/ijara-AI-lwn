@@ -26,8 +26,8 @@ import { InstagramPlatformModal } from "@/components/listings/instagram-platform
 import { PostingPlatformModal } from "@/components/listings/posting-platform-modal";
 import { PostingManualExportModal } from "@/components/listings/posting-manual-export-modal";
 import { PostingLogsModal } from "@/components/listings/posting-logs-modal";
-import { TelegramDistributionModal } from "@/components/listings/telegram-distribution-modal";
 import { ManualPostingDialog } from "@/components/listings/manual-posting-dialog";
+import { TelegramDistributionModal } from "@/components/listings/telegram-distribution-modal";
 
 const STATUS_LABEL: Record<ListingStatus, string> = {
   active: "Faol",
@@ -38,19 +38,22 @@ const STATUS_LABEL: Record<ListingStatus, string> = {
 export function ListingPostingCard({
   listing,
   jobs,
+  serverListingId,
   onJobsChange,
   onDelete,
 }: {
   listing: LandlordListing;
   jobs: PostingJobView[];
+  /** PostgreSQL listing id — Telegram multi-channel uchun */
+  serverListingId?: string;
   onJobsChange: (listingId: string, jobs: PostingJobView[]) => void;
   onDelete: () => void;
 }) {
   const [selectedJob, setSelectedJob] = useState<PostingJobView | null>(null);
+  const [telegramOpen, setTelegramOpen] = useState(false);
   const [manualJob, setManualJob] = useState<PostingJobView | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
-  const [telegramOpen, setTelegramOpen] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [redistributing, setRedistributing] = useState(false);
 
@@ -158,7 +161,7 @@ export function ListingPostingCard({
                 jobs={jobs}
                 compact
                 onJobClick={(job) => {
-                  if (job.platform === "TELEGRAM") {
+                  if (job.platform === "TELEGRAM" && serverListingId) {
                     setTelegramOpen(true);
                   } else {
                     setSelectedJob(job);
@@ -248,11 +251,13 @@ export function ListingPostingCard({
         listingTitle={listing.title}
       />
 
-      <TelegramDistributionModal
-        listingId={listing.id}
-        open={telegramOpen}
-        onOpenChange={setTelegramOpen}
-      />
+      {serverListingId && (
+        <TelegramDistributionModal
+          listingId={serverListingId}
+          open={telegramOpen}
+          onOpenChange={setTelegramOpen}
+        />
+      )}
     </>
   );
 }

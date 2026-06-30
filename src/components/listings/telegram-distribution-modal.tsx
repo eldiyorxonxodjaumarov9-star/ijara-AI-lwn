@@ -25,7 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isApiConfigured } from "@/lib/api/client";
 import {
   bulkRepostTelegramApi,
   fetchListingTelegramJobs,
@@ -56,7 +55,7 @@ export function TelegramDistributionModal({
   const [reposting, setReposting] = useState(false);
 
   const load = useCallback(async () => {
-    if (!isApiConfigured || !listingId) return;
+    if (!listingId) return;
     setLoading(true);
     try {
       const data = await fetchListingTelegramJobs(listingId);
@@ -111,11 +110,7 @@ export function TelegramDistributionModal({
           </DialogTitle>
         </DialogHeader>
 
-        {!isApiConfigured ? (
-          <p className="text-sm text-muted-foreground">
-            Ko&apos;p kanalli tarqatish server rejimida ishlaydi.
-          </p>
-        ) : loading ? (
+        {loading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="size-6 animate-spin" />
           </div>

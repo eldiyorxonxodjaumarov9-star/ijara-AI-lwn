@@ -378,8 +378,8 @@ enum PostingJobStatus {
 model RentalListing {
   id            String              @id @default(uuid())
   title         String
-  district      String
   region        String?
+  district      String
   propertyType  String
   rooms         Int                 @default(1)
   area          Float               @default(0)
@@ -392,9 +392,9 @@ model RentalListing {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  images RentalListingImage[]
-  jobs   PostingJob[]
-  telegramJobs TelegramPostingJob[]
+  images        RentalListingImage[]
+  jobs          PostingJob[]
+  telegramJobs  TelegramPostingJob[]
 
   @@index([landlordEmail])
   @@index([status])
@@ -488,7 +488,7 @@ model TelegramChannel {
 
   jobs TelegramPostingJob[]
 
-  @@index([enabled, priority])
+  @@index([enabled])
   @@map("telegram_channels")
 }
 
@@ -508,12 +508,13 @@ model TelegramPostingJob {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  listing RentalListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  channel TelegramChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  listing RentalListing    @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  channel TelegramChannel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   logs    TelegramPostingLog[]
 
   @@unique([listingId, channelId])
-  @@index([status, scheduledAt])
+  @@index([status])
+  @@index([scheduledAt])
   @@index([listingId])
   @@map("telegram_posting_jobs")
 }

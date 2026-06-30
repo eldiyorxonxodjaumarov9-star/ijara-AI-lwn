@@ -38,6 +38,7 @@ import { ROLE_MAP } from "@/lib/constants";
 import type { Language } from "@/types";
 import { PostingChannelsPanel } from "@/components/listings/posting-channels-panel";
 import { InstagramSettingsPanel } from "@/components/listings/instagram-settings-panel";
+import { TelegramDistributionPanel } from "@/components/listings/telegram-distribution-panel";
 
 export default function SettingsPage() {
   return (
@@ -264,6 +265,7 @@ function SettingsPageContent() {
         </TabsContent>
 
         <TabsContent value="posting" className="space-y-6">
+          <TelegramDistributionPanel />
           <InstagramSettingsPanel />
           <Card>
             <CardHeader>

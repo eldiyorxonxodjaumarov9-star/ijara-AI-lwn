@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
     const input: ListingPostInput = {
       title: body.title.trim(),
+      region: body.region?.trim() || body.district?.trim(),
       district: body.district.trim(),
       propertyType: body.propertyType?.trim() || "Kvartira",
       rooms: Number(body.rooms) || 1,
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
       landlordEmail: body.landlordEmail.trim().toLowerCase(),
       landlordName: body.landlordName?.trim() || undefined,
       legacyLocalId: body.legacyLocalId?.trim() || undefined,
+      scheduledAt: body.scheduledAt?.trim() || undefined,
     };
 
     if (!input.price) {

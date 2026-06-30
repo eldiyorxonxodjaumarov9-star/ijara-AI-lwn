@@ -54,6 +54,7 @@ const EMPTY_FORM = {
   description: "",
   status: "active" as ListingStatus,
   images: [] as string[],
+  scheduleAt: "",
 };
 
 export function ListingPublishPanel({
@@ -68,6 +69,7 @@ export function ListingPublishPanel({
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [postingJobs, setPostingJobs] = useState<Record<string, PostingJobView[]>>({});
+  const [serverListingIds, setServerListingIds] = useState<Record<string, string>>({});
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const email = landlordEmail.trim().toLowerCase();
@@ -77,6 +79,7 @@ export function ListingPublishPanel({
     setListings(loaded);
 
     const jobs: Record<string, PostingJobView[]> = {};
+    const serverIds: Record<string, string> = {};
     for (const l of loaded) {
       const stored = getLocalPostingJobs(l.id);
       if (stored?.length) jobs[l.id] = stored;
@@ -87,6 +90,7 @@ export function ListingPublishPanel({
         const fromDb = await fetchListingsWithJobs(email);
         for (const row of fromDb) {
           const localId = row.legacyLocalId ?? row.id;
+          serverIds[localId] = row.id;
           if (row.jobs?.length) {
             jobs[localId] = row.jobs;
             saveLocalPostingJobs(localId, row.jobs);
@@ -97,6 +101,7 @@ export function ListingPublishPanel({
       }
     }
 
+    setServerListingIds(serverIds);
     setPostingJobs(jobs);
   }, [email]);
 
@@ -196,9 +201,16 @@ export function ListingPublishPanel({
         landlordEmail: email,
         landlordName: landlordName.trim() || "ArendaAi",
         legacyLocalId: result.listing.id,
+        scheduledAt: form.scheduleAt
+          ? new Date(form.scheduleAt).toISOString()
+          : undefined,
       });
 
       onJobsChange(result.listing.id, published.jobs);
+      setServerListingIds((prev) => ({
+        ...prev,
+        [result.listing.id]: published.id,
+      }));
       setForm(EMPTY_FORM);
 
       const posted = published.jobs.filter((j) => j.status === "POSTED").length;
@@ -349,6 +361,17 @@ export function ListingPublishPanel({
                 className="min-h-24"
               />
             </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Telegram yuborish vaqti (ixtiyoriy)</Label>
+              <Input
+                type="datetime-local"
+                value={form.scheduleAt}
+                onChange={(e) => setForm((f) => ({ ...f, scheduleAt: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Bo&apos;sh qoldirsangiz — darhol barcha mos Telegram kanallarga yuboriladi.
+              </p>
+            </div>
             <div className="sm:col-span-2">
               <Button type="submit" className="gap-2" disabled={saving || uploadingImages}>
                 <Plus className="size-4" />
@@ -374,6 +397,7 @@ export function ListingPublishPanel({
                 key={l.id}
                 listing={l}
                 jobs={postingJobs[l.id] ?? []}
+                serverListingId={serverListingIds[l.id]}
                 onJobsChange={onJobsChange}
                 onDelete={() => {
                   deleteLandlordListing(l.id);

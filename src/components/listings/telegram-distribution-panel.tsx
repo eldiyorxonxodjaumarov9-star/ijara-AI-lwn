@@ -39,7 +39,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isApiConfigured } from "@/lib/api/client";
 import {
   checkTelegramChannelAdminApi,
   createTelegramChannelApi,
@@ -70,15 +69,12 @@ export function TelegramDistributionPanel() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!isApiConfigured) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       setChannels(await fetchTelegramChannels());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Yuklash xatosi");
+      setChannels([]);
     } finally {
       setLoading(false);
     }
@@ -191,19 +187,6 @@ export function TelegramDistributionPanel() {
       setBusy(null);
     }
   };
-
-  if (!isApiConfigured) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Telegram Distribution</CardTitle>
-          <CardDescription>
-            Server rejimida (PostgreSQL) ko&apos;p kanalli tarqatish ishlaydi.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
 
   return (
     <Card>

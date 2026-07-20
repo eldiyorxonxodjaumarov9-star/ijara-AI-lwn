@@ -37,18 +37,15 @@ export async function upsertContractFromTenant(tenant: Tenant) {
   const notes = `Arendatordan avtomatik (${durationMonths} oy)`;
 
   if (existing) {
-    const startDate = tenant.entryDate
-      ? new Date(tenant.entryDate)
-      : new Date(existing.startDate);
+    // startDate ni o'zgartirmaymiz — eski oylar va to'lov tarixi saqlansin
+    const lockedStart = new Date(existing.startDate);
     return prisma.contract.update({
       where: { id: existing.id },
       data: {
-        propertyId,
         monthlyRent,
         deposit: tenant.depositAmount ?? 0,
         depositPaid: tenant.depositPaid ?? false,
-        startDate,
-        endDate: addMonths(startDate, durationMonths),
+        endDate: addMonths(lockedStart, durationMonths),
         status: monthlyRent > 0 ? "ACTIVE" : existing.status,
         notes,
       },

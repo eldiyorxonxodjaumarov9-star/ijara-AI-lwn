@@ -41,7 +41,9 @@ import { useTashkentNow } from "@/context/tashkent-time-context";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { computeDebts } from "@/lib/analytics";
-import { isSameMonthTashkent, getTashkentDateParts } from "@/lib/payment-due-schedule";
+import { MONTHS_UZ_FULL } from "@/lib/analytics";
+import { paymentBillingPeriod } from "@/lib/debt-calculator";
+import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import type { Contract, Payment, Tenant } from "@/types";
@@ -51,6 +53,7 @@ type PaymentTableRow = {
   tenantName: string;
   propertyName: string;
   dateLabel: string;
+  periodLabel: string;
   methodLabel: string;
   amount: number;
   isDebtor: boolean;
@@ -99,6 +102,7 @@ export default function PaymentsPage() {
             d.overdueDays > 0
               ? `Kechikkan (${d.overdueDays} kun)`
               : "Muddati o'tgan",
+          periodLabel: "—",
           methodLabel: "Qarzdor",
           amount: d.debt,
           isDebtor: true,
@@ -109,11 +113,13 @@ export default function PaymentsPage() {
 
     for (const p of data) {
       const isDebtor = !!p.contractId && debtorContractIds.has(p.contractId);
+      const period = paymentBillingPeriod(p);
       rows.push({
         id: p.id,
         tenantName: p.tenantName ?? "—",
         propertyName: p.propertyName ?? "—",
         dateLabel: formatDate(p.date),
+        periodLabel: `${MONTHS_UZ_FULL[period.month - 1]} ${period.year}`,
         methodLabel: PAYMENT_METHOD_MAP[p.method],
         amount: p.amount,
         isDebtor,
@@ -132,7 +138,10 @@ export default function PaymentsPage() {
   const thisMonth = useMemo(() => {
     const today = getTashkentDateParts(tashkentNow);
     return data
-      .filter((p) => isSameMonthTashkent(p.date, today.year, today.month))
+      .filter((p) => {
+        const period = paymentBillingPeriod(p);
+        return period.year === today.year && period.month === today.month;
+      })
       .reduce((s, p) => s + (p.amount || 0), 0);
   }, [data, tashkentNow]);
 
@@ -146,7 +155,7 @@ export default function PaymentsPage() {
     paged,
   } = useTableData<PaymentTableRow>({
     data: tableRows,
-    searchFields: ["tenantName", "propertyName", "dateLabel"],
+    searchFields: ["tenantName", "propertyName", "dateLabel", "periodLabel"],
     pageSize: 10,
   });
 
@@ -183,7 +192,7 @@ export default function PaymentsPage() {
           loading={loading}
         />
         <StatCard
-          title="Bu oy"
+          title="Bu oy uchun"
           value={formatCurrency(thisMonth)}
           icon={Banknote}
           tone="blue"
@@ -232,7 +241,8 @@ export default function PaymentsPage() {
                 <TableRow>
                   <TableHead>Arendator</TableHead>
                   <TableHead className="hidden md:table-cell">Mulk</TableHead>
-                  <TableHead>Sana</TableHead>
+                  <TableHead>Oy uchun</TableHead>
+                  <TableHead className="hidden sm:table-cell">Qabul</TableHead>
                   <TableHead>Usul</TableHead>
                   <TableHead>Summa</TableHead>
                   <TableHead className="w-12" />
@@ -268,6 +278,16 @@ export default function PaymentsPage() {
                       className={cn(
                         "whitespace-nowrap",
                         row.isDebtor && "text-destructive"
+                      )}
+                    >
+                      {row.periodLabel}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "hidden whitespace-nowrap sm:table-cell",
+                        row.isDebtor
+                          ? "text-destructive/80"
+                          : "text-muted-foreground"
                       )}
                     >
                       {row.dateLabel}

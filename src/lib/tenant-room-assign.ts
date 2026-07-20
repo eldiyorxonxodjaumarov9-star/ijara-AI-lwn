@@ -1,4 +1,5 @@
 import { getCollectionApi } from "@/lib/data/store";
+import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import type { Contract, Payment, PaymentMethod, Property, Tenant } from "@/types";
 
 function addMonths(date: Date, months: number) {
@@ -48,7 +49,7 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
     tenantId: tenant.id,
     propertyName: room.name,
     tenantName: tenant.fullName,
-    startDate: startDate.toISOString(),
+    startDate: existing?.startDate ?? startDate.toISOString(),
     endDate: endDate.toISOString(),
     monthlyPayment,
     deposit: tenant.depositAmount ?? 0,
@@ -59,7 +60,12 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
 
   let contractId: string;
   if (existing) {
-    await contractApi.update(existing.id, contractPayload);
+    // Kirish sanasi / startDate saqlanadi — eski to'lovlar oylari o'chmasin
+    await contractApi.update(existing.id, {
+      ...contractPayload,
+      startDate: existing.startDate,
+      endDate: addMonths(new Date(existing.startDate), durationMonths).toISOString(),
+    });
     contractId = existing.id;
   } else {
     contractId = await contractApi.create(contractPayload);
@@ -68,6 +74,7 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
   if (paymentStatus === "paid") {
     const amount = input.paymentAmount ?? monthlyPayment;
     const date = input.paymentDate ?? new Date().toISOString().slice(0, 10);
+    const period = getTashkentDateParts(date);
     await paymentApi.create({
       contractId,
       tenantId: tenant.id,
@@ -75,8 +82,10 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
       propertyName: room.name,
       amount,
       date,
+      periodYear: period.year,
+      periodMonth: period.month,
       method: input.paymentMethod ?? "cash",
-      note: "Xonaga biriktirish paytida",
+      note: `${period.year}-${String(period.month).padStart(2, "0")} oyi uchun`,
     });
   }
 

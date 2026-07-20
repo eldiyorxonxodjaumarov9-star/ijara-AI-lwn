@@ -27,18 +27,23 @@ import {
 } from "@/components/ui/select";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { isApiConfigured } from "@/lib/api/client";
+import { MONTHS_UZ_FULL } from "@/lib/analytics";
 import { notifyTenantPaymentLocal } from "@/lib/payment-reminders";
+import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { zResolver } from "@/lib/form";
 import { paymentSchema, type PaymentInput } from "@/lib/validations";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import type { Contract, Payment, PaymentMethod } from "@/types";
 
 const today = new Date().toISOString().slice(0, 10);
+const nowParts = getTashkentDateParts();
 
 const defaults: PaymentInput = {
   contractId: "",
   amount: 0,
   date: today,
+  periodYear: nowParts.year,
+  periodMonth: nowParts.month,
   method: "cash",
   note: "",
 };
@@ -68,18 +73,28 @@ export function PaymentDialog({
   });
 
   useEffect(() => {
-    if (open)
+    if (open) {
+      const dateParts = payment
+        ? getTashkentDateParts(payment.date)
+        : getTashkentDateParts();
       reset(
         payment
           ? {
               contractId: payment.contractId ?? "",
               amount: payment.amount,
               date: payment.date.slice(0, 10),
+              periodYear: payment.periodYear ?? dateParts.year,
+              periodMonth: payment.periodMonth ?? dateParts.month,
               method: payment.method,
               note: payment.note ?? "",
             }
-          : defaults
+          : {
+              ...defaults,
+              periodYear: dateParts.year,
+              periodMonth: dateParts.month,
+            }
       );
+    }
   }, [open, payment, reset]);
 
   const onContractChange = (contractId: string) => {
@@ -92,11 +107,19 @@ export function PaymentDialog({
 
   const onSubmit = async (values: PaymentInput) => {
     const contract = contracts.find((c) => c.id === values.contractId);
+    const periodYear = values.periodYear ?? getTashkentDateParts(values.date).year;
+    const periodMonth =
+      values.periodMonth ?? getTashkentDateParts(values.date).month;
     const payload = {
       ...values,
+      periodYear,
+      periodMonth,
       tenantId: contract?.tenantId,
       tenantName: contract?.tenantName,
       propertyName: contract?.propertyName,
+      note:
+        values.note?.trim() ||
+        `${MONTHS_UZ_FULL[periodMonth - 1]} ${periodYear} oyi uchun`,
     };
     try {
       if (payment) {
@@ -120,12 +143,17 @@ export function PaymentDialog({
     }
   };
 
+  const yearOptions = Array.from({ length: 6 }, (_, i) => nowParts.year - 2 + i);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{payment ? "To'lovni tahrirlash" : "Yangi to'lov"}</DialogTitle>
-          <DialogDescription>To&apos;lov ma&apos;lumotlari.</DialogDescription>
+          <DialogDescription>
+            To&apos;lov qaysi oy uchun ekanini belgilang — shu oy uchun summa
+            doim saqlanib qoladi.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -147,6 +175,49 @@ export function PaymentDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
+              <Label>Qaysi oy uchun</Label>
+              <Select
+                value={String(watch("periodMonth") ?? nowParts.month)}
+                onValueChange={(v) =>
+                  setValue("periodMonth", Number(v), { shouldValidate: true })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS_UZ_FULL.map((label, i) => (
+                    <SelectItem key={label} value={String(i + 1)}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Yil</Label>
+              <Select
+                value={String(watch("periodYear") ?? nowParts.year)}
+                onValueChange={(v) =>
+                  setValue("periodYear", Number(v), { shouldValidate: true })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
               <Label>To&apos;langan summa</Label>
               <MoneyInput
                 value={watch("amount") ?? 0}
@@ -157,7 +228,7 @@ export function PaymentDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label>Sana</Label>
+              <Label>Qabul qilingan sana</Label>
               <Input type="date" {...register("date")} />
             </div>
           </div>
@@ -183,7 +254,7 @@ export function PaymentDialog({
 
           <div className="space-y-1.5">
             <Label>Izoh</Label>
-            <Textarea placeholder="Masalan: Iyun oyi uchun" {...register("note")} />
+            <Textarea placeholder="Ixtiyoriy" {...register("note")} />
           </div>
 
           <DialogFooter>

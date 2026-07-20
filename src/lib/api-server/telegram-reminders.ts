@@ -63,6 +63,8 @@ export async function computeServerDebts(): Promise<DebtReminderInput[]> {
         tenantId: c.tenantId,
         amount: p.amount,
         date: p.paymentDate.toISOString(),
+        periodYear: p.periodYear ?? undefined,
+        periodMonth: p.periodMonth ?? undefined,
         method: p.paymentMethod.toLowerCase() as Payment["method"],
         note: p.notes ?? undefined,
         createdAt: p.createdAt.toISOString(),

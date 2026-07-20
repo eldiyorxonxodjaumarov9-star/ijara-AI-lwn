@@ -82,6 +82,8 @@ export const paymentSchema = z.object({
   contractId: z.string().optional(),
   amount: z.coerce.number().min(1, "Summani kiriting"),
   date: z.string().min(1, "Sanani tanlang"),
+  periodYear: z.coerce.number().int().min(2000).max(2100).optional(),
+  periodMonth: z.coerce.number().int().min(1).max(12).optional(),
   method: z.enum(["cash", "card", "bank"]),
   note: z.string().optional(),
 });

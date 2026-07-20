@@ -220,10 +220,13 @@ const payment: MapperConfig = {
     return {
       id: String(i.id),
       contractId: s(i.contractId),
+      tenantId: s(ten.id ?? c.tenantId),
       tenantName: s(ten.fullName),
       propertyName: s(prop.title),
       amount: n(i.amount),
       date: String(i.paymentDate ?? i.createdAt ?? ""),
+      periodYear: i.periodYear != null ? n(i.periodYear) : undefined,
+      periodMonth: i.periodMonth != null ? n(i.periodMonth) : undefined,
       method: paymentMethodFromApi(i.paymentMethod),
       note: s(i.notes),
       createdAt: String(i.createdAt ?? new Date().toISOString()),
@@ -233,6 +236,14 @@ const payment: MapperConfig = {
     contractId: d.contractId,
     amount: n(d.amount),
     paymentDate: new Date((d.date as string) ?? Date.now()).toISOString(),
+    periodYear:
+      d.periodYear != null && d.periodYear !== ""
+        ? n(d.periodYear)
+        : undefined,
+    periodMonth:
+      d.periodMonth != null && d.periodMonth !== ""
+        ? n(d.periodMonth)
+        : undefined,
     paymentMethod: PAYMENT_METHOD_TO_API[d.method as PaymentMethod] ?? "CASH",
     notes: d.note || undefined,
   }),

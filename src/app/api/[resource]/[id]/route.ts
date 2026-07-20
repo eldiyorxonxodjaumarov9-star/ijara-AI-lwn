@@ -107,8 +107,41 @@ export async function PATCH(
             include: { property: true, tenant: true },
           })
         );
-      case "payments":
-        return ok(await prisma.payment.update({ where: { id }, data: body as never }));
+      case "payments": {
+        const data: Record<string, unknown> = {};
+        if (body.contractId != null) data.contractId = String(body.contractId);
+        if (body.amount != null) data.amount = Number(body.amount);
+        if (body.paymentDate != null || body.date != null) {
+          data.paymentDate = new Date(
+            String(body.paymentDate ?? body.date)
+          );
+        }
+        if (body.paymentMethod != null) data.paymentMethod = body.paymentMethod;
+        if (body.notes != null || body.note != null) {
+          data.notes = String(body.notes ?? body.note ?? "") || null;
+        }
+        if (body.periodYear !== undefined) {
+          data.periodYear =
+            body.periodYear == null || body.periodYear === ""
+              ? null
+              : Number(body.periodYear);
+        }
+        if (body.periodMonth !== undefined) {
+          data.periodMonth =
+            body.periodMonth == null || body.periodMonth === ""
+              ? null
+              : Number(body.periodMonth);
+        }
+        return ok(
+          await prisma.payment.update({
+            where: { id },
+            data: data as never,
+            include: {
+              contract: { include: { property: true, tenant: true } },
+            },
+          })
+        );
+      }
       case "expenses":
         return ok(await prisma.expense.update({ where: { id }, data: body as never }));
       case "maintenance":

@@ -137,9 +137,10 @@ export default function DebtsPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        * Qarzdorlik Toshkent vaqti bo&apos;yicha hisoblanadi: har oyning belgilangan
-        to&apos;lov kunidan keyin to&apos;lanmagan summa avtomatik qarz bo&apos;limiga
-        tushadi. Soat yarim tunda va har daqiqada yangilanadi.
+        * Qarzdorlik Toshkent vaqti bo&apos;yicha hisoblanadi. Bir oy uchun
+        to&apos;langan summa shu oyda saqlanib qoladi — keyingi oy alohida
+        hisoblanadi. Shartnoma tugasa ham eski to&apos;lovlar o&apos;chmaydi
+        («Yakunlash»). Soat yarim tunda va har daqiqada yangilanadi.
       </p>
     </div>
   );

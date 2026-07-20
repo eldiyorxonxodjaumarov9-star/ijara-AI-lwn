@@ -3,7 +3,6 @@ import {
   getPaymentDayOfMonth,
   getTashkentDateParts,
   isPaymentMonthOverdue,
-  isSameMonthTashkent,
   type TashkentDateParts,
 } from "@/lib/payment-due-schedule";
 
@@ -13,6 +12,10 @@ function daysInMonth(year: number, month: number) {
 
 function toTashkentParts(value: string | Date): TashkentDateParts {
   return getTashkentDateParts(value);
+}
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 /** Arendator to'lov kuni (1–31), yo'q bo'lsa shartnoma boshlanish kuni */
@@ -67,19 +70,24 @@ function contractActiveInMonth(
   return true;
 }
 
-function paidInMonth(
-  payments: Payment[],
-  contractId: string,
-  year: number,
-  month: number
-) {
-  return payments
-    .filter(
-      (p) =>
-        p.contractId === contractId &&
-        isSameMonthTashkent(p.date, year, month)
-    )
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
+/**
+ * To'lov qaysi oyga tegishli.
+ * periodYear/periodMonth bo'lsa — shu oy; aks holda to'lov sanasi oyi.
+ */
+export function paymentBillingPeriod(payment: Payment): {
+  year: number;
+  month: number;
+} {
+  if (
+    payment.periodYear &&
+    payment.periodMonth &&
+    payment.periodMonth >= 1 &&
+    payment.periodMonth <= 12
+  ) {
+    return { year: payment.periodYear, month: payment.periodMonth };
+  }
+  const p = getTashkentDateParts(payment.date);
+  return { year: p.year, month: p.month };
 }
 
 /**
@@ -128,6 +136,12 @@ export interface ContractDebtResult {
   overdueDays: number;
 }
 
+/**
+ * Qarzdorlik: har bir muddati o'tgan oy uchun oylik summa.
+ * To'lovlar avval o'z oyiga (period) birikadi, qolgani eski oylardan
+ * boshlab FIFO bilan taqsimlanadi — bir marta to'langan oy doim to'langan
+ * qoladi, yangi oy alohida hisoblanadi.
+ */
 export function computeContractDebt(
   contract: Contract,
   payments: Payment[],
@@ -150,11 +164,7 @@ export function computeContractDebt(
     untilMonth = end.month;
   }
 
-  let monthsDue = 0;
-  let expected = 0;
-  let paidApplied = 0;
-  let debt = 0;
-
+  const overdueMonths: { year: number; month: number }[] = [];
   for (const { year, month } of eachMonth(start, {
     year: untilYear,
     month: untilMonth,
@@ -162,16 +172,58 @@ export function computeContractDebt(
   })) {
     if (!contractActiveInMonth(start, end, year, month, today)) continue;
     if (!isPaymentMonthOverdue(year, month, paymentDay, now)) continue;
-
-    monthsDue += 1;
-    expected += monthly;
-    const paidThisMonth = paidInMonth(payments, contract.id, year, month);
-    paidApplied += Math.min(paidThisMonth, monthly);
-    const shortfall = monthly - paidThisMonth;
-    if (shortfall > 0) {
-      debt += shortfall;
-    }
+    overdueMonths.push({ year, month });
   }
+
+  const monthsDue = overdueMonths.length;
+  const expected = monthsDue * monthly;
+
+  if (monthly <= 0 || monthsDue === 0) {
+    return { monthsDue, expected: 0, paid: 0, debt: 0, overdueDays: 0 };
+  }
+
+  const contractPayments = payments
+    .filter((p) => p.contractId === contract.id && (p.amount || 0) > 0)
+    .slice()
+    .sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+  const remainingByMonth = new Map<string, number>();
+  for (const m of overdueMonths) {
+    remainingByMonth.set(monthKey(m.year, m.month), monthly);
+  }
+
+  let pool = 0;
+
+  for (const payment of contractPayments) {
+    let left = payment.amount || 0;
+    const period = paymentBillingPeriod(payment);
+    const key = monthKey(period.year, period.month);
+    const need = remainingByMonth.get(key);
+    if (need != null && need > 0) {
+      const apply = Math.min(left, need);
+      remainingByMonth.set(key, need - apply);
+      left -= apply;
+    }
+    if (left > 0) pool += left;
+  }
+
+  for (const m of overdueMonths) {
+    if (pool <= 0) break;
+    const key = monthKey(m.year, m.month);
+    const need = remainingByMonth.get(key) ?? 0;
+    if (need <= 0) continue;
+    const apply = Math.min(pool, need);
+    remainingByMonth.set(key, need - apply);
+    pool -= apply;
+  }
+
+  let debt = 0;
+  for (const m of overdueMonths) {
+    debt += remainingByMonth.get(monthKey(m.year, m.month)) ?? 0;
+  }
+  const paidApplied = Math.max(0, expected - debt);
 
   const dueDayThisMonth = Math.min(
     paymentDay,

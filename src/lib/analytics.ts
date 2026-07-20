@@ -5,7 +5,7 @@ import type {
   Property,
   Tenant,
 } from "@/types";
-import { computeContractDebt } from "@/lib/debt-calculator";
+import { computeContractDebt, paymentBillingPeriod } from "@/lib/debt-calculator";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 
 const MONTHS_UZ = [
@@ -266,8 +266,6 @@ export function buildPaymentReportRows({
   /** 0 = Yanvar … 11 = Dekabr */
   month: number;
 }) {
-  const ref = new Date(year, month, 1);
-
   const resolveName = (p: Payment) => {
     if (p.tenantName?.trim()) return p.tenantName.trim();
     const tenant = tenants.find((t) => t.id === p.tenantId);
@@ -275,7 +273,11 @@ export function buildPaymentReportRows({
   };
 
   return payments
-    .filter((p) => isSameMonth(new Date(p.date), ref))
+    .filter((p) => {
+      const period = paymentBillingPeriod(p);
+      // month arg: 0 = Yanvar … 11 = Dekabr
+      return period.year === year && period.month === month + 1;
+    })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .map((p, index) => ({
       index: index + 1,

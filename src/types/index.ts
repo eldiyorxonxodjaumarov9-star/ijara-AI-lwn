@@ -81,6 +81,9 @@ export interface Payment {
   propertyName?: string;
   amount: number;
   date: string;
+  /** Qaysi kalendar oyi uchun (1–12) */
+  periodYear?: number;
+  periodMonth?: number;
   method: PaymentMethod;
   note?: string;
   createdAt: string;

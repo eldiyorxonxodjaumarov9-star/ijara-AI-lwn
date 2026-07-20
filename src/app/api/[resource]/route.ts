@@ -148,6 +148,10 @@ export async function POST(
           201
         );
       case "payments": {
+        const periodYear =
+          body.periodYear != null ? Number(body.periodYear) : undefined;
+        const periodMonth =
+          body.periodMonth != null ? Number(body.periodMonth) : undefined;
         const created = await prisma.payment.create({
           data: {
             contractId: String(body.contractId),
@@ -155,6 +159,12 @@ export async function POST(
             paymentDate: new Date(
               String(body.paymentDate ?? body.date ?? Date.now())
             ),
+            periodYear:
+              periodYear && periodYear >= 2000 ? periodYear : undefined,
+            periodMonth:
+              periodMonth && periodMonth >= 1 && periodMonth <= 12
+                ? periodMonth
+                : undefined,
             paymentMethod: (body.paymentMethod as never) ?? "CASH",
             notes: body.notes ? String(body.notes) : undefined,
           },

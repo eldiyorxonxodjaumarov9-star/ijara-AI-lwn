@@ -194,6 +194,9 @@ model Payment {
   contractId    String
   amount        Float
   paymentDate   DateTime      @default(now())
+  /** Qaysi oy uchun to'langan (1–12). Belgilansa shu oyga birikadi. */
+  periodYear    Int?
+  periodMonth   Int?
   paymentMethod PaymentMethod @default(CASH)
   notes         String?
   createdAt     DateTime      @default(now())
@@ -203,6 +206,7 @@ model Payment {
 
   @@index([contractId])
   @@index([paymentDate])
+  @@index([periodYear, periodMonth])
   @@map("payments")
 }
 

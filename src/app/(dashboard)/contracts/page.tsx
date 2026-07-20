@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  CheckCircle2,
   Download,
   FileText,
   MoreVertical,
@@ -45,14 +46,17 @@ import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CONTRACT_STATUS_MAP } from "@/lib/constants";
 import { generateContractPdf } from "@/lib/pdf";
-import type { Client, Contract } from "@/types";
+import type { Client, Contract, Property } from "@/types";
 
 export default function ContractsPage() {
   const { data, loading, api } = useCollection<Contract>("contracts");
   const { data: clients, loading: loadingClients } = useCollection<Client>("clients");
-  const { remove } = useCollectionActions<Contract>("contracts");
+  const { data: properties } = useCollection<Property>("properties");
+  const { remove, update } = useCollectionActions<Contract>("contracts");
+  const { update: updateProperty } = useCollectionActions<Property>("properties");
   const [syncing, setSyncing] = useState(false);
   const autoSynced = useRef(false);
+  const [finishId, setFinishId] = useState<string | null>(null);
 
   const runSync = async (silent = false) => {
     if (!isApiConfigured) return;
@@ -99,6 +103,34 @@ export default function ContractsPage() {
     await remove(deleteId);
     toast.success("Shartnoma o'chirildi");
     setDeleteId(null);
+  };
+
+  const handleFinish = async () => {
+    if (!finishId) return;
+    const contract = data.find((c) => c.id === finishId);
+    if (!contract) {
+      setFinishId(null);
+      return;
+    }
+    await update(finishId, {
+      ...contract,
+      status: "expired",
+    });
+    const property = properties.find((p) => p.id === contract.propertyId);
+    if (property) {
+      try {
+        await updateProperty(property.id, {
+          ...property,
+          status: "available",
+        });
+      } catch {
+        /* xona bo'shatilmasa ham shartnoma yakunlanadi */
+      }
+    }
+    toast.success(
+      "Shartnoma yakunlandi. To'lovlar va kirish sanasi saqlanib qoldi."
+    );
+    setFinishId(null);
   };
 
   return (
@@ -221,6 +253,11 @@ export default function ContractsPage() {
                             >
                               <Pencil className="size-4" /> Tahrirlash
                             </DropdownMenuItem>
+                            {c.status === "active" || c.status === "pending" ? (
+                              <DropdownMenuItem onClick={() => setFinishId(c.id)}>
+                                <CheckCircle2 className="size-4" /> Yakunlash
+                              </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => setDeleteId(c.id)}
@@ -318,9 +355,18 @@ export default function ContractsPage() {
         client={depositClient}
       />
       <ConfirmDialog
+        open={!!finishId}
+        onOpenChange={(o) => !o && setFinishId(null)}
+        title="Shartnomani yakunlash"
+        description="Shartnoma tugaydi, xona bo'shaydi. Eski to'lovlar, summalar va kirish sanasi o'chirilmaydi."
+        confirmText="Yakunlash"
+        onConfirm={handleFinish}
+      />
+      <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
         title="Shartnomani o'chirish"
+        description="Diqqat: shartnoma bilan birga barcha to'lov tarixi ham o'chadi. Tarixni saqlash uchun «Yakunlash»ni tanlang."
         onConfirm={handleDelete}
       />
     </div>

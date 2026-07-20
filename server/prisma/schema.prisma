@@ -66,6 +66,7 @@ enum NotificationType {
 enum ClientStatus {
   NEW
   MATCHED
+  ARCHIVED
 }
 
 // ===================== MODELS =====================
@@ -139,27 +140,30 @@ model Property {
 }
 
 model Tenant {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
+  clientNumber     String?   @unique
   fullName         String
   phone            String
   passport         String
-  login            String?  @unique
+  login            String?   @unique
   password         String?
   telegram         String?
-  telegramChatId   String?  @unique
+  telegramChatId   String?   @unique
   email            String?
   address          String?
-  rentAmount       Float    @default(0)
+  rentAmount       Float     @default(0)
   contractDuration Int?
   entryDate        DateTime?
   paymentDueDate   DateTime?
-  depositPaid      Boolean  @default(false)
-  depositAmount    Float    @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  depositPaid      Boolean   @default(false)
+  depositAmount    Float     @default(0)
+  leftAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   contracts Contract[]
   clients   Client[]
+  archives  TenantArchive[]
   telegramBotUsers TelegramBotUser[]
 
   @@map("tenants")
@@ -182,6 +186,7 @@ model Contract {
   property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   payments Payment[]
+  archives TenantArchive[]
 
   @@index([status])
   @@index([propertyId])
@@ -299,6 +304,40 @@ model Client {
   @@index([status])
   @@index([tenantId])
   @@map("clients")
+}
+
+// Klient chiqgandan keyin saqlanadigan to'liq tarix (to'lovlar o'chmaydi)
+model TenantArchive {
+  id               String   @id @default(uuid())
+  clientNumber     String
+  tenantId         String?
+  contractId       String?
+  fullName         String
+  phone            String
+  passport         String?
+  propertyId       String?
+  propertyName     String
+  entryDate        DateTime?
+  leaveDate        DateTime @default(now())
+  contractStart    DateTime
+  contractEnd      DateTime
+  monthlyRent      Float    @default(0)
+  deposit          Float    @default(0)
+  depositPaid      Boolean  @default(false)
+  contractDuration Int?
+  totalPaid        Float    @default(0)
+  paymentCount     Int      @default(0)
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@index([clientNumber])
+  @@index([tenantId])
+  @@index([leaveDate])
+  @@index([propertyName])
+  @@map("tenant_archives")
 }
 
 model TelegramSession {

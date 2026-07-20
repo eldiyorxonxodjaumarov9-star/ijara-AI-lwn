@@ -99,6 +99,7 @@ export const CLIENT_STATUS_MAP: Record<
 > = {
   new: { label: "Yangi", variant: "warning" },
   matched: { label: "Ro'yxatda bor", variant: "success" },
+  archived: { label: "Chiqib ketgan", variant: "secondary" },
 };
 
 export const ROLE_MAP: Record<Role, string> = {

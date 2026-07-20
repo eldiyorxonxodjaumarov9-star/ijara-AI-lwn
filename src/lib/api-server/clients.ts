@@ -95,7 +95,16 @@ export async function upsertClientFromTenant(tenant: {
   phone: string;
   depositPaid?: boolean;
   depositAmount?: number;
+  leftAt?: Date | null;
 }) {
+  if (tenant.leftAt) {
+    await prisma.client.updateMany({
+      where: { tenantId: tenant.id },
+      data: { status: "ARCHIVED" },
+    });
+    return prisma.client.findFirst({ where: { tenantId: tenant.id } });
+  }
+
   const row = await upsertClientLead({
     fullName: tenant.fullName,
     phone: tenant.phone,

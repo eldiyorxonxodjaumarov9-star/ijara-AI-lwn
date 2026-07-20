@@ -84,6 +84,7 @@ const notifTypeFromApi = (v: unknown): NotificationType => {
 const CLIENT_STATUS_TO_API: Record<ClientStatus, string> = {
   new: "NEW",
   matched: "MATCHED",
+  archived: "ARCHIVED",
 };
 const clientStatusFromApi = (v: unknown): ClientStatus =>
   String(v ?? "NEW").toLowerCase() as ClientStatus;
@@ -135,6 +136,7 @@ const tenant: MapperConfig = {
   path: "/tenants",
   fromApi: (i): Tenant => ({
     id: String(i.id),
+    clientNumber: s(i.clientNumber),
     fullName: String(i.fullName ?? ""),
     phone: String(i.phone ?? ""),
     passport: String(i.passport ?? ""),
@@ -148,6 +150,7 @@ const tenant: MapperConfig = {
     paymentDueDate: s(i.paymentDueDate),
     depositPaid: Boolean(i.depositPaid),
     depositAmount: n(i.depositAmount),
+    leftAt: s(i.leftAt),
     createdAt: String(i.createdAt ?? new Date().toISOString()),
   }),
   toCreate: (d) => ({

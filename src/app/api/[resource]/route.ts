@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { mapTenantCreate, stripTenantSecret } from "@/lib/api-server/tenants";
+import { ensureTenantClientNumber } from "@/lib/api-server/client-number";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
@@ -125,9 +126,11 @@ export async function POST(
         const created = await prisma.tenant.create({
           data: await mapTenantCreate(body),
         });
-        await upsertClientFromTenant(created);
-        await upsertContractFromTenant(created);
-        return ok(stripTenantSecret(created), 201);
+        await ensureTenantClientNumber(created.id);
+        const fresh = await prisma.tenant.findUnique({ where: { id: created.id } });
+        await upsertClientFromTenant(fresh ?? created);
+        await upsertContractFromTenant(fresh ?? created);
+        return ok(stripTenantSecret(fresh ?? created), 201);
       }
       case "contracts":
         return ok(

@@ -24,6 +24,7 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
   const propertyApi = getCollectionApi<Property>("properties");
   const contractApi = getCollectionApi<Contract>("contracts");
   const paymentApi = getCollectionApi<Payment>("payments");
+  const tenantApi = getCollectionApi<Tenant>("tenants");
 
   const contracts = await contractApi.list();
   const existing = contracts.find((c) => c.tenantId === tenant.id);
@@ -67,6 +68,10 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
       endDate: addMonths(new Date(existing.startDate), durationMonths).toISOString(),
     });
     contractId = existing.id;
+    await tenantApi.update(tenant.id, {
+      ...tenant,
+      leftAt: undefined,
+    });
   } else {
     contractId = await contractApi.create(contractPayload);
   }

@@ -37,6 +37,7 @@ export interface Property {
 
 export interface Tenant {
   id: string;
+  clientNumber?: string;
   fullName: string;
   phone: string;
   passport: string;
@@ -49,6 +50,7 @@ export interface Tenant {
   paymentDueDate?: string;
   depositPaid?: boolean;
   depositAmount?: number;
+  leftAt?: string;
   createdAt: string;
 }
 
@@ -131,7 +133,7 @@ export interface AppNotification {
   createdAt: string;
 }
 
-export type ClientStatus = "new" | "matched";
+export type ClientStatus = "new" | "matched" | "archived";
 
 /** Portal orqali ism+telefon bilan kirganlar (CRM) */
 export interface Client {
@@ -145,6 +147,31 @@ export interface Client {
   loginCount: number;
   firstLoginAt: string;
   lastLoginAt: string;
+  createdAt: string;
+}
+
+/** Chiqib ketgan klientlar to'liq tarixi — to'lovlar saqlanadi */
+export interface TenantArchive {
+  id: string;
+  clientNumber: string;
+  tenantId?: string;
+  contractId?: string;
+  fullName: string;
+  phone: string;
+  passport?: string;
+  propertyId?: string;
+  propertyName: string;
+  entryDate?: string;
+  leaveDate: string;
+  contractStart: string;
+  contractEnd: string;
+  monthlyRent: number;
+  deposit: number;
+  depositPaid: boolean;
+  contractDuration?: number;
+  totalPaid: number;
+  paymentCount: number;
+  notes?: string;
   createdAt: string;
 }
 

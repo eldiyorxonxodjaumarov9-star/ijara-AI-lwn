@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   Link2,
+  LogOut,
   MoreVertical,
   Pencil,
   Plus,
@@ -47,6 +48,10 @@ import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
 import { refreshCollection } from "@/lib/data/store";
 import { getTenantRoomMaps } from "@/lib/tenant-room-assign";
+import {
+  checkoutTenantApi,
+  checkoutTenantLocal,
+} from "@/lib/tenant-checkout-client";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import { deleteTenantWithLinkedClients } from "@/lib/tenant-client-sync";
 import type { Contract, Tenant } from "@/types";
@@ -54,7 +59,7 @@ import type { Contract, Tenant } from "@/types";
 type TenantRow = Tenant & { assignedRoom: string };
 
 export default function TenantsPage() {
-  const { data, loading } = useCollection<Tenant>("tenants");
+  const { data, loading, api } = useCollection<Tenant>("tenants");
   const { data: contracts } = useCollection<Contract>("contracts");
   const { remove } = useCollectionActions<Tenant>("tenants");
 
@@ -63,13 +68,18 @@ export default function TenantsPage() {
     [contracts]
   );
 
+  const activeTenants = useMemo(
+    () => data.filter((t) => !t.leftAt),
+    [data]
+  );
+
   const tenantsWithRoom = useMemo<TenantRow[]>(
     () =>
-      data.map((t) => ({
+      activeTenants.map((t) => ({
         ...t,
         assignedRoom: roomByTenant.get(t.id) ?? "",
       })),
-    [data, roomByTenant]
+    [activeTenants, roomByTenant]
   );
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -77,6 +87,8 @@ export default function TenantsPage() {
   const [editing, setEditing] = useState<Tenant | null>(null);
   const [assigning, setAssigning] = useState<Tenant | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
     useTableData<TenantRow>({
@@ -97,11 +109,42 @@ export default function TenantsPage() {
     setDeleteId(null);
   };
 
+  const handleCheckout = async () => {
+    if (!checkoutId) return;
+    setCheckingOut(true);
+    try {
+      if (isApiConfigured) {
+        await checkoutTenantApi(checkoutId);
+        await Promise.all([
+          api.list(),
+          refreshCollection("contracts"),
+          refreshCollection("properties"),
+          refreshCollection("clients"),
+        ]);
+      } else {
+        await checkoutTenantLocal(checkoutId);
+        await Promise.all([
+          api.list(),
+          refreshCollection("contracts"),
+          refreshCollection("properties"),
+        ]);
+      }
+      toast.success(
+        "Klient chiqdi — xona bo'shadi, to'lovlar Klient bazasida saqlanadi"
+      );
+      setCheckoutId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Chiqish xatosi");
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Arendatorlar"
-        description="Ijarachilar ro'yxati va ularning ma'lumotlari."
+        description="Faol ijarachilar. Chiqish — xona bo'shadi, ma'lumotlar Klient bazasida qoladi."
         action={
           <div className="flex flex-wrap gap-2">
             <SendPaymentRemindersButton variant="outline" />
@@ -147,6 +190,7 @@ export default function TenantsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>№</TableHead>
                   <TableHead>F.I.O</TableHead>
                   <TableHead>Xona</TableHead>
                   <TableHead className="hidden md:table-cell">Telefon</TableHead>
@@ -167,6 +211,13 @@ export default function TenantsPage() {
                       setAssignOpen(true);
                     }}
                   >
+                    <TableCell>
+                      {tenant.clientNumber ? (
+                        <Badge variant="outline">{tenant.clientNumber}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
@@ -236,11 +287,20 @@ export default function TenantsPage() {
                           >
                             <Pencil className="size-4" /> Tahrirlash
                           </DropdownMenuItem>
+                          {tenant.assignedRoom ? (
+                            <DropdownMenuItem onClick={() => setCheckoutId(tenant.id)}>
+                              <LogOut className="size-4" /> Xonadan chiqish
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => setCheckoutId(tenant.id)}>
+                              <LogOut className="size-4" /> Chiqish (arxivga)
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => setDeleteId(tenant.id)}
                           >
-                            <Trash2 className="size-4" /> O&apos;chirish
+                            <Trash2 className="size-4" /> Butunlay o&apos;chirish
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -271,9 +331,18 @@ export default function TenantsPage() {
         tenant={assigning}
       />
       <ConfirmDialog
+        open={!!checkoutId}
+        onOpenChange={(o) => !o && setCheckoutId(null)}
+        title="Klientni xonadan chiqarish"
+        description="Xona bo'shaydi. Barcha to'lovlar va shartnoma ma'lumotlari Klient bazasida saqlanadi — pul kamaymaydi."
+        confirmText={checkingOut ? "Jarayonda..." : "Chiqish"}
+        onConfirm={handleCheckout}
+      />
+      <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
-        title="Arendatorni o'chirish"
+        title="Arendatorni butunlay o'chirish"
+        description="Diqqat: shartnoma va barcha to'lovlar ham o'chadi. Tarixni saqlash uchun «Xonadan chiqish»ni tanlang."
         onConfirm={handleDelete}
       />
     </div>

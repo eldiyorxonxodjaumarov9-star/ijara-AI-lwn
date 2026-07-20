@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Banknote,
+  Archive,
   Bell,
   BookUser,
   Bot,
@@ -45,6 +46,7 @@ export const navigation: NavSection[] = [
       { titleKey: "nav.lwnRooms", href: "/lwn-rooms", icon: DoorOpen },
       { titleKey: "nav.tenants", href: "/tenants", icon: Users },
       { titleKey: "nav.clients", href: "/clients", icon: BookUser },
+      { titleKey: "nav.clientDatabase", href: "/klient-baza", icon: Archive },
       {
         titleKey: "nav.aiAgent",
         href: "/ai-agent",

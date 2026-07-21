@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -59,6 +59,8 @@ export function PaymentDialog({
 }) {
   const { data: contracts } = useCollection<Contract>("contracts");
   const { create, update } = useCollectionActions<Payment>("payments");
+  const submittingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const {
     register,
@@ -66,7 +68,7 @@ export function PaymentDialog({
     reset,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<PaymentInput>({
     resolver: zResolver<PaymentInput>(paymentSchema),
     defaultValues: defaults,
@@ -74,6 +76,8 @@ export function PaymentDialog({
 
   useEffect(() => {
     if (open) {
+      submittingRef.current = false;
+      setSaving(false);
       const dateParts = payment
         ? getTashkentDateParts(payment.date)
         : getTashkentDateParts();
@@ -106,6 +110,11 @@ export function PaymentDialog({
   };
 
   const onSubmit = async (values: PaymentInput) => {
+    // Ikki marta bosish / Enter — faqat 1 marta saqlansin
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSaving(true);
+
     const contract = contracts.find((c) => c.id === values.contractId);
     const periodYear = values.periodYear ?? getTashkentDateParts(values.date).year;
     const periodMonth =
@@ -139,6 +148,8 @@ export function PaymentDialog({
       }
       onOpenChange(false);
     } catch {
+      submittingRef.current = false;
+      setSaving(false);
       toast.error("Xatolik yuz berdi");
     }
   };
@@ -156,10 +167,21 @@ export function PaymentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void handleSubmit(onSubmit)(e);
+          }}
+          className="space-y-4"
+        >
           <div className="space-y-1.5">
             <Label>Shartnoma</Label>
-            <Select value={watch("contractId")} onValueChange={onContractChange}>
+            <Select
+              value={watch("contractId")}
+              onValueChange={onContractChange}
+              disabled={saving}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Shartnomani tanlang" />
               </SelectTrigger>
@@ -261,12 +283,13 @@ export function PaymentDialog({
             <Button
               type="button"
               variant="outline"
+              disabled={saving}
               onClick={() => onOpenChange(false)}
             >
               Bekor qilish
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="size-4 animate-spin" />}
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="size-4 animate-spin" />}
               {payment ? "Saqlash" : "Qo'shish"}
             </Button>
           </DialogFooter>

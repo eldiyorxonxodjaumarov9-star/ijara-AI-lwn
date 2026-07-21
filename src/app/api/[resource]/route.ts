@@ -4,6 +4,7 @@ import { mapTenantCreate, stripTenantSecret } from "@/lib/api-server/tenants";
 import { ensureTenantClientNumber } from "@/lib/api-server/client-number";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
+import { findRecentDuplicatePayment } from "@/lib/api-server/payment-dedupe";
 import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
@@ -155,20 +156,39 @@ export async function POST(
           body.periodYear != null ? Number(body.periodYear) : undefined;
         const periodMonth =
           body.periodMonth != null ? Number(body.periodMonth) : undefined;
+        const contractId = String(body.contractId);
+        const amount = Number(body.amount ?? 0);
+        const paymentDate = new Date(
+          String(body.paymentDate ?? body.date ?? Date.now())
+        );
+        const paymentMethod = (body.paymentMethod as never) ?? "CASH";
+        const resolvedPeriodYear =
+          periodYear && periodYear >= 2000 ? periodYear : undefined;
+        const resolvedPeriodMonth =
+          periodMonth && periodMonth >= 1 && periodMonth <= 12
+            ? periodMonth
+            : undefined;
+
+        const duplicate = await findRecentDuplicatePayment({
+          contractId,
+          amount,
+          paymentDate,
+          periodYear: resolvedPeriodYear,
+          periodMonth: resolvedPeriodMonth,
+          paymentMethod: String(paymentMethod),
+        });
+        if (duplicate) {
+          return ok(duplicate, 200);
+        }
+
         const created = await prisma.payment.create({
           data: {
-            contractId: String(body.contractId),
-            amount: Number(body.amount ?? 0),
-            paymentDate: new Date(
-              String(body.paymentDate ?? body.date ?? Date.now())
-            ),
-            periodYear:
-              periodYear && periodYear >= 2000 ? periodYear : undefined,
-            periodMonth:
-              periodMonth && periodMonth >= 1 && periodMonth <= 12
-                ? periodMonth
-                : undefined,
-            paymentMethod: (body.paymentMethod as never) ?? "CASH",
+            contractId,
+            amount,
+            paymentDate,
+            periodYear: resolvedPeriodYear,
+            periodMonth: resolvedPeriodMonth,
+            paymentMethod,
             notes: body.notes ? String(body.notes) : undefined,
           },
           include: {

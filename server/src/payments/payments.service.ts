@@ -23,16 +23,36 @@ export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(dto: CreatePaymentDto) {
-    return this.prisma.payment.create({
-      data: {
-        contractId: dto.contractId,
-        amount: dto.amount,
-        paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
-        paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH,
-        notes: dto.notes,
-      },
-      include: INCLUDE,
-    });
+    const amount = dto.amount;
+    const contractId = dto.contractId;
+    const paymentDate = dto.paymentDate ? new Date(dto.paymentDate) : new Date();
+    const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH;
+    const since = new Date(Date.now() - 45_000);
+
+    return this.prisma.payment
+      .findFirst({
+        where: {
+          contractId,
+          amount,
+          paymentMethod,
+          createdAt: { gte: since },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: INCLUDE,
+      })
+      .then((existing) => {
+        if (existing) return existing;
+        return this.prisma.payment.create({
+          data: {
+            contractId,
+            amount,
+            paymentDate,
+            paymentMethod,
+            notes: dto.notes,
+          },
+          include: INCLUDE,
+        });
+      });
   }
 
   async findAll(query: PaginationDto, contractId?: string) {

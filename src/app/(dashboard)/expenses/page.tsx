@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FileText,
   MoreVertical,
@@ -24,6 +24,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,7 +46,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
+import { MONTHS_UZ_FULL } from "@/lib/analytics";
 import { exportToPdf } from "@/lib/export";
+import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { EXPENSE_CATEGORY_MAP } from "@/lib/constants";
 import type { Expense } from "@/types";
@@ -48,21 +57,41 @@ export default function ExpensesPage() {
   const { data, loading } = useCollection<Expense>("expenses");
   const { remove } = useCollectionActions<Expense>("expenses");
 
+  const nowParts = getTashkentDateParts();
+  const [month, setMonth] = useState(String(nowParts.month));
+  const [year, setYear] = useState(String(nowParts.year));
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const monthNum = Number(month);
+  const yearNum = Number(year);
+  const periodLabel = `${MONTHS_UZ_FULL[monthNum - 1]} ${yearNum}`;
+
+  const yearOptions = useMemo(() => {
+    const y = nowParts.year;
+    return Array.from({ length: 6 }, (_, i) => y - 2 + i);
+  }, [nowParts.year]);
+
+  const filtered = useMemo(() => {
+    return data.filter((e) => {
+      const p = getTashkentDateParts(e.date);
+      return p.year === yearNum && p.month === monthNum;
+    });
+  }, [data, yearNum, monthNum]);
+
   const total = useMemo(
-    () => data.reduce((s, e) => s + (e.amount || 0), 0),
-    [data]
+    () => filtered.reduce((s, e) => s + (e.amount || 0), 0),
+    [filtered]
   );
 
   const sortedExpenses = useMemo(
     () =>
-      [...data].sort(
+      [...filtered].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       ),
-    [data]
+    [filtered]
   );
 
   const handlePdf = () => {
@@ -71,7 +100,7 @@ export default function ExpensesPage() {
       return;
     }
     exportToPdf({
-      title: "Xarajatlar hisoboti",
+      title: `Xarajatlar hisoboti — ${periodLabel}`,
       head: ["№", "Kategoriya", "Izoh", "Sana", "Summa"],
       body: sortedExpenses.map((e, i) => [
         i + 1,
@@ -89,7 +118,7 @@ export default function ExpensesPage() {
           formatCurrency(total),
         ],
       ],
-      fileName: `xarajatlar-${new Date().toISOString().slice(0, 10)}`,
+      fileName: `xarajatlar-${yearNum}-${String(monthNum).padStart(2, "0")}`,
     });
     toast.success("PDF yuklab olindi");
   };
@@ -103,10 +132,14 @@ export default function ExpensesPage() {
     total: count,
     paged,
   } = useTableData<Expense>({
-    data,
+    data: sortedExpenses,
     searchFields: ["category", "note"],
     pageSize: 10,
   });
+
+  useEffect(() => {
+    setPage(1);
+  }, [month, year, setPage]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -119,9 +152,33 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Xarajatlar"
-        description="Operatsion xarajatlarni qayd eting."
+        description={`${periodLabel} — operatsion xarajatlarni qayd eting.`}
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Oy" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS_UZ_FULL.map((name, i) => (
+                  <SelectItem key={name} value={String(i + 1)}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="Yil" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={handlePdf} disabled={loading}>
               <FileText className="size-4" /> PDF
             </Button>
@@ -139,7 +196,7 @@ export default function ExpensesPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard
-          title="Jami xarajat"
+          title={`${periodLabel} jami`}
           value={formatCurrency(total)}
           icon={Receipt}
           tone="rose"
@@ -147,7 +204,7 @@ export default function ExpensesPage() {
         />
         <StatCard
           title="Yozuvlar soni"
-          value={String(data.length)}
+          value={String(filtered.length)}
           icon={Receipt}
           tone="amber"
           loading={loading}
@@ -177,8 +234,8 @@ export default function ExpensesPage() {
             <div className="p-6">
               <EmptyState
                 icon={Receipt}
-                title="Xarajatlar yo'q"
-                description="Birinchi xarajatni qo'shing."
+                title={`${periodLabel}da xarajat yo'q`}
+                description="Boshqa oy tanlang yoki yangi xarajat qo'shing."
               />
             </div>
           ) : (

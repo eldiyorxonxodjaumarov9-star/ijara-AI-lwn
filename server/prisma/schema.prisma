@@ -69,6 +69,15 @@ enum ClientStatus {
   ARCHIVED
 }
 
+enum ContactInterest {
+  INTERESTED
+  CALLED
+  THINKING
+  VISITED
+  FOLLOW_UP
+  NOT_INTERESTED
+}
+
 // ===================== MODELS =====================
 
 model User {
@@ -338,6 +347,23 @@ model TenantArchive {
   @@index([leaveDate])
   @@index([propertyName])
   @@map("tenant_archives")
+}
+
+/** Telefon qilgan / qiziqqan kontaktlar */
+model ContactLead {
+  id        String          @id @default(uuid())
+  fullName  String
+  phone     String
+  interest  ContactInterest @default(CALLED)
+  notes     String?
+  source    String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([phone])
+  @@index([interest])
+  @@index([createdAt])
+  @@map("contact_leads")
 }
 
 model TelegramSession {

@@ -1,6 +1,7 @@
 import type {
   AnalysisLevel,
   ClientStatus,
+  ContactInterest,
   ContractStatus,
   ExpenseCategory,
   MaintenanceStatus,
@@ -100,6 +101,18 @@ export const CLIENT_STATUS_MAP: Record<
   new: { label: "Yangi", variant: "warning" },
   matched: { label: "Ro'yxatda bor", variant: "success" },
   archived: { label: "Chiqib ketgan", variant: "secondary" },
+};
+
+export const CONTACT_INTEREST_MAP: Record<
+  ContactInterest,
+  { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" | "outline" }
+> = {
+  interested: { label: "Qiziqdi", variant: "success" },
+  called: { label: "Qo'ng'iroq qildi", variant: "default" },
+  thinking: { label: "O'ylab ko'radi", variant: "warning" },
+  visited: { label: "Kelib ko'rdi", variant: "outline" },
+  follow_up: { label: "Qayta bog'lanish", variant: "secondary" },
+  not_interested: { label: "Qiziqmadi", variant: "destructive" },
 };
 
 export const ROLE_MAP: Record<Role, string> = {

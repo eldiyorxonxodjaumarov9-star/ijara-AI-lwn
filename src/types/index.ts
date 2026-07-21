@@ -150,6 +150,26 @@ export interface Client {
   createdAt: string;
 }
 
+export type ContactInterest =
+  | "interested"
+  | "called"
+  | "thinking"
+  | "visited"
+  | "follow_up"
+  | "not_interested";
+
+/** Telefon / qiziqish kontaktlari */
+export interface ContactLead {
+  id: string;
+  fullName: string;
+  phone: string;
+  interest: ContactInterest;
+  notes?: string;
+  source?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 /** Chiqib ketgan klientlar to'liq tarixi — to'lovlar saqlanadi */
 export interface TenantArchive {
   id: string;
@@ -173,6 +193,31 @@ export interface TenantArchive {
   paymentCount: number;
   notes?: string;
   createdAt: string;
+}
+
+/** Klient bazasi birlashtirilgan qator */
+export type ClientDatabaseKind = "active" | "left" | "contact";
+
+export interface ClientDatabaseRow {
+  id: string;
+  kind: ClientDatabaseKind;
+  clientNumber?: string;
+  fullName: string;
+  phone: string;
+  propertyName?: string;
+  entryDate?: string;
+  leaveDate?: string;
+  totalPaid?: number;
+  interest?: ContactInterest;
+  notes?: string;
+  passport?: string;
+  monthlyRent?: number;
+  contractDuration?: number;
+  depositPaid?: boolean;
+  deposit?: number;
+  paymentCount?: number;
+  contractStart?: string;
+  contractEnd?: string;
 }
 
 export type AnalysisLevel = "high" | "medium" | "low" | "unknown";

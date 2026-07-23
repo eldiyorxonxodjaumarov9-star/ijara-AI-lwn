@@ -26,7 +26,10 @@ function monthsBetween(from: Date, to: Date) {
 
 export async function computeServerDebts(): Promise<DebtReminderInput[]> {
   const contracts = await prisma.contract.findMany({
-    where: { status: { in: ["ACTIVE", "EXPIRED"] } },
+    where: {
+      status: { in: ["ACTIVE", "EXPIRED"] },
+      tenant: { leftAt: null },
+    },
     include: { property: true, tenant: true, payments: true },
   });
   const now = new Date();
@@ -76,6 +79,8 @@ export async function computeServerDebts(): Promise<DebtReminderInput[]> {
         tenantName: c.tenant.fullName,
         propertyName: c.property.title,
         debt: result.debt,
+        overdueDays: result.overdueDays,
+        monthsDue: result.monthsDue,
       };
     })
     .filter((d) => d.debt > 0);

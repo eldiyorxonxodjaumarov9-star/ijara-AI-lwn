@@ -2,22 +2,22 @@ import bcrypt from "bcryptjs";
 import type { Role } from "@prisma/client";
 
 import { prisma } from "@/lib/api-server/prisma";
-import { computeServerDebts } from "@/lib/api-server/telegram-reminders";
+import { computeContractDebt } from "@/lib/debt-calculator";
 import { sendTelegramMessage } from "@/lib/api-server/telegram-bot";
+import {
+  formatUzs,
+  type DebtReminderInput,
+} from "@/lib/payment-reminder-utils";
 import {
   DUE_SOON_WINDOW,
   formatScheduleStatus,
-  formatTashkentDateTime,
+  formatTashkentClock,
   getPaymentDayOfMonth,
   getPaymentSchedule,
 } from "@/lib/payment-due-schedule";
+import type { Contract, ContractStatus, Payment, Tenant } from "@/types";
 
 const OWNER_ROLES: Role[] = ["SUPER_ADMIN", "ADMIN", "MANAGER"];
-
-function formatDateUz(value?: Date | null) {
-  if (!value) return "—";
-  return value.toISOString().slice(0, 10);
-}
 
 export function daysUntilPayment(dueDate?: Date | null) {
   const schedule = getPaymentSchedule(dueDate);
@@ -26,11 +26,19 @@ export function daysUntilPayment(dueDate?: Date | null) {
   return schedule.daysLeft;
 }
 
-function formatDaysLeft(days: number | null) {
-  if (days === null) return "To'lov muddati kiritilmagan";
-  if (days < 0) return `Muddati o'tgan (${Math.abs(days)} kun)`;
-  if (days === 0) return "Bugun to'lov kuni";
-  return `To'lovga ${days} kun qoldi`;
+function formatDebtStatus(row: AdminTenantRow) {
+  if (!row.hasDebt) {
+    if (row.daysLeft === null) return "To'lov muddati kiritilmagan";
+    if (row.daysLeft === 0) return "Bugun to'lov kuni";
+    if (row.daysLeft > 0) return `To'lovga ${row.daysLeft} kun qoldi`;
+    return "Qarzsiz";
+  }
+  const parts: string[] = [];
+  if (row.debtAmount > 0) parts.push(formatUzs(row.debtAmount));
+  if (row.overdueDays > 0) parts.push(`${row.overdueDays} kun kechikkan`);
+  else if (row.monthsDue > 0) parts.push(`${row.monthsDue} oy qarzdor`);
+  else parts.push("Qarzdor");
+  return parts.join(" · ");
 }
 
 export async function verifyOwnerCredentials(email: string, password: string) {
@@ -67,35 +75,93 @@ export type AdminTenantRow = {
   paymentDayOfMonth: number | null;
   daysLeft: number | null;
   overdueDays: number;
+  monthsDue: number;
+  debtAmount: number;
   hasDebt: boolean;
   isDueSoon: boolean;
 };
 
+/**
+ * Saytdagi Qarzdorliklar / Arendatorlar bilan bir xil hisob:
+ * to'lovlar bo'yicha computeContractDebt + Toshkent vaqti.
+ */
 export async function getAdminDashboardRows(): Promise<AdminTenantRow[]> {
+  const now = new Date();
   const tenants = await prisma.tenant.findMany({
+    where: { leftAt: null },
     orderBy: { fullName: "asc" },
     include: {
       contracts: {
-        where: { status: { in: ["ACTIVE", "PENDING"] } },
-        include: { property: true },
+        where: { status: { in: ["ACTIVE", "PENDING", "EXPIRED"] } },
+        include: {
+          property: true,
+          payments: true,
+        },
         orderBy: { createdAt: "desc" },
-        take: 1,
       },
     },
   });
 
-  const debts = await computeServerDebts();
-  const debtTenantIds = new Set(
-    debts.filter((d) => d.tenantId).map((d) => d.tenantId as string)
-  );
-
   return tenants.map((t) => {
-    const schedule = getPaymentSchedule(t.paymentDueDate);
+    const contractRow =
+      t.contracts.find((c) => c.status === "ACTIVE" || c.status === "PENDING") ??
+      t.contracts[0];
+
+    let debtAmount = 0;
+    let overdueDays = 0;
+    let monthsDue = 0;
+
+    if (contractRow) {
+      const contract: Contract = {
+        id: contractRow.id,
+        propertyId: contractRow.propertyId,
+        tenantId: t.id,
+        propertyName: contractRow.property.title,
+        tenantName: t.fullName,
+        startDate: contractRow.startDate.toISOString(),
+        endDate: contractRow.endDate.toISOString(),
+        monthlyPayment: contractRow.monthlyRent,
+        deposit: contractRow.deposit ?? undefined,
+        depositPaid: contractRow.depositPaid,
+        status: contractRow.status.toLowerCase() as ContractStatus,
+        notes: contractRow.notes ?? undefined,
+        createdAt: contractRow.createdAt.toISOString(),
+      };
+      const tenant: Tenant = {
+        id: t.id,
+        fullName: t.fullName,
+        phone: t.phone,
+        passport: t.passport,
+        rentAmount: t.rentAmount,
+        paymentDueDate: t.paymentDueDate?.toISOString(),
+        createdAt: t.createdAt.toISOString(),
+      };
+      const payments: Payment[] = contractRow.payments.map((p) => ({
+        id: p.id,
+        contractId: p.contractId,
+        tenantId: t.id,
+        amount: p.amount,
+        date: p.paymentDate.toISOString(),
+        periodYear: p.periodYear ?? undefined,
+        periodMonth: p.periodMonth ?? undefined,
+        method: p.paymentMethod.toLowerCase() as Payment["method"],
+        note: p.notes ?? undefined,
+        createdAt: p.createdAt.toISOString(),
+      }));
+      const result = computeContractDebt(contract, payments, tenant, now);
+      debtAmount = result.debt;
+      overdueDays = result.overdueDays;
+      monthsDue = result.monthsDue;
+    }
+
+    const hasDebt = debtAmount > 0;
+    const schedule = getPaymentSchedule(t.paymentDueDate, now);
+
     return {
       id: t.id,
       fullName: t.fullName,
       phone: t.phone,
-      room: t.contracts[0]?.property.title ?? "—",
+      room: contractRow?.property.title ?? "—",
       paymentDueDate: t.paymentDueDate,
       paymentDayOfMonth: t.paymentDueDate
         ? getPaymentDayOfMonth(t.paymentDueDate)
@@ -105,9 +171,12 @@ export async function getAdminDashboardRows(): Promise<AdminTenantRow[]> {
           ? -schedule.overdueDays
           : schedule.daysLeft
         : null,
-      overdueDays: schedule?.overdueDays ?? 0,
-      hasDebt: debtTenantIds.has(t.id),
-      isDueSoon: schedule?.isDueSoon ?? false,
+      overdueDays: hasDebt ? overdueDays : 0,
+      monthsDue,
+      debtAmount,
+      hasDebt,
+      // Faqat qarzsiz va yaqin to'lov — saytdagi "yaqin" mantiq
+      isDueSoon: !hasDebt && (schedule?.isDueSoon ?? false),
     };
   });
 }
@@ -130,15 +199,17 @@ function chunkLines(lines: string[], maxLen = 3900) {
 
 export function buildAdminTenantsMessage(rows: AdminTenantRow[]) {
   if (rows.length === 0) {
-    return "📋 <b>Arendatorlar</b>\n\nHozircha arendator yo'q.";
+    return "📋 <b>Arendatorlar</b>\n\nHozircha faol arendator yo'q.";
   }
-  const lines = [`📋 <b>Arendatorlar</b> (${rows.length} ta)\n`];
+  const lines = [
+    `📋 <b>Arendatorlar</b> (${rows.length} ta)`,
+    `🕐 ${formatTashkentClock()}\n`,
+  ];
   rows.forEach((r, i) => {
     lines.push(
       `${i + 1}. <b>${r.fullName}</b> — ${r.room}`,
       `   📱 ${r.phone}`,
-      `   ⏰ ${formatDaysLeft(r.daysLeft)} (${formatDateUz(r.paymentDueDate)})`,
-      r.hasDebt ? "   ⚠️ Qarzdor" : "   ✅ Qarzsiz",
+      `   ${r.hasDebt ? "⚠️" : "✅"} ${formatDebtStatus(r)}`,
       ""
     );
   });
@@ -146,15 +217,23 @@ export function buildAdminTenantsMessage(rows: AdminTenantRow[]) {
 }
 
 export function buildAdminDebtorsMessage(rows: AdminTenantRow[]) {
-  const debtors = rows.filter((r) => r.hasDebt);
+  const debtors = rows
+    .filter((r) => r.hasDebt)
+    .sort((a, b) => b.debtAmount - a.debtAmount);
   if (debtors.length === 0) {
-    return "✅ <b>Qarzdorlar</b>\n\nHozircha qarzdor arendator yo'q.";
+    return "✅ <b>Qarzdorlar</b>\n\nHozircha qarzdor arendator yo'q (sayt bilan bir xil).";
   }
-  const lines = [`⚠️ <b>Qarzdorlar</b> (${debtors.length} ta)\n`];
+  const totalDebt = debtors.reduce((s, r) => s + r.debtAmount, 0);
+  const lines = [
+    `⚠️ <b>Qarzdorlar</b> (${debtors.length} ta)`,
+    `💰 Jami qarz: <b>${formatUzs(totalDebt)}</b>`,
+    `🕐 ${formatTashkentClock()}\n`,
+  ];
   debtors.forEach((r, i) => {
     lines.push(
       `${i + 1}. <b>${r.fullName}</b> — ${r.room}`,
-      `   ⏰ ${formatDaysLeft(r.daysLeft)}`,
+      `   💰 ${formatDebtStatus(r)}`,
+      `   📱 ${r.phone}`,
       ""
     );
   });
@@ -162,38 +241,35 @@ export function buildAdminDebtorsMessage(rows: AdminTenantRow[]) {
 }
 
 export function buildAdminDueSoonMessage(rows: AdminTenantRow[]) {
-  const today = formatTashkentDateTime();
+  const today = formatTashkentClock();
   const dueSoon = rows
     .filter((r) => r.isDueSoon && r.paymentDayOfMonth !== null)
-    .sort((a, b) => {
-      const aSort = a.overdueDays > 0 ? -a.overdueDays : (a.daysLeft ?? 99);
-      const bSort = b.overdueDays > 0 ? -b.overdueDays : (b.daysLeft ?? 99);
-      return aSort - bSort;
-    });
+    .sort((a, b) => (a.daysLeft ?? 99) - (b.daysLeft ?? 99));
 
   if (dueSoon.length === 0) {
     return (
       `📅 <b>To'lov muddati yaqin kelganlar</b>\n` +
       `🕐 Toshkent: ${today}\n\n` +
-      `Keyingi ${DUE_SOON_WINDOW} kun ichida to'lov muddati yaqinlashgan arendator yo'q.`
+      `Keyingi ${DUE_SOON_WINDOW} kun ichida to'lov muddati yaqinlashgan (qarzsiz) arendator yo'q.`
     );
   }
 
   const lines = [
     `📅 <b>To'lov muddati yaqin kelganlar</b> (${dueSoon.length} ta)`,
     `🕐 Toshkent: ${today}`,
-    `📆 Sana oyning kuni bo'yicha avtomatik hisoblanadi\n`,
+    `ℹ️ Faqat qarzsiz, yaqin kunlarda to'lov qilishi kerak bo'lganlar\n`,
   ];
 
   dueSoon.forEach((r, i) => {
     const schedule = getPaymentSchedule(r.paymentDueDate);
-    const status = schedule ? formatScheduleStatus(schedule) : formatDaysLeft(r.daysLeft);
+    const status = schedule
+      ? formatScheduleStatus(schedule)
+      : formatDebtStatus(r);
     lines.push(
       `${i + 1}. <b>${r.fullName}</b> — ${r.room}`,
       `   📱 ${r.phone}`,
       `   📆 Har oyning <b>${r.paymentDayOfMonth}</b>-kuni to'lov`,
       `   ⏰ ${status}${schedule ? ` (${schedule.nextDueDate})` : ""}`,
-      r.hasDebt ? "   ⚠️ Qarzdor" : "",
       ""
     );
   });
@@ -202,26 +278,34 @@ export function buildAdminDueSoonMessage(rows: AdminTenantRow[]) {
 }
 
 export function buildAdminSummaryMessage(rows: AdminTenantRow[]) {
-  const debtors = rows.filter((r) => r.hasDebt);
+  const debtors = rows
+    .filter((r) => r.hasDebt)
+    .sort((a, b) => b.debtAmount - a.debtAmount);
   const dueSoon = rows.filter((r) => r.isDueSoon);
-  const overdue = rows.filter((r) => r.daysLeft !== null && r.daysLeft < 0);
+  const totalDebt = debtors.reduce((s, r) => s + r.debtAmount, 0);
 
   const lines = [
-    "📊 <b>ArendaAi — Admin hisobot</b>\n",
-    `👥 Arendatorlar: <b>${rows.length}</b> ta`,
+    "📊 <b>ArendaAi — Admin hisobot</b>",
+    `🕐 ${formatTashkentClock()}`,
+    "",
+    `👥 Faol arendatorlar: <b>${rows.length}</b> ta`,
     `⚠️ Qarzdorlar: <b>${debtors.length}</b> ta`,
-    `📅 7 kun ichida to'lov: <b>${dueSoon.length}</b> ta`,
-    `🔴 Muddati o'tgan: <b>${overdue.length}</b> ta`,
+    `💰 Jami qarz: <b>${formatUzs(totalDebt)}</b>`,
+    `📅 ${DUE_SOON_WINDOW} kun ichida to'lov: <b>${dueSoon.length}</b> ta`,
   ];
 
   if (debtors.length > 0) {
-    lines.push("\n<b>Qarzdorlar:</b>");
+    lines.push("\n<b>Qarzdorlar (sayt bilan bir xil):</b>");
     debtors.slice(0, 15).forEach((r, i) => {
-      lines.push(`${i + 1}. ${r.fullName} (${r.room}) — ${formatDaysLeft(r.daysLeft)}`);
+      lines.push(
+        `${i + 1}. ${r.fullName} (${r.room}) — ${formatDebtStatus(r)}`
+      );
     });
     if (debtors.length > 15) {
       lines.push(`… va yana ${debtors.length - 15} ta`);
     }
+  } else {
+    lines.push("\n✅ Hozircha qarzdor yo'q.");
   }
 
   return lines.join("\n");
@@ -289,4 +373,20 @@ export async function sendAdminReportsToAll(slotLabel?: string) {
     }
   }
   return { sent, skipped };
+}
+
+/** Eslatma uchun — sayt qarzdorlari bilan bir xil */
+export async function getAdminDebtReminderRows(): Promise<DebtReminderInput[]> {
+  const rows = await getAdminDashboardRows();
+  return rows
+    .filter((r) => r.hasDebt)
+    .map((r) => ({
+      contractId: r.id,
+      tenantId: r.id,
+      tenantName: r.fullName,
+      propertyName: r.room,
+      debt: r.debtAmount,
+      overdueDays: r.overdueDays,
+      monthsDue: r.monthsDue,
+    }));
 }

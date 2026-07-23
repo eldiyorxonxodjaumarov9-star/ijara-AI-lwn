@@ -4,6 +4,8 @@ export interface DebtReminderInput {
   tenantName: string;
   propertyName: string;
   debt: number;
+  overdueDays?: number;
+  monthsDue?: number;
 }
 
 /** Kunlik eslatma vaqti (Toshkent) */

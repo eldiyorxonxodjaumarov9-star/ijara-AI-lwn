@@ -48,7 +48,10 @@ export async function GET(
       });
       break;
     case "expenses":
-      found = await prisma.expense.findUnique({ where: { id } });
+      found = await prisma.expense.findUnique({
+        where: { id },
+        include: { employee: { include: { company: true } } },
+      });
       break;
     case "maintenance":
       found = await prisma.maintenance.findUnique({
@@ -142,8 +145,49 @@ export async function PATCH(
           })
         );
       }
-      case "expenses":
-        return ok(await prisma.expense.update({ where: { id }, data: body as never }));
+      case "expenses": {
+        const data: Record<string, unknown> = {};
+        if (body.title != null || body.note != null) {
+          data.title = String(body.title ?? body.note ?? "Xarajat");
+        }
+        if (body.amount != null) data.amount = Number(body.amount);
+        if (body.category != null) data.category = body.category;
+        if (body.date != null) data.date = new Date(String(body.date));
+        if (body.notes != null || body.note != null) {
+          data.notes = body.notes ?? body.note ?? null;
+        }
+        if (body.receiptUrl !== undefined) {
+          data.receiptUrl = body.receiptUrl ? String(body.receiptUrl) : null;
+        }
+        if (body.employeeId !== undefined) {
+          data.employeeId = body.employeeId ? String(body.employeeId) : null;
+        }
+        if (
+          body.monthlyType !== undefined ||
+          body.monthlyExpenseType !== undefined
+        ) {
+          const raw = body.monthlyType ?? body.monthlyExpenseType;
+          data.monthlyType =
+            raw == null || raw === ""
+              ? null
+              : String(raw).toUpperCase();
+        }
+        if (
+          body.monthlyTypeCustom !== undefined ||
+          body.monthlyExpenseCustomName !== undefined
+        ) {
+          const raw = body.monthlyTypeCustom ?? body.monthlyExpenseCustomName;
+          const trimmed = raw == null ? "" : String(raw).trim();
+          data.monthlyTypeCustom = trimmed || null;
+        }
+        return ok(
+          await prisma.expense.update({
+            where: { id },
+            data: data as never,
+            include: { employee: { include: { company: true } } },
+          })
+        );
+      }
       case "maintenance":
         return ok(await prisma.maintenance.update({ where: { id }, data: body as never }));
       case "notifications":

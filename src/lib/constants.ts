@@ -5,6 +5,7 @@ import type {
   ContractStatus,
   ExpenseCategory,
   MaintenanceStatus,
+  MonthlyExpenseType,
   PaymentMethod,
   PropertyStatus,
   Role,
@@ -72,7 +73,26 @@ export const EXPENSE_CATEGORY_MAP: Record<ExpenseCategory, string> = {
   tax: "Soliq",
   repair: "Ta'mirlash",
   marketing: "Marketing",
+  advance: "Avans",
   other: "Boshqa",
+};
+
+export const MONTHLY_EXPENSE_TYPE_MAP: Record<MonthlyExpenseType, string> = {
+  water: "Suv",
+  electricity: "Elektr energiyasi",
+  office: "Ofis jihozlari",
+  custom: "Boshqa",
+};
+
+/** Oylik xarajat turi → asosiy kategoriya */
+export const MONTHLY_EXPENSE_TYPE_CATEGORY: Record<
+  MonthlyExpenseType,
+  ExpenseCategory
+> = {
+  water: "utilities",
+  electricity: "utilities",
+  office: "other",
+  custom: "other",
 };
 
 export const MAINTENANCE_STATUS_MAP: Record<

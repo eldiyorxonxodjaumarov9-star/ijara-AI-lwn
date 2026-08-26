@@ -51,7 +51,10 @@ import { exportToPdf } from "@/lib/export";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { EXPENSE_CATEGORY_MAP } from "@/lib/constants";
-import type { Expense } from "@/types";
+import { formatExpenseDetail } from "@/lib/monthly-expense-type";
+import type { Expense, ExpenseCategory } from "@/types";
+
+const ALL_CATEGORIES = "all";
 
 export default function ExpensesPage() {
   const { data, loading } = useCollection<Expense>("expenses");
@@ -60,6 +63,7 @@ export default function ExpensesPage() {
   const nowParts = getTashkentDateParts();
   const [month, setMonth] = useState(String(nowParts.month));
   const [year, setYear] = useState(String(nowParts.year));
+  const [category, setCategory] = useState<string>(ALL_CATEGORIES);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -67,7 +71,15 @@ export default function ExpensesPage() {
 
   const monthNum = Number(month);
   const yearNum = Number(year);
+  const categoryLabel =
+    category === ALL_CATEGORIES
+      ? "Barcha kategoriyalar"
+      : EXPENSE_CATEGORY_MAP[category as ExpenseCategory] ?? category;
   const periodLabel = `${MONTHS_UZ_FULL[monthNum - 1]} ${yearNum}`;
+  const filterLabel =
+    category === ALL_CATEGORIES
+      ? periodLabel
+      : `${periodLabel} · ${categoryLabel}`;
 
   const yearOptions = useMemo(() => {
     const y = nowParts.year;
@@ -77,9 +89,11 @@ export default function ExpensesPage() {
   const filtered = useMemo(() => {
     return data.filter((e) => {
       const p = getTashkentDateParts(e.date);
-      return p.year === yearNum && p.month === monthNum;
+      if (p.year !== yearNum || p.month !== monthNum) return false;
+      if (category !== ALL_CATEGORIES && e.category !== category) return false;
+      return true;
     });
-  }, [data, yearNum, monthNum]);
+  }, [data, yearNum, monthNum, category]);
 
   const total = useMemo(
     () => filtered.reduce((s, e) => s + (e.amount || 0), 0),
@@ -99,13 +113,23 @@ export default function ExpensesPage() {
       toast.error("Eksport qilish uchun xarajatlar yo'q");
       return;
     }
+    const catSlug =
+      category === ALL_CATEGORIES ? "barcha" : category;
     exportToPdf({
-      title: `Xarajatlar hisoboti — ${periodLabel}`,
-      head: ["№", "Kategoriya", "Izoh", "Sana", "Summa"],
+      title: `Xarajatlar hisoboti — ${filterLabel}`,
+      head: [
+        "№",
+        "Kategoriya",
+        "Ishchi / Oylik tur / Izoh",
+        "Kompaniya",
+        "Sana",
+        "Summa",
+      ],
       body: sortedExpenses.map((e, i) => [
         i + 1,
         EXPENSE_CATEGORY_MAP[e.category] ?? e.category,
-        e.note?.trim() || "—",
+        formatExpenseDetail(e),
+        e.companyName || (e.employeeName ? "O'zimiz" : "—"),
         formatDate(e.date),
         formatCurrency(e.amount),
       ]),
@@ -114,11 +138,12 @@ export default function ExpensesPage() {
           "",
           "JAMI",
           "",
+          "",
           `${sortedExpenses.length} ta yozuv`,
           formatCurrency(total),
         ],
       ],
-      fileName: `xarajatlar-${yearNum}-${String(monthNum).padStart(2, "0")}`,
+      fileName: `xarajatlar-${yearNum}-${String(monthNum).padStart(2, "0")}-${catSlug}`,
     });
     toast.success("PDF yuklab olindi");
   };
@@ -133,13 +158,20 @@ export default function ExpensesPage() {
     paged,
   } = useTableData<Expense>({
     data: sortedExpenses,
-    searchFields: ["category", "note"],
+    searchFields: [
+      "category",
+      "note",
+      "employeeName",
+      "companyName",
+      "monthlyExpenseLabel",
+      "monthlyExpenseCustomName",
+    ],
     pageSize: 10,
   });
 
   useEffect(() => {
     setPage(1);
-  }, [month, year, setPage]);
+  }, [month, year, category, setPage]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -152,7 +184,7 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Xarajatlar"
-        description={`${periodLabel} — operatsion xarajatlarni qayd eting.`}
+        description={`${filterLabel} — operatsion xarajatlarni qayd eting.`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Select value={month} onValueChange={setMonth}>
@@ -179,6 +211,19 @@ export default function ExpensesPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Kategoriya" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CATEGORIES}>Barchasi</SelectItem>
+                {Object.entries(EXPENSE_CATEGORY_MAP).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={handlePdf} disabled={loading}>
               <FileText className="size-4" /> PDF
             </Button>
@@ -196,7 +241,7 @@ export default function ExpensesPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard
-          title={`${periodLabel} jami`}
+          title={`${filterLabel} jami`}
           value={formatCurrency(total)}
           icon={Receipt}
           tone="rose"
@@ -215,7 +260,7 @@ export default function ExpensesPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Izoh bo'yicha qidirish..."
+          placeholder="Izoh, oylik tur (suv, elektr...)..."
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -234,8 +279,8 @@ export default function ExpensesPage() {
             <div className="p-6">
               <EmptyState
                 icon={Receipt}
-                title={`${periodLabel}da xarajat yo'q`}
-                description="Boshqa oy tanlang yoki yangi xarajat qo'shing."
+                title={`${filterLabel}da xarajat yo'q`}
+                description="Boshqa oy/kategoriya tanlang yoki yangi xarajat qo'shing."
               />
             </div>
           ) : (
@@ -243,7 +288,10 @@ export default function ExpensesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Kategoriya</TableHead>
-                  <TableHead className="hidden md:table-cell">Izoh</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Ishchi / Oylik tur / Izoh
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell">Kompaniya</TableHead>
                   <TableHead>Sana</TableHead>
                   <TableHead>Summa</TableHead>
                   <TableHead className="w-12" />
@@ -258,7 +306,18 @@ export default function ExpensesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {e.note ?? "—"}
+                      {formatExpenseDetail(e)}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {e.companyName ? (
+                        <Badge variant="outline">{e.companyName}</Badge>
+                      ) : e.employeeName ? (
+                        <span className="text-xs text-muted-foreground">
+                          O&apos;zimiz
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {formatDate(e.date)}

@@ -42,6 +42,24 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsString()
   receiptUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
+
+  @ApiPropertyOptional({
+    enum: ['WATER', 'ELECTRICITY', 'OFFICE', 'CUSTOM'],
+    description: 'Oylik xarajat turi',
+  })
+  @IsOptional()
+  @IsString()
+  monthlyType?: string;
+
+  @ApiPropertyOptional({ description: 'CUSTOM tur uchun nom' })
+  @IsOptional()
+  @IsString()
+  monthlyTypeCustom?: string;
 }
 
 export class UpdateExpenseDto extends PartialType(CreateExpenseDto) {}

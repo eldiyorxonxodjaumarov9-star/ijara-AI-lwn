@@ -79,7 +79,7 @@ export const contractSchema = z.object({
 });
 
 export const paymentSchema = z.object({
-  contractId: z.string().optional(),
+  contractId: z.string().min(1, "Shartnomani tanlang"),
   amount: z.coerce.number().min(1, "Summani kiriting"),
   date: z.string().min(1, "Sanani tanlang"),
   periodYear: z.coerce.number().int().min(2000).max(2100).optional(),
@@ -88,19 +88,58 @@ export const paymentSchema = z.object({
   note: z.string().optional(),
 });
 
-export const expenseSchema = z.object({
-  category: z.enum([
-    "utilities",
-    "salary",
-    "tax",
-    "repair",
-    "marketing",
-    "other",
-  ]),
-  amount: z.coerce.number().min(1, "Summani kiriting"),
-  date: z.string().min(1, "Sanani tanlang"),
-  receiptUrl: z.string().optional(),
-  note: z.string().optional(),
+export const expenseSchema = z
+  .object({
+    category: z.enum([
+      "utilities",
+      "salary",
+      "tax",
+      "repair",
+      "marketing",
+      "advance",
+      "other",
+    ]),
+    amount: z.coerce.number().min(1, "Summani kiriting"),
+    date: z.string().min(1, "Sanani tanlang"),
+    receiptUrl: z.string().optional(),
+    note: z.string().optional(),
+    employeeId: z.string().optional(),
+    monthlyExpenseType: z
+      .enum(["water", "electricity", "office", "custom"])
+      .optional()
+      .nullable(),
+    monthlyExpenseCustomName: z.string().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    // Faqat "Boshqa" (custom) tanlanganda nom majburiy
+    if (data.monthlyExpenseType === "custom") {
+      const name = data.monthlyExpenseCustomName?.trim() ?? "";
+      if (!name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Xarajat nomini kiriting",
+          path: ["monthlyExpenseCustomName"],
+        });
+      }
+    }
+  });
+
+export const employeeSchema = z.object({
+  fullName: z.string().min(2, "Ismni kiriting"),
+  phone: z.string().optional(),
+  position: z.string().optional(),
+  monthlySalary: z.coerce.number().min(0).optional().default(0),
+  salaryPayDay: z.coerce.number().int().min(1).max(31).optional().nullable(),
+  active: z.coerce.boolean().default(true),
+  notes: z.string().optional(),
+  companyId: z.string().optional().nullable(),
+});
+
+export const companySchema = z.object({
+  name: z.string().min(2, "Kompaniya nomini kiriting"),
+  phone: z.string().optional(),
+  notes: z.string().optional(),
+  active: z.coerce.boolean().default(true),
 });
 
 export const maintenanceSchema = z.object({
@@ -119,4 +158,6 @@ export type TenantInput = z.infer<typeof tenantSchema>;
 export type ContractInput = z.infer<typeof contractSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+export type EmployeeInput = z.infer<typeof employeeSchema>;
+export type CompanyInput = z.infer<typeof companySchema>;
 export type MaintenanceInput = z.infer<typeof maintenanceSchema>;

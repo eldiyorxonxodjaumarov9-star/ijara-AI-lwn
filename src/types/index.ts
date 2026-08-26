@@ -97,7 +97,15 @@ export type ExpenseCategory =
   | "tax"
   | "repair"
   | "marketing"
+  | "advance"
   | "other";
+
+/** Oylik xarajat turi (frontend lowercase) */
+export type MonthlyExpenseType =
+  | "water"
+  | "electricity"
+  | "office"
+  | "custom";
 
 export interface Expense {
   id: string;
@@ -106,6 +114,38 @@ export interface Expense {
   date: string;
   receiptUrl?: string;
   note?: string;
+  employeeId?: string;
+  employeeName?: string;
+  /** Hamkor kompaniya nomi (ishchi orqali) */
+  companyName?: string;
+  monthlyExpenseType?: MonthlyExpenseType | null;
+  monthlyExpenseCustomName?: string | null;
+  /** Ko‘rsatish/qidiruv uchun (Suv, Elektr… yoki custom nom) */
+  monthlyExpenseLabel?: string;
+  createdAt: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  phone?: string;
+  notes?: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface Employee {
+  id: string;
+  fullName: string;
+  phone?: string;
+  position?: string;
+  monthlySalary: number;
+  /** Har oy oylik beriladigan kun (1–31) */
+  salaryPayDay?: number | null;
+  active: boolean;
+  notes?: string;
+  companyId?: string | null;
+  companyName?: string;
   createdAt: string;
 }
 

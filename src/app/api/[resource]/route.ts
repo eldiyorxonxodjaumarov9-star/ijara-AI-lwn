@@ -74,7 +74,12 @@ export async function GET(
     }
     case "expenses": {
       const [data, total] = await Promise.all([
-        prisma.expense.findMany({ skip, take: limit, orderBy: { [sortBy]: order } }),
+        prisma.expense.findMany({
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: order },
+          include: { employee: { include: { company: true } } },
+        }),
         prisma.expense.count(),
       ]);
       return ok(paginated(data, total, page, limit));
@@ -156,11 +161,20 @@ export async function POST(
           body.periodYear != null ? Number(body.periodYear) : undefined;
         const periodMonth =
           body.periodMonth != null ? Number(body.periodMonth) : undefined;
-        const contractId = String(body.contractId);
+        const contractId = String(body.contractId ?? "").trim();
+        if (!contractId) {
+          return fail("Shartnomani tanlang", 400);
+        }
         const amount = Number(body.amount ?? 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return fail("Summani kiriting", 400);
+        }
         const paymentDate = new Date(
           String(body.paymentDate ?? body.date ?? Date.now())
         );
+        if (Number.isNaN(paymentDate.getTime())) {
+          return fail("Sana noto'g'ri", 400);
+        }
         const paymentMethod = (body.paymentMethod as never) ?? "CASH";
         const resolvedPeriodYear =
           periodYear && periodYear >= 2000 ? periodYear : undefined;
@@ -195,14 +209,26 @@ export async function POST(
             contract: { include: { property: true, tenant: true } },
           },
         });
-        try {
-          await notifyTenantPaymentReceived(created);
-        } catch {
-          /* xabar yuborilmasa ham to'lov saqlanadi */
-        }
+        // Javobni kutib qolmasin — to'lov darhol qabul qilinsin
+        void notifyTenantPaymentReceived(created).catch(() => {});
         return ok(created, 201);
       }
-      case "expenses":
+      case "expenses": {
+        const employeeId = body.employeeId
+          ? String(body.employeeId)
+          : undefined;
+        const monthlyType =
+          body.monthlyType != null && body.monthlyType !== ""
+            ? String(body.monthlyType)
+            : body.monthlyExpenseType != null && body.monthlyExpenseType !== ""
+              ? String(body.monthlyExpenseType).toUpperCase()
+              : undefined;
+        const monthlyTypeCustomRaw =
+          body.monthlyTypeCustom ?? body.monthlyExpenseCustomName;
+        const monthlyTypeCustom =
+          monthlyType === "CUSTOM" && monthlyTypeCustomRaw
+            ? String(monthlyTypeCustomRaw).trim() || null
+            : null;
         return ok(
           await prisma.expense.create({
             data: {
@@ -212,10 +238,15 @@ export async function POST(
               date: new Date(String(body.date ?? Date.now())),
               notes: body.notes ? String(body.notes) : undefined,
               receiptUrl: body.receiptUrl ? String(body.receiptUrl) : undefined,
+              employeeId: employeeId || undefined,
+              monthlyType: (monthlyType as never) || undefined,
+              monthlyTypeCustom: monthlyTypeCustom || undefined,
             },
+            include: { employee: { include: { company: true } } },
           }),
           201
         );
+      }
       case "maintenance":
         return ok(
           await prisma.maintenance.create({

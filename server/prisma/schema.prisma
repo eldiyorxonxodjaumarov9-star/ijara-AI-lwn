@@ -46,7 +46,15 @@ enum ExpenseCategory {
   TAX
   REPAIR
   MARKETING
+  ADVANCE
   OTHER
+}
+
+enum MonthlyExpenseType {
+  WATER
+  ELECTRICITY
+  OFFICE
+  CUSTOM
 }
 
 enum MaintenanceStatus {
@@ -224,19 +232,68 @@ model Payment {
   @@map("payments")
 }
 
-model Expense {
-  id        String          @id @default(uuid())
-  title     String
-  amount    Float
-  category  ExpenseCategory @default(OTHER)
-  date      DateTime        @default(now())
+model PartnerCompany {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
   notes     String?
-  receiptUrl String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees Employee[]
+
+  @@index([name])
+  @@index([active])
+  @@map("companies")
+}
+
+model Employee {
+  id             String   @id @default(uuid())
+  fullName       String
+  phone          String?
+  position       String?
+  monthlySalary  Float    @default(0)
+  /** Har oy oylik beriladigan kun (1–31) */
+  salaryPayDay   Int?
+  active         Boolean  @default(true)
+  notes          String?
+  companyId      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company  PartnerCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  expenses Expense[]
+
+  @@index([active])
+  @@index([fullName])
+  @@index([salaryPayDay])
+  @@index([companyId])
+  @@map("employees")
+}
+
+model Expense {
+  id                 String              @id @default(uuid())
+  title              String
+  amount             Float
+  category           ExpenseCategory     @default(OTHER)
+  date               DateTime            @default(now())
+  notes              String?
+  receiptUrl         String?
+  employeeId         String?
+  /** Oylik xarajat turi: suv, elektr, ofis, boshqa */
+  monthlyType        MonthlyExpenseType?
+  /** monthlyType=CUSTOM bo‘lganda foydalanuvchi yozgan nom */
+  monthlyTypeCustom  String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   @@index([category])
   @@index([date])
+  @@index([employeeId])
+  @@index([monthlyType])
   @@map("expenses")
 }
 

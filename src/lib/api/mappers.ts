@@ -1,4 +1,5 @@
 import type { CollectionName } from "@/lib/data/store";
+import { resolveMonthlyExpenseLabel } from "@/lib/monthly-expense-type";
 import type {
   CollectionEntity,
   AppNotification,
@@ -6,10 +7,13 @@ import type {
   ClientStatus,
   Contract,
   ContractStatus,
+  Employee,
   Expense,
   ExpenseCategory,
+  Company,
   Maintenance,
   MaintenanceStatus,
+  MonthlyExpenseType,
   NotificationType,
   Payment,
   PaymentMethod,
@@ -55,10 +59,25 @@ const EXPENSE_CATEGORY_TO_API: Record<ExpenseCategory, string> = {
   tax: "TAX",
   repair: "REPAIR",
   marketing: "MARKETING",
+  advance: "ADVANCE",
   other: "OTHER",
 };
 const expenseCategoryFromApi = (v: unknown): ExpenseCategory =>
   String(v ?? "OTHER").toLowerCase() as ExpenseCategory;
+
+const MONTHLY_EXPENSE_TYPE_TO_API: Record<MonthlyExpenseType, string> = {
+  water: "WATER",
+  electricity: "ELECTRICITY",
+  office: "OFFICE",
+  custom: "CUSTOM",
+};
+const monthlyExpenseTypeFromApi = (
+  v: unknown
+): MonthlyExpenseType | undefined => {
+  if (v == null || v === "") return undefined;
+  const key = String(v).toLowerCase() as MonthlyExpenseType;
+  return key in MONTHLY_EXPENSE_TYPE_TO_API ? key : undefined;
+};
 
 const MAINT_STATUS_TO_API: Record<MaintenanceStatus, string> = {
   pending: "PENDING",
@@ -128,7 +147,23 @@ const property: MapperConfig = {
     images: (d.images as string[]) ?? [],
   }),
   toUpdate(d) {
-    return this.toCreate(d);
+    // Faqat yuborilgan maydonlar — status o'zgartirish narx/maydonni 0 qilmasin
+    const body: Record<string, unknown> = {};
+    if (d.name != null) body.title = d.name;
+    if (d.address != null) body.address = d.address;
+    if (d.region != null) body.region = d.region;
+    if (d.district != null) body.district = d.district;
+    if (d.building !== undefined) body.building = d.building || undefined;
+    if (d.price != null) body.rentPrice = n(d.price);
+    if (d.rooms != null) body.rooms = n(d.rooms);
+    if (d.area != null) body.area = n(d.area);
+    if (d.description !== undefined) body.description = d.description || undefined;
+    if (d.status != null) {
+      body.status =
+        PROPERTY_STATUS_TO_API[d.status as PropertyStatus] ?? "AVAILABLE";
+    }
+    if (d.images != null) body.images = d.images;
+    return body;
   },
 };
 
@@ -257,22 +292,118 @@ const payment: MapperConfig = {
 
 const expense: MapperConfig = {
   path: "/expenses",
-  fromApi: (i): Expense => ({
+  fromApi: (i): Expense => {
+    const emp = (i.employee as Api) ?? {};
+    const company = (emp.company as Api) ?? {};
+    const monthlyExpenseType = monthlyExpenseTypeFromApi(
+      i.monthlyType ?? i.monthlyExpenseType
+    );
+    const monthlyExpenseCustomName = s(
+      i.monthlyTypeCustom ?? i.monthlyExpenseCustomName
+    );
+    return {
+      id: String(i.id),
+      category: expenseCategoryFromApi(i.category),
+      amount: n(i.amount),
+      date: String(i.date ?? i.createdAt ?? ""),
+      receiptUrl: s(i.receiptUrl),
+      note: s(i.notes ?? i.title),
+      employeeId: s(i.employeeId ?? emp.id),
+      employeeName: s(emp.fullName),
+      companyName: s(company.name),
+      monthlyExpenseType,
+      monthlyExpenseCustomName,
+      monthlyExpenseLabel: resolveMonthlyExpenseLabel(
+        monthlyExpenseType,
+        monthlyExpenseCustomName
+      ),
+      createdAt: String(i.createdAt ?? new Date().toISOString()),
+    };
+  },
+  toCreate: (d) => {
+    const monthlyExpenseType = monthlyExpenseTypeFromApi(d.monthlyExpenseType);
+    const custom =
+      monthlyExpenseType === "custom"
+        ? String(d.monthlyExpenseCustomName ?? "").trim() || undefined
+        : undefined;
+    return {
+      title: (d.note as string) || (d.category as string) || "Xarajat",
+      amount: n(d.amount),
+      category: EXPENSE_CATEGORY_TO_API[d.category as ExpenseCategory] ?? "OTHER",
+      date: new Date((d.date as string) ?? Date.now()).toISOString(),
+      notes: d.note || undefined,
+      receiptUrl: d.receiptUrl || undefined,
+      employeeId: d.employeeId || undefined,
+      monthlyType: monthlyExpenseType
+        ? MONTHLY_EXPENSE_TYPE_TO_API[monthlyExpenseType]
+        : null,
+      monthlyTypeCustom: custom ?? null,
+      monthlyExpenseType,
+      monthlyExpenseCustomName: custom,
+    };
+  },
+  toUpdate(d) {
+    return this.toCreate(d);
+  },
+};
+
+const employee: MapperConfig = {
+  path: "/employees",
+  fromApi: (i): Employee => {
+    const company = (i.company as Api) ?? {};
+    return {
+      id: String(i.id),
+      fullName: String(i.fullName ?? ""),
+      phone: s(i.phone),
+      position: s(i.position),
+      monthlySalary: n(i.monthlySalary),
+      salaryPayDay:
+        i.salaryPayDay != null && i.salaryPayDay !== ""
+          ? n(i.salaryPayDay)
+          : undefined,
+      active: i.active == null ? true : Boolean(i.active),
+      notes: s(i.notes),
+      companyId: s(i.companyId ?? company.id),
+      companyName: s(company.name),
+      createdAt: String(i.createdAt ?? new Date().toISOString()),
+    };
+  },
+  toCreate: (d) => ({
+    fullName: d.fullName,
+    phone: d.phone || undefined,
+    position: d.position || undefined,
+    monthlySalary: n(d.monthlySalary),
+    salaryPayDay:
+      d.salaryPayDay != null && d.salaryPayDay !== ""
+        ? n(d.salaryPayDay)
+        : undefined,
+    active: d.active == null ? true : Boolean(d.active),
+    notes: d.notes || undefined,
+    companyId:
+      d.companyId === null || d.companyId === ""
+        ? null
+        : d.companyId || undefined,
+  }),
+  toUpdate(d) {
+    return this.toCreate(d);
+  },
+};
+
+const company: MapperConfig = {
+  path: "/companies",
+  fromApi: (i): Company => ({
     id: String(i.id),
-    category: expenseCategoryFromApi(i.category),
-    amount: n(i.amount),
-    date: String(i.date ?? i.createdAt ?? ""),
-    receiptUrl: s(i.receiptUrl),
-    note: s(i.notes ?? i.title),
+    name: String(i.name ?? ""),
+    phone: s(i.phone),
+    notes: s(i.notes),
+    active: i.active == null ? true : Boolean(i.active),
     createdAt: String(i.createdAt ?? new Date().toISOString()),
   }),
   toCreate: (d) => ({
-    title: (d.note as string) || (d.category as string) || "Xarajat",
-    amount: n(d.amount),
-    category: EXPENSE_CATEGORY_TO_API[d.category as ExpenseCategory] ?? "OTHER",
-    date: new Date((d.date as string) ?? Date.now()).toISOString(),
-    notes: d.note || undefined,
-    receiptUrl: d.receiptUrl || undefined,
+    name: d.name,
+    phone: d.phone || undefined,
+    notes: d.notes || undefined,
+    active: d.active == null ? true : Boolean(d.active),
   }),
   toUpdate(d) {
     return this.toCreate(d);
@@ -375,6 +506,8 @@ export const MAPPERS: Partial<Record<CollectionName, MapperConfig>> = {
   contracts: contract,
   payments: payment,
   expenses: expense,
+  employees: employee,
+  companies: company,
   maintenance,
   notifications: notification,
   clients: client,

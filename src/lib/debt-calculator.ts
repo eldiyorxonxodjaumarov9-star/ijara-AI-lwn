@@ -1,6 +1,8 @@
 import type { Contract, Payment, Tenant } from "@/types";
 import {
+  formatTashkentDate,
   getPaymentDayOfMonth,
+  getPaymentSchedule,
   getTashkentDateParts,
   isPaymentMonthOverdue,
   type TashkentDateParts,
@@ -134,6 +136,8 @@ export interface ContractDebtResult {
   paid: number;
   debt: number;
   overdueDays: number;
+  /** Qarz bo'lsa eng eski ochiq oyning to'lov sanasi (YYYY-MM-DD, Toshkent) */
+  oldestUnpaidDueDate: string | null;
 }
 
 /**
@@ -179,7 +183,14 @@ export function computeContractDebt(
   const expected = monthsDue * monthly;
 
   if (monthly <= 0 || monthsDue === 0) {
-    return { monthsDue, expected: 0, paid: 0, debt: 0, overdueDays: 0 };
+    return {
+      monthsDue,
+      expected: 0,
+      paid: 0,
+      debt: 0,
+      overdueDays: 0,
+      oldestUnpaidDueDate: null,
+    };
   }
 
   const contractPayments = payments
@@ -220,8 +231,17 @@ export function computeContractDebt(
   }
 
   let debt = 0;
+  let oldestUnpaidDueDate: string | null = null;
   for (const m of overdueMonths) {
-    debt += remainingByMonth.get(monthKey(m.year, m.month)) ?? 0;
+    const remaining = remainingByMonth.get(monthKey(m.year, m.month)) ?? 0;
+    debt += remaining;
+    if (remaining > 0 && oldestUnpaidDueDate == null) {
+      oldestUnpaidDueDate = formatTashkentDate({
+        year: m.year,
+        month: m.month,
+        day: Math.min(paymentDay, daysInMonth(m.year, m.month)),
+      });
+    }
   }
   const paidApplied = Math.max(0, expected - debt);
 
@@ -240,5 +260,34 @@ export function computeContractDebt(
     paid: paidApplied,
     debt,
     overdueDays,
+    oldestUnpaidDueDate,
   };
+}
+
+/**
+ * SMS / jadval ko'rinishi uchun shartnoma bo'yicha keyingi to'lov muddati.
+ * Qarz bo'lsa — eng eski ochiq muddat; aks holda — getPaymentSchedule nextDueDate.
+ */
+export function getContractDisplayPaymentDueDate(
+  contract: Contract,
+  payments: Payment[],
+  tenant: Tenant | undefined,
+  now = new Date()
+): string | null {
+  const result = computeContractDebt(contract, payments, tenant, now);
+
+  if (result.debt > 0) {
+    return result.oldestUnpaidDueDate;
+  }
+
+  if (contract.status === "expired") {
+    return null;
+  }
+
+  const scheduleSource = tenant?.paymentDueDate ?? contract.startDate;
+  if (!scheduleSource) {
+    return null;
+  }
+
+  return getPaymentSchedule(scheduleSource, now)?.nextDueDate ?? null;
 }

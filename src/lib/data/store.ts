@@ -22,6 +22,7 @@ import {
   tokenStore,
 } from "@/lib/api/client";
 import { MAPPERS } from "@/lib/api/mappers";
+import { fetchCollectionAllPages } from "@/lib/collection-list-all";
 import { scheduleCloudPush } from "@/lib/cloud/sync-client";
 import type { CollectionEntity } from "@/types";
 
@@ -31,6 +32,8 @@ export type CollectionName =
   | "contracts"
   | "payments"
   | "expenses"
+  | "employees"
+  | "companies"
   | "maintenance"
   | "notifications"
   | "clients"
@@ -217,19 +220,11 @@ async function refetchApi(name: CollectionName) {
   const mapper = MAPPERS[name];
   if (!mapper) return;
   try {
-    const res = await apiFetch<unknown>(
-      `${mapper.path}?limit=100&sortBy=createdAt&order=desc`
+    const items = (await fetchCollectionAllPages(name)).sort(
+      (a, b) =>
+        new Date(b.createdAt ?? 0).getTime() -
+        new Date(a.createdAt ?? 0).getTime()
     );
-    const rawList = Array.isArray(res)
-      ? res
-      : ((res as { data?: unknown[] })?.data ?? []);
-    const items = (rawList as Record<string, unknown>[])
-      .map((item) => mapper.fromApi(item) as unknown as CollectionEntity)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt ?? 0).getTime() -
-          new Date(a.createdAt ?? 0).getTime()
-      );
     apiCache[name] = items;
     notifyApi(name);
   } catch {

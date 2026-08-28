@@ -117,7 +117,8 @@ export function isPaymentMonthOverdue(
   }
   if (year === today.year && month === today.month) {
     const dueDay = Math.min(paymentDay, daysInMonth(year, month));
-    return today.day > dueDay;
+    // To'lov kuni kelishi bilan qarzdorlikka tushadi (shu kun ham)
+    return today.day >= dueDay;
   }
   return false;
 }
@@ -138,7 +139,7 @@ const DUE_SOON_WINDOW = 7;
  * overdueDays — shu oy to'lov kuni o'tgan bo'lsa, necha kun o'tgan.
  */
 export function getPaymentSchedule(
-  paymentDueDate: Date | null | undefined,
+  paymentDueDate: Date | string | null | undefined,
   now = new Date()
 ): PaymentSchedule | null {
   if (!paymentDueDate) return null;

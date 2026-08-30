@@ -88,6 +88,25 @@ export const paymentSchema = z.object({
   note: z.string().optional(),
 });
 
+export const employeeSchema = z.object({
+  fullName: z.string().min(2, "Ismni kiriting"),
+  phone: z.string().optional(),
+  position: z.string().min(1, "Lavozimni tanlang"),
+  monthlySalary: z.coerce.number().min(0, "Oylik manfiy bo'lishi mumkin emas").optional().default(0),
+  salaryPayDay: z.coerce.number().int().min(1).max(31).optional().nullable(),
+  active: z.coerce.boolean().default(true),
+  notes: z.string().optional(),
+  companyId: z.string().min(1, "Kompaniyani tanlang (Sunnur yoki LWN)"),
+  startedAt: z.string().optional().nullable(),
+});
+
+export const companySchema = z.object({
+  name: z.string().min(2, "Kompaniya nomini kiriting"),
+  phone: z.string().optional(),
+  notes: z.string().optional(),
+  active: z.coerce.boolean().default(true),
+});
+
 export const expenseSchema = z
   .object({
     category: z.enum([
@@ -111,7 +130,6 @@ export const expenseSchema = z
     monthlyExpenseCustomName: z.string().optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    // Faqat "Boshqa" (custom) tanlanganda nom majburiy
     if (data.monthlyExpenseType === "custom") {
       const name = data.monthlyExpenseCustomName?.trim() ?? "";
       if (!name) {
@@ -122,25 +140,17 @@ export const expenseSchema = z
         });
       }
     }
+    if (
+      (data.category === "salary" || data.category === "advance") &&
+      !data.employeeId?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Xodimni tanlang",
+        path: ["employeeId"],
+      });
+    }
   });
-
-export const employeeSchema = z.object({
-  fullName: z.string().min(2, "Ismni kiriting"),
-  phone: z.string().optional(),
-  position: z.string().optional(),
-  monthlySalary: z.coerce.number().min(0).optional().default(0),
-  salaryPayDay: z.coerce.number().int().min(1).max(31).optional().nullable(),
-  active: z.coerce.boolean().default(true),
-  notes: z.string().optional(),
-  companyId: z.string().optional().nullable(),
-});
-
-export const companySchema = z.object({
-  name: z.string().min(2, "Kompaniya nomini kiriting"),
-  phone: z.string().optional(),
-  notes: z.string().optional(),
-  active: z.coerce.boolean().default(true),
-});
 
 export const maintenanceSchema = z.object({
   propertyId: z.string().min(1, "Mulkni tanlang"),

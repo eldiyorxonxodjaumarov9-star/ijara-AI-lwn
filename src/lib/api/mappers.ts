@@ -365,6 +365,7 @@ const employee: MapperConfig = {
       notes: s(i.notes),
       companyId: s(i.companyId ?? company.id),
       companyName: s(company.name),
+      startedAt: s(i.startedAt) ?? null,
       createdAt: String(i.createdAt ?? new Date().toISOString()),
     };
   },
@@ -383,6 +384,7 @@ const employee: MapperConfig = {
       d.companyId === null || d.companyId === ""
         ? null
         : d.companyId || undefined,
+    startedAt: d.startedAt || undefined,
   }),
   toUpdate(d) {
     return this.toCreate(d);

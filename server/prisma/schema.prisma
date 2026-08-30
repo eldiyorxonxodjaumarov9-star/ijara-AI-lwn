@@ -89,25 +89,25 @@ enum ContactInterest {
 // ===================== MODELS =====================
 
 model User {
-  id               String    @id @default(uuid())
-  email            String    @unique
-  password         String
-  fullName         String
-  phone            String?
-  role             Role      @default(EMPLOYEE)
-  isActive         Boolean   @default(true)
-  avatarUrl        String?
-  language         String    @default("uz")
-  refreshTokenHash String?
-  resetToken       String?
-  resetTokenExp    DateTime?
-  lastLoginAt      DateTime?
-  telegramAdminChatId String? @unique
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  password            String
+  fullName            String
+  phone               String?
+  role                Role      @default(EMPLOYEE)
+  isActive            Boolean   @default(true)
+  avatarUrl           String?
+  language            String    @default("uz")
+  refreshTokenHash    String?
+  resetToken          String?
+  resetTokenExp       DateTime?
+  lastLoginAt         DateTime?
+  telegramAdminChatId String?   @unique
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  notifications Notification[]
-  auditLogs     AuditLog[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
   telegramAdminDevices TelegramAdminDevice[]
 
   @@index([role])
@@ -178,9 +178,9 @@ model Tenant {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  contracts Contract[]
-  clients   Client[]
-  archives  TenantArchive[]
+  contracts        Contract[]
+  clients          Client[]
+  archives         TenantArchive[]
   telegramBotUsers TelegramBotUser[]
 
   @@map("tenants")
@@ -200,8 +200,8 @@ model Contract {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   payments Payment[]
   archives TenantArchive[]
 
@@ -216,7 +216,9 @@ model Payment {
   contractId    String
   amount        Float
   paymentDate   DateTime      @default(now())
-  /** Qaysi oy uchun to'langan (1–12). Belgilansa shu oyga birikadi. */
+  /**
+   * Qaysi oy uchun to'langan (1–12). Belgilansa shu oyga birikadi.
+   */
   periodYear    Int?
   periodMonth   Int?
   paymentMethod PaymentMethod @default(CASH)
@@ -249,22 +251,29 @@ model PartnerCompany {
 }
 
 model Employee {
-  id             String   @id @default(uuid())
-  fullName       String
-  phone          String?
-  position       String?
-  monthlySalary  Float    @default(0)
-  /** Har oy oylik beriladigan kun (1–31) */
-  salaryPayDay   Int?
-  active         Boolean  @default(true)
-  notes          String?
-  companyId      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String    @id @default(uuid())
+  fullName      String
+  phone         String?
+  position      String?
+  monthlySalary Float     @default(0)
+  /**
+   * Har oy oylik beriladigan kun (1–31)
+   */
+  salaryPayDay  Int?
+  active        Boolean   @default(true)
+  notes         String?
+  companyId     String?
+  /**
+   * Ish boshlagan sana
+   */
+  startedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   company  PartnerCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   expenses Expense[]
 
+  @@unique([phone])
   @@index([active])
   @@index([fullName])
   @@index([salaryPayDay])
@@ -273,20 +282,24 @@ model Employee {
 }
 
 model Expense {
-  id                 String              @id @default(uuid())
-  title              String
-  amount             Float
-  category           ExpenseCategory     @default(OTHER)
-  date               DateTime            @default(now())
-  notes              String?
-  receiptUrl         String?
-  employeeId         String?
-  /** Oylik xarajat turi: suv, elektr, ofis, boshqa */
-  monthlyType        MonthlyExpenseType?
-  /** monthlyType=CUSTOM bo‘lganda foydalanuvchi yozgan nom */
-  monthlyTypeCustom  String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                String              @id @default(uuid())
+  title             String
+  amount            Float
+  category          ExpenseCategory     @default(OTHER)
+  date              DateTime            @default(now())
+  notes             String?
+  receiptUrl        String?
+  employeeId        String?
+  /**
+   * Oylik xarajat turi: suv, elektr, ofis, boshqa
+   */
+  monthlyType       MonthlyExpenseType?
+  /**
+   * monthlyType=CUSTOM bo‘lganda foydalanuvchi yozgan nom
+   */
+  monthlyTypeCustom String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
@@ -351,18 +364,18 @@ model AuditLog {
 }
 
 model Client {
-  id          String       @id @default(uuid())
-  fullName    String
-  phone       String
-  status      ClientStatus @default(NEW)
-  tenantId    String?
-  depositPaid Boolean      @default(false)
-  depositAmount Float      @default(0)
-  loginCount  Int          @default(1)
-  firstLoginAt DateTime     @default(now())
-  lastLoginAt  DateTime     @default(now())
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String       @id @default(uuid())
+  fullName      String
+  phone         String
+  status        ClientStatus @default(NEW)
+  tenantId      String?
+  depositPaid   Boolean      @default(false)
+  depositAmount Float        @default(0)
+  loginCount    Int          @default(1)
+  firstLoginAt  DateTime     @default(now())
+  lastLoginAt   DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
@@ -374,7 +387,7 @@ model Client {
 
 // Klient chiqgandan keyin saqlanadigan to'liq tarix (to'lovlar o'chmaydi)
 model TenantArchive {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   clientNumber     String
   tenantId         String?
   contractId       String?
@@ -384,17 +397,17 @@ model TenantArchive {
   propertyId       String?
   propertyName     String
   entryDate        DateTime?
-  leaveDate        DateTime @default(now())
+  leaveDate        DateTime  @default(now())
   contractStart    DateTime
   contractEnd      DateTime
-  monthlyRent      Float    @default(0)
-  deposit          Float    @default(0)
-  depositPaid      Boolean  @default(false)
+  monthlyRent      Float     @default(0)
+  deposit          Float     @default(0)
+  depositPaid      Boolean   @default(false)
   contractDuration Int?
-  totalPaid        Float    @default(0)
-  paymentCount     Int      @default(0)
+  totalPaid        Float     @default(0)
+  paymentCount     Int       @default(0)
   notes            String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
   tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   contract Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
@@ -406,7 +419,9 @@ model TenantArchive {
   @@map("tenant_archives")
 }
 
-/** Telefon qilgan / qiziqqan kontaktlar */
+/**
+ * Telefon qilgan / qiziqqan kontaktlar
+ */
 model ContactLead {
   id        String          @id @default(uuid())
   fullName  String
@@ -518,9 +533,9 @@ model RentalListing {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  images        RentalListingImage[]
-  jobs          PostingJob[]
-  telegramJobs  TelegramPostingJob[]
+  images       RentalListingImage[]
+  jobs         PostingJob[]
+  telegramJobs TelegramPostingJob[]
 
   @@index([landlordEmail])
   @@index([status])
@@ -599,18 +614,18 @@ enum TelegramPostingStatus {
 }
 
 model TelegramChannel {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   name                String
   username            String?
   chatId              String
-  enabled             Boolean  @default(true)
-  regionFilters       String[] @default([])
-  propertyTypeFilters String[] @default([])
-  priority            Int      @default(0)
+  enabled             Boolean   @default(true)
+  regionFilters       String[]  @default([])
+  propertyTypeFilters String[]  @default([])
+  priority            Int       @default(0)
   isBotAdmin          Boolean?
   lastAdminCheckAt    DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   jobs TelegramPostingJob[]
 
@@ -634,8 +649,8 @@ model TelegramPostingJob {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  listing RentalListing    @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  channel TelegramChannel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  listing RentalListing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  channel TelegramChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
   logs    TelegramPostingLog[]
 
   @@unique([listingId, channelId])

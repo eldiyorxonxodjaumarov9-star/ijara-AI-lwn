@@ -146,6 +146,8 @@ export interface Employee {
   notes?: string;
   companyId?: string | null;
   companyName?: string;
+  /** Ish boshlagan sana (ISO) */
+  startedAt?: string | null;
   createdAt: string;
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
@@ -435,37 +436,42 @@ export function ExpenseDialog({
 
               <div className="space-y-1.5">
                 <Label>
-                  Ishchi
+                  Xodim
                   {category === "other" && workerPayType === "expense"
                     ? " (ixtiyoriy)"
                     : ""}
                 </Label>
-                <Select
-                  value={employeeId || undefined}
-                  onValueChange={onEmployeeChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Ishchini tanlang" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeEmployees.length === 0 ? (
-                      <SelectItem value="_none" disabled>
-                        Avval Ishchilar bo&apos;limidan qo&apos;shing
-                      </SelectItem>
-                    ) : (
-                      activeEmployees.map((e) => (
+                {activeEmployees.length === 0 ? (
+                  <div className="rounded-md border border-dashed bg-background px-3 py-3 text-sm text-muted-foreground">
+                    <p>Avval Xodimlar bo‘limidan xodim qo‘shing.</p>
+                    <Button asChild variant="link" className="h-auto px-0">
+                      <Link href="/employees">Xodimlar bo‘limiga o‘tish</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <Select
+                    value={employeeId || undefined}
+                    onValueChange={onEmployeeChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Xodimni tanlang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeEmployees.map((e) => (
                         <SelectItem key={e.id} value={e.id}>
                           {e.fullName}
-                          {e.companyName
-                            ? ` — ${e.companyName}`
-                            : e.position
-                              ? ` — ${e.position}`
-                              : ""}
+                          {e.companyName ? ` — ${e.companyName}` : ""}
+                          {e.position ? ` · ${e.position}` : ""}
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {errors.employeeId && (
+                  <p className="text-xs text-destructive">
+                    {errors.employeeId.message}
+                  </p>
+                )}
               </div>
             </div>
           )}

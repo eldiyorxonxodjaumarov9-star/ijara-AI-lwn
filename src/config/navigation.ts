@@ -12,6 +12,7 @@ import {
   Megaphone,
   Receipt,
   Settings,
+  UserCog,
   Users,
   Wrench,
   PieChart,
@@ -74,6 +75,12 @@ export const navigation: NavSection[] = [
     labelKey: "nav.section.management",
     items: [
       { titleKey: "nav.maintenance", href: "/maintenance", icon: Wrench },
+      {
+        titleKey: "nav.employees",
+        href: "/employees",
+        icon: UserCog,
+        roles: ["admin", "manager"],
+      },
       {
         titleKey: "nav.platformRental",
         href: "/platform-rental",

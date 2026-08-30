@@ -5,8 +5,11 @@ import type {
   Property,
   Tenant,
 } from "@/types";
-import { computeContractDebt, paymentBillingPeriod } from "@/lib/debt-calculator";
-import { getTashkentDateParts } from "@/lib/payment-due-schedule";
+import { computeContractDebt, paymentBillingPeriod, resolvePaymentDay } from "@/lib/debt-calculator";
+import {
+  formatTashkentDate,
+  getTashkentDateParts,
+} from "@/lib/payment-due-schedule";
 
 const MONTHS_UZ = [
   "Yan",
@@ -223,6 +226,10 @@ export interface DebtRow {
   debt: number;
   endDate: string;
   overdueDays: number;
+  /** Shu oydagi to'lov qilish sanasi (YYYY-MM-DD, Toshkent) */
+  paymentDueDate: string;
+  /** Har oydagi to'lov kuni (1–31) */
+  paymentDay: number;
 }
 
 export function computeDebts(
@@ -234,10 +241,22 @@ export function computeDebts(
   const tenantById = new Map(tenants.map((t) => [t.id, t]));
 
   return contracts
-    .filter((c) => c.status === "active" || c.status === "expired")
+    .filter((c) => {
+      if (c.status !== "active" && c.status !== "expired") return false;
+      const tenant = tenantById.get(c.tenantId);
+      // Xonadan chiqqan (leftAt) klientlar qarzdorlar ro'yxatiga tushmasin
+      if (tenant?.leftAt) return false;
+      return true;
+    })
     .map((c) => {
       const tenant = tenantById.get(c.tenantId);
       const result = computeContractDebt(c, payments, tenant, now);
+      const paymentDay = resolvePaymentDay(tenant, c);
+      const today = getTashkentDateParts(now);
+      const dueDay = Math.min(
+        paymentDay,
+        new Date(Date.UTC(today.year, today.month, 0)).getUTCDate()
+      );
       return {
         contractId: c.id,
         propertyName: c.propertyName ?? "—",
@@ -248,6 +267,12 @@ export function computeDebts(
         debt: result.debt,
         endDate: c.endDate,
         overdueDays: result.overdueDays,
+        paymentDay,
+        paymentDueDate: formatTashkentDate({
+          year: today.year,
+          month: today.month,
+          day: dueDay,
+        }),
       };
     })
     .filter((row) => row.debt > 0)

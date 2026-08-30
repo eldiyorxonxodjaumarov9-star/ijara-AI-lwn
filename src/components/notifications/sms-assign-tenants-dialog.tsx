@@ -37,52 +37,36 @@ import {
 import { useCollection } from "@/hooks/use-collection";
 import { useTenantPaymentDueMap } from "@/hooks/use-tenant-payment-due-lines";
 import { useTableData } from "@/hooks/use-table-data";
-import {
-  buildTenantRows,
-  collectAssignedRooms,
-  type TenantRow,
-} from "@/hooks/use-tenant-rows";
 import { ApiError, isApiConfigured } from "@/lib/api/client";
 import { refreshCollection } from "@/lib/data/store";
 import {
+  buildSmsTenantCandidates,
+  collectSmsCandidateRooms,
+} from "@/lib/sms-link-candidates";
+import { assignSmsLinks } from "@/lib/sms-links-client";
+import {
   DEFAULT_SMS_SETTINGS,
   formatPhoneDisplay,
-  validateTenantPhone,
 } from "@/lib/sms-notifications";
 import type { Contract, Payment, Tenant } from "@/types";
-import type { SmsLinkedTenant, SmsTenantCandidate } from "@/types/sms-notifications";
+import type {
+  SmsLinkedTenant,
+  SmsTenantCandidate,
+} from "@/types/sms-notifications";
 
 const ALL_ROOMS = "all";
 const PAGE_SIZE = 10;
 
-function buildCandidates(
-  rows: TenantRow[],
-  linkedIds: Set<string>
-): SmsTenantCandidate[] {
-  return rows.map((t) => {
-    const phoneCheck = validateTenantPhone(t.phone);
-    return {
-      tenantId: t.id,
-      fullName: t.fullName,
-      phone: t.phone,
-      propertyLabel: t.assignedRoom.trim() ? t.assignedRoom : "—",
-      phoneValid: phoneCheck.valid,
-      phoneInvalidReason: phoneCheck.reason,
-      alreadyLinked: linkedIds.has(t.id),
-    };
-  });
-}
-
 export function SmsAssignTenantsDialog({
   open,
   onOpenChange,
-  linkedIds,
-  onAssign,
+  linkedKeys,
+  onAssigned,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  linkedIds: Set<string>;
-  onAssign: (tenants: SmsLinkedTenant[]) => void;
+  linkedKeys: Set<string>;
+  onAssigned: (rows: SmsLinkedTenant[]) => void;
 }) {
   const { data: tenants, loading: tenantsLoading } =
     useCollection<Tenant>("tenants");
@@ -92,6 +76,7 @@ export function SmsAssignTenantsDialog({
   const paymentDueByTenant = useTenantPaymentDueMap();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [roomFilter, setRoomFilter] = useState(ALL_ROOMS);
@@ -124,19 +109,14 @@ export function SmsAssignTenantsDialog({
     void reloadFromSource();
   }, [open, reloadFromSource]);
 
-  const tenantRows = useMemo(
-    () => buildTenantRows(tenants, contracts),
-    [tenants, contracts]
-  );
-
   const candidates = useMemo(
-    () => buildCandidates(tenantRows, linkedIds),
-    [tenantRows, linkedIds]
+    () => buildSmsTenantCandidates(tenants, contracts, linkedKeys),
+    [tenants, contracts, linkedKeys]
   );
 
   const roomOptions = useMemo(
-    () => collectAssignedRooms(tenantRows),
-    [tenantRows]
+    () => collectSmsCandidateRooms(candidates),
+    [candidates]
   );
 
   const roomFiltered = useMemo(() => {
@@ -166,26 +146,25 @@ export function SmsAssignTenantsDialog({
     setLoadError(null);
   }, [setSearch, setPage]);
 
-  const candidateById = useMemo(() => {
+  const candidateByKey = useMemo(() => {
     const map = new Map<string, SmsTenantCandidate>();
-    for (const c of candidates) map.set(c.tenantId, c);
+    for (const c of candidates) map.set(c.candidateKey, c);
     return map;
   }, [candidates]);
 
-  const selectableVisible = paged.filter(
-    (c) => !c.alreadyLinked && c.phoneValid
-  );
+  /** Telefon yo‘q bo‘lsa ham biriktirish mumkin — faqat allaqachon bog‘langanlar cheklanadi */
+  const selectableVisible = paged.filter((c) => !c.alreadyLinked);
 
   const allVisibleSelected =
     selectableVisible.length > 0 &&
-    selectableVisible.every((c) => selected.has(c.tenantId));
+    selectableVisible.every((c) => selected.has(c.candidateKey));
 
-  const toggleOne = (tenantId: string, canSelect: boolean) => {
+  const toggleOne = (candidateKey: string, canSelect: boolean) => {
     if (!canSelect) return;
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(tenantId)) next.delete(tenantId);
-      else next.add(tenantId);
+      if (next.has(candidateKey)) next.delete(candidateKey);
+      else next.add(candidateKey);
       return next;
     });
   };
@@ -194,28 +173,23 @@ export function SmsAssignTenantsDialog({
     if (allVisibleSelected) {
       setSelected((prev) => {
         const next = new Set(prev);
-        for (const c of selectableVisible) next.delete(c.tenantId);
+        for (const c of selectableVisible) next.delete(c.candidateKey);
         return next;
       });
     } else {
       setSelected((prev) => {
         const next = new Set(prev);
-        for (const c of selectableVisible) next.add(c.tenantId);
+        for (const c of selectableVisible) next.add(c.candidateKey);
         return next;
       });
     }
   };
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     const toAdd: SmsTenantCandidate[] = [];
-    for (const id of selected) {
-      const c = candidateById.get(id);
-      if (
-        c &&
-        !c.alreadyLinked &&
-        c.phoneValid &&
-        !toAdd.some((x) => x.tenantId === id)
-      ) {
+    for (const key of selected) {
+      const c = candidateByKey.get(key);
+      if (c && !c.alreadyLinked && !toAdd.some((x) => x.candidateKey === key)) {
         toAdd.push(c);
       }
     }
@@ -223,19 +197,44 @@ export function SmsAssignTenantsDialog({
       toast.info("Kamida bitta arendator tanlang");
       return;
     }
-    onAssign(
-      toAdd.map((c) => ({
-        tenantId: c.tenantId,
-        fullName: c.fullName,
-        phone: c.phone,
-        propertyLabel: c.propertyLabel,
-        smsEnabled: true,
-        settings: { ...DEFAULT_SMS_SETTINGS },
-      }))
-    );
-    toast.success(`${toAdd.length} ta arendator biriktirildi (vaqtinchalik)`);
-    resetDialogUi();
-    onOpenChange(false);
+
+    if (!isApiConfigured) {
+      toast.error("API sozlanmagan — biriktirish saqlanmaydi");
+      return;
+    }
+
+    setAssigning(true);
+    try {
+      const result = await assignSmsLinks(
+        toAdd.map((c) => ({
+          tenantId: c.tenantId,
+          contractId: c.contractId,
+          propertyId: c.propertyId,
+          propertyLabel: c.propertyLabel === "—" ? "" : c.propertyLabel,
+          smsEnabled: true,
+          settings: { ...DEFAULT_SMS_SETTINGS },
+        }))
+      );
+      onAssigned(result.data);
+      const n = result.created.length;
+      if (n === 0) {
+        toast.info("Yangi biriktirish yo'q (allaqachon mavjud)");
+      } else {
+        toast.success(`${n} ta arendator biriktirildi`);
+      }
+      resetDialogUi();
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Biriktirish saqlanmadi"
+      );
+    } finally {
+      setAssigning(false);
+    }
   };
 
   const initialLoading =
@@ -245,7 +244,7 @@ export function SmsAssignTenantsDialog({
 
   const showError =
     !loading &&
-    tenantRows.length === 0 &&
+    candidates.length === 0 &&
     Boolean(loadError || (isApiConfigured && tenants.length === 0));
 
   const errorMessage =
@@ -266,8 +265,8 @@ export function SmsAssignTenantsDialog({
         <DialogHeader className="space-y-1 border-b px-6 py-4">
           <DialogTitle>Arendator biriktirish</DialogTitle>
           <DialogDescription>
-            Arendatorlar bo&apos;limidagi ro&apos;yxatdan tanlang. Asosiy
-            arendator yozuvi o&apos;zgarmaydi.
+            Arendatorlar bo&apos;limidagi ro&apos;yxatdan tanlang. Har bir
+            xona/shartnoma alohida qator sifatida biriktiriladi.
           </DialogDescription>
         </DialogHeader>
 
@@ -276,11 +275,11 @@ export function SmsAssignTenantsDialog({
             <div className="relative sm:col-span-2">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Ism yoki telefon bo'yicha qidirish..."
+                placeholder="Ism, xona yoki telefon bo'yicha qidirish..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                disabled={loading || showError}
+                disabled={loading || showError || assigning}
               />
             </div>
             {roomOptions.length > 0 && (
@@ -292,7 +291,7 @@ export function SmsAssignTenantsDialog({
                     setRoomFilter(v);
                     setPage(1);
                   }}
-                  disabled={loading || showError}
+                  disabled={loading || showError || assigning}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Barchasi" />
@@ -314,8 +313,8 @@ export function SmsAssignTenantsDialog({
             <span className="font-medium text-foreground">{selected.size}</span>
             {!loading && !showError && (
               <span className="ml-2">
-                · Jami faol: {tenantRows.length}
-                {filteredTotal !== tenantRows.length &&
+                · Jami: {candidates.length}
+                {filteredTotal !== candidates.length &&
                   ` · Ko‘rinayotgan: ${filteredTotal}`}
               </span>
             )}
@@ -359,7 +358,7 @@ export function SmsAssignTenantsDialog({
                         className="size-4 rounded border-input accent-primary"
                         checked={allVisibleSelected}
                         onChange={toggleAllVisible}
-                        disabled={selectableVisible.length === 0}
+                        disabled={selectableVisible.length === 0 || assigning}
                         aria-label="Joriy sahifadagi tanlash mumkin bo'lganlarni belgilash"
                       />
                     </TableHead>
@@ -371,20 +370,28 @@ export function SmsAssignTenantsDialog({
                 </TableHeader>
                 <TableBody>
                   {paged.map((c) => {
-                    const canSelect = !c.alreadyLinked && c.phoneValid;
+                    const canSelect = !c.alreadyLinked;
                     const dueLines = paymentDueByTenant.get(c.tenantId) ?? [];
+                    const dueForRow =
+                      c.propertyLabel === "—"
+                        ? dueLines
+                        : dueLines.filter(
+                            (l) => l.propertyLabel === c.propertyLabel
+                          );
                     return (
                       <TableRow
-                        key={c.tenantId}
+                        key={c.candidateKey}
                         className={!canSelect ? "opacity-70" : undefined}
                       >
                         <TableCell>
                           <input
                             type="checkbox"
                             className="size-4 rounded border-input accent-primary"
-                            checked={selected.has(c.tenantId)}
-                            disabled={!canSelect}
-                            onChange={() => toggleOne(c.tenantId, canSelect)}
+                            checked={selected.has(c.candidateKey)}
+                            disabled={!canSelect || assigning}
+                            onChange={() =>
+                              toggleOne(c.candidateKey, canSelect)
+                            }
                             aria-label={`${c.fullName} tanlash`}
                           />
                         </TableCell>
@@ -396,8 +403,9 @@ export function SmsAssignTenantsDialog({
                             </Badge>
                           )}
                           {!c.phoneValid && !c.alreadyLinked && (
-                            <p className="mt-0.5 text-xs text-destructive">
-                              {c.phoneInvalidReason}
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {c.phoneInvalidReason ?? "Telefon yo'q"} — baribir
+                              biriktirish mumkin
                             </p>
                           )}
                           <span className="mt-0.5 block text-xs text-muted-foreground sm:hidden">
@@ -413,7 +421,13 @@ export function SmsAssignTenantsDialog({
                             : "—"}
                         </TableCell>
                         <TableCell className="min-w-[7rem]">
-                          <PaymentDueCell lines={dueLines} />
+                          {dueForRow.length === 0 ? (
+                            <span className="text-sm text-muted-foreground">
+                              —
+                            </span>
+                          ) : (
+                            <PaymentDueCell lines={dueForRow} />
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -437,6 +451,7 @@ export function SmsAssignTenantsDialog({
         <DialogFooter className="border-t px-6 py-4">
           <Button
             variant="outline"
+            disabled={assigning}
             onClick={() => {
               resetDialogUi();
               onOpenChange(false);
@@ -445,11 +460,13 @@ export function SmsAssignTenantsDialog({
             Bekor qilish
           </Button>
           <Button
-            onClick={handleAssign}
-            disabled={selected.size === 0 || loading || showError}
+            onClick={() => void handleAssign()}
+            disabled={selected.size === 0 || loading || showError || assigning}
           >
             <UserPlus className="size-4" />
-            Biriktirish ({selected.size})
+            {assigning
+              ? "Saqlanmoqda..."
+              : `Biriktirish (${selected.size})`}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ExpenseDialog } from "@/components/expenses/expense-dialog";
+import { RecurringExpensesPanel } from "@/components/expenses/recurring-expenses-panel";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +68,7 @@ export default function ExpensesPage() {
   const { remove } = useCollectionActions<Expense>("expenses");
 
   const nowParts = getTashkentDateParts();
+  const [tab, setTab] = useState("expenses");
   const [month, setMonth] = useState(String(nowParts.month));
   const [year, setYear] = useState(String(nowParts.year));
   const [category, setCategory] = useState<string>(ALL_CATEGORIES);
@@ -184,186 +192,207 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Xarajatlar"
-        description={`${filterLabel} — operatsion xarajatlarni qayd eting.`}
+        description={
+          tab === "recurring"
+            ? "Muntazam (doimiy) xarajatlar jadvali va oylik reja."
+            : `${filterLabel} — operatsion xarajatlarni qayd eting.`
+        }
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={month} onValueChange={setMonth}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Oy" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS_UZ_FULL.map((name, i) => (
-                  <SelectItem key={name} value={String(i + 1)}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={year} onValueChange={setYear}>
-              <SelectTrigger className="w-28">
-                <SelectValue placeholder="Yil" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Kategoriya" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_CATEGORIES}>Barchasi</SelectItem>
-                {Object.entries(EXPENSE_CATEGORY_MAP).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={handlePdf} disabled={loading}>
-              <FileText className="size-4" /> PDF
-            </Button>
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="size-4" /> Xarajat qo&apos;shish
-            </Button>
-          </div>
+          tab === "expenses" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={month} onValueChange={setMonth}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Oy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS_UZ_FULL.map((name, i) => (
+                    <SelectItem key={name} value={String(i + 1)}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="Yil" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Kategoriya" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_CATEGORIES}>Barchasi</SelectItem>
+                  {Object.entries(EXPENSE_CATEGORY_MAP).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={handlePdf} disabled={loading}>
+                <FileText className="size-4" /> PDF
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditing(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="size-4" /> Xarajat qo&apos;shish
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatCard
-          title={`${filterLabel} jami`}
-          value={formatCurrency(total)}
-          icon={Receipt}
-          tone="rose"
-          loading={loading}
-        />
-        <StatCard
-          title="Yozuvlar soni"
-          value={String(filtered.length)}
-          icon={Receipt}
-          tone="amber"
-          loading={loading}
-          index={1}
-        />
-      </div>
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="flex h-auto w-full flex-wrap gap-1 sm:w-auto">
+          <TabsTrigger value="expenses">Xarajatlar</TabsTrigger>
+          <TabsTrigger value="recurring">Doimiy xarajatlar</TabsTrigger>
+        </TabsList>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Izoh, oylik tur (suv, elektr...)..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+        <TabsContent value="expenses" className="mt-6 space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <StatCard
+              title={`${filterLabel} jami`}
+              value={formatCurrency(total)}
+              icon={Receipt}
+              tone="rose"
+              loading={loading}
+            />
+            <StatCard
+              title="Yozuvlar soni"
+              value={String(filtered.length)}
+              icon={Receipt}
+              tone="amber"
+              loading={loading}
+              index={1}
+            />
+          </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="space-y-2 p-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : paged.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={Receipt}
-                title={`${filterLabel}da xarajat yo'q`}
-                description="Boshqa oy/kategoriya tanlang yoki yangi xarajat qo'shing."
-              />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Kategoriya</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Ishchi / Oylik tur / Izoh
-                  </TableHead>
-                  <TableHead className="hidden lg:table-cell">Kompaniya</TableHead>
-                  <TableHead>Sana</TableHead>
-                  <TableHead>Summa</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paged.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {EXPENSE_CATEGORY_MAP[e.category]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {formatExpenseDetail(e)}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {e.companyName ? (
-                        <Badge variant="outline">{e.companyName}</Badge>
-                      ) : e.employeeName ? (
-                        <span className="text-xs text-muted-foreground">
-                          O&apos;zimiz
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {formatDate(e.date)}
-                    </TableCell>
-                    <TableCell className="font-semibold text-destructive">
-                      −{formatCurrency(e.amount)}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="icon" variant="ghost">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditing(e);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="size-4" /> Tahrirlash
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteId(e.id)}
-                          >
-                            <Trash2 className="size-4" /> O&apos;chirish
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Izoh, oylik tur (suv, elektr...)..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={count}
-        onPageChange={setPage}
-      />
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="space-y-2 p-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : paged.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    icon={Receipt}
+                    title={`${filterLabel}da xarajat yo'q`}
+                    description="Boshqa oy/kategoriya tanlang yoki yangi xarajat qo'shing."
+                  />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Kategoriya</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Ishchi / Oylik tur / Izoh
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Kompaniya
+                      </TableHead>
+                      <TableHead>Sana</TableHead>
+                      <TableHead>Summa</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paged.map((e) => (
+                      <TableRow key={e.id}>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {EXPENSE_CATEGORY_MAP[e.category]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-muted-foreground">
+                          {formatExpenseDetail(e)}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {e.companyName ? (
+                            <Badge variant="outline">{e.companyName}</Badge>
+                          ) : e.employeeName ? (
+                            <span className="text-xs text-muted-foreground">
+                              O&apos;zimiz
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {formatDate(e.date)}
+                        </TableCell>
+                        <TableCell className="font-semibold text-destructive">
+                          −{formatCurrency(e.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost">
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditing(e);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="size-4" /> Tahrirlash
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteId(e.id)}
+                              >
+                                <Trash2 className="size-4" /> O&apos;chirish
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={count}
+            onPageChange={setPage}
+          />
+        </TabsContent>
+
+        <TabsContent value="recurring" className="mt-6">
+          <RecurringExpensesPanel />
+        </TabsContent>
+      </Tabs>
 
       <ExpenseDialog
         open={dialogOpen}

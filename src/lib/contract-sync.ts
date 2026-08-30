@@ -9,6 +9,8 @@ function addMonths(date: Date, months: number) {
 }
 
 export async function syncContractFromTenant(tenant: Tenant) {
+  if (tenant.leftAt) return null;
+
   const propertyApi = getCollectionApi<Property>("properties");
   const contractApi = getCollectionApi<Contract>("contracts");
   const properties = await propertyApi.list();

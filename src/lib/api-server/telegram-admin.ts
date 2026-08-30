@@ -14,8 +14,13 @@ import {
   formatTashkentClock,
   getPaymentDayOfMonth,
   getPaymentSchedule,
+  getTashkentDateParts,
 } from "@/lib/payment-due-schedule";
-import type { Contract, ContractStatus, Payment, Tenant } from "@/types";
+import { MONTHS_UZ_FULL } from "@/lib/analytics";
+import {
+  RECURRING_STATUS_LABEL,
+} from "@/lib/recurring-expense";
+import type { Contract, ContractStatus, Payment, RecurringPlanSummary, Tenant } from "@/types";
 
 const OWNER_ROLES: Role[] = ["SUPER_ADMIN", "ADMIN", "MANAGER"];
 
@@ -311,26 +316,47 @@ export function buildAdminSummaryMessage(rows: AdminTenantRow[]) {
   return lines.join("\n");
 }
 
-export async function sendAdminMessage(chatId: string, text: string) {
-  const chunks = chunkLines(text.split("\n"));
-  for (const chunk of chunks) {
-    await sendTelegramMessage(chatId, chunk, {
-      reply_markup: ADMIN_MENU_KEYBOARD,
-    });
+export async function getEmployeeSalaryReminderRows(withinDays?: number) {
+  const employees = await prisma.employee.findMany({
+    where: {
+      active: true,
+      salaryPayDay: { not: null },
+      monthlySalary: { gt: 0 },
+    },
+    include: { company: true },
+    orderBy: { fullName: "asc" },
+  });
+
+  const { mapEmployeeSalaryRow, filterSalaryDueSoon } = await import(
+    "@/lib/employee-salary"
+  );
+  const mapped = employees
+    .map((e) => {
+      const row = mapEmployeeSalaryRow(e);
+      if (!row) return null;
+      return {
+        ...row,
+        companyName: e.company?.name ?? null,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r != null);
+
+  if (withinDays == null || withinDays >= 31) {
+    return mapped.sort(
+      (a, b) =>
+        a.daysLeft - b.daysLeft || a.fullName.localeCompare(b.fullName)
+    );
   }
+  return filterSalaryDueSoon(mapped, withinDays);
 }
 
-export const ADMIN_MENU_KEYBOARD = {
-  keyboard: [
-    [{ text: "📋 Arendatorlar" }, { text: "⚠️ Qarzdorlar" }],
-    [{ text: "📅 To'lov muddati yaqin kelganlar" }],
-    [{ text: "📊 Umumiy hisobot" }],
-    [{ text: "🚪 Chiqish" }],
-  ],
-  resize_keyboard: true,
-};
+export async function buildEmployeeSalaryMessage(withinDays = 31) {
+  const { buildSalaryRemindersMessage } = await import("@/lib/employee-salary");
+  const rows = await getEmployeeSalaryReminderRows(withinDays);
+  return buildSalaryRemindersMessage(rows);
+}
 
-export async function sendAdminReportsToAll(slotLabel?: string) {
+async function listAdminChatIds() {
   const devices = await prisma.telegramAdminDevice.findMany({
     where: {
       user: { isActive: true, role: { in: OWNER_ROLES } },
@@ -353,7 +379,32 @@ export async function sendAdminReportsToAll(slotLabel?: string) {
       if (o.telegramAdminChatId) chatIds.push(o.telegramAdminChatId);
     }
   }
+  return chatIds;
+}
 
+export async function sendAdminMessage(chatId: string, text: string) {
+  const chunks = chunkLines(text.split("\n"));
+  for (const chunk of chunks) {
+    await sendTelegramMessage(chatId, chunk, {
+      reply_markup: ADMIN_MENU_KEYBOARD,
+    });
+  }
+}
+
+export const ADMIN_MENU_KEYBOARD = {
+  keyboard: [
+    [{ text: "📋 Arendatorlar" }, { text: "⚠️ Qarzdorlar" }],
+    [{ text: "📅 To'lov muddati yaqin kelganlar" }],
+    [{ text: "💰 Ishchilar oyligi" }],
+    [{ text: "📅 Oylik doimiy xarajatlar" }],
+    [{ text: "📊 Umumiy hisobot" }],
+    [{ text: "🚪 Chiqish" }],
+  ],
+  resize_keyboard: true,
+};
+
+export async function sendAdminReportsToAll(slotLabel?: string) {
+  const chatIds = await listAdminChatIds();
   if (chatIds.length === 0) {
     return { sent: 0, skipped: 0 };
   }
@@ -373,6 +424,109 @@ export async function sendAdminReportsToAll(slotLabel?: string) {
     }
   }
   return { sent, skipped };
+}
+
+export async function sendEmployeeSalaryRemindersToAll(
+  withinDays = 31,
+  slotLabel?: string
+) {
+  const chatIds = await listAdminChatIds();
+  if (chatIds.length === 0) {
+    return { sent: 0, skipped: 0, dueCount: 0, chatIds: 0 };
+  }
+
+  const rows = await getEmployeeSalaryReminderRows(withinDays);
+  const { buildSalaryRemindersMessage } = await import("@/lib/employee-salary");
+  const body = buildSalaryRemindersMessage(rows);
+  const text = slotLabel ? `🔔 ${slotLabel}\n\n${body}` : body;
+
+  let sent = 0;
+  let skipped = 0;
+  for (const chatId of chatIds) {
+    try {
+      await sendAdminMessage(chatId, text);
+      sent += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+  return { sent, skipped, dueCount: rows.length, chatIds: chatIds.length };
+}
+
+export function buildRecurringExpensesMessage(
+  plan: RecurringPlanSummary,
+  monthLabel: string
+) {
+  const lines = [
+    "📅 <b>Oylik doimiy xarajatlar</b>",
+    `📆 ${monthLabel}`,
+    `🕐 ${formatTashkentClock()}`,
+    "",
+    `📋 Rejadagi occurrence: <b>${plan.count}</b> ta`,
+    `💰 Jami summa: <b>${formatUzs(plan.plannedTotal)}</b>`,
+    `✅ To'langan: <b>${formatUzs(plan.paidTotal)}</b>`,
+    `⏳ Qolgan: <b>${formatUzs(plan.remainingTotal)}</b>`,
+    `🔴 Muddati o'tgan: <b>${plan.overdueCount}</b> ta`,
+  ];
+
+  if (plan.occurrences.length === 0) {
+    lines.push("", "Bu oyda faol doimiy xarajat yo'q.");
+    return lines.join("\n");
+  }
+
+  lines.push("", "<b>Xarajatlar (sana bo'yicha):</b>");
+  plan.occurrences.forEach((o, i) => {
+    const status = RECURRING_STATUS_LABEL[o.status];
+    lines.push(
+      `${i + 1}. ${status} — <b>${o.name}</b> · ${o.dueDate} · ${formatUzs(o.amount)}`
+    );
+  });
+
+  return lines.join("\n");
+}
+
+export async function buildRecurringExpensesReportMessage(
+  year?: number,
+  month?: number
+) {
+  const { loadRecurringPlan } = await import(
+    "@/lib/api-server/recurring-expenses"
+  );
+
+  const now = getTashkentDateParts();
+  const y = year ?? now.year;
+  const m = month ?? now.month;
+  const plan = await loadRecurringPlan(y, m);
+  const monthLabel = `${MONTHS_UZ_FULL[m - 1]} ${y}`;
+  return { text: buildRecurringExpensesMessage(plan, monthLabel), plan };
+}
+
+export async function sendRecurringExpensesReportToAll(slotLabel?: string) {
+  const chatIds = await listAdminChatIds();
+  if (chatIds.length === 0) {
+    return { sent: 0, skipped: 0, chatIds: 0, count: 0 };
+  }
+
+  const { text: body, plan } = await buildRecurringExpensesReportMessage();
+  const text = slotLabel ? `🔔 ${slotLabel}\n\n${body}` : body;
+
+  let sent = 0;
+  let skipped = 0;
+  for (const chatId of chatIds) {
+    try {
+      await sendAdminMessage(chatId, text);
+      sent += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  return {
+    sent,
+    skipped,
+    chatIds: chatIds.length,
+    count: plan.count,
+  };
 }
 
 /** Eslatma uchun — sayt qarzdorlari bilan bir xil */

@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/api-server/prisma";
 
-const DEDUPE_WINDOW_MS = 45_000;
+/** Qayta bosish / sekin tarmoq — shu oynada bir xil to'lov qayta yozilmasin */
+const DEDUPE_WINDOW_MS = 10 * 60_000;
 
 /**
- * Bir xil to'lov 45 soniya ichida qayta yuborilsa — yangi yozuv yaratmaydi.
- * (Ikki marta bosish / tarmoq qayta urinishi)
+ * Bir xil shartnoma + summa + oy + usul yaqin vaqt ichida qayta yuborilsa
+ * yangi yozuv yaratmaydi (mavjudini qaytaradi).
  */
 export async function findRecentDuplicatePayment(input: {
   contractId: string;

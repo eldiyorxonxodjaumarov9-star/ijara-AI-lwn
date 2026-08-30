@@ -107,6 +107,20 @@ export type MonthlyExpenseType =
   | "office"
   | "custom";
 
+export type RecurrenceInterval =
+  | "monthly"
+  | "quarterly"
+  | "semiannual"
+  | "yearly";
+
+export type ExpenseSource = "manual" | "recurring_expense";
+
+export type RecurringOccurrenceStatus =
+  | "paid"
+  | "pending"
+  | "overdue"
+  | "due_today";
+
 export interface Expense {
   id: string;
   category: ExpenseCategory;
@@ -122,7 +136,58 @@ export interface Expense {
   monthlyExpenseCustomName?: string | null;
   /** Ko‘rsatish/qidiruv uchun (Suv, Elektr… yoki custom nom) */
   monthlyExpenseLabel?: string;
+  source?: ExpenseSource;
+  recurringExpenseId?: string | null;
+  paymentPeriodKey?: string | null;
+  plannedDueDate?: string | null;
   createdAt: string;
+}
+
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  amount: number;
+  category: ExpenseCategory;
+  monthlyExpenseType?: MonthlyExpenseType | null;
+  monthlyExpenseCustomName?: string | null;
+  monthlyExpenseLabel?: string;
+  notes?: string;
+  firstPaymentDate: string;
+  interval: RecurrenceInterval;
+  active: boolean;
+  companyId?: string | null;
+  companyName?: string;
+  createdAt: string;
+}
+
+export interface RecurringOccurrence {
+  recurringExpenseId: string;
+  name: string;
+  category: ExpenseCategory;
+  monthlyExpenseType?: MonthlyExpenseType | null;
+  monthlyExpenseCustomName?: string | null;
+  monthlyExpenseLabel?: string;
+  paymentPeriodKey: string;
+  dueDate: string;
+  amount: number;
+  paid: boolean;
+  status: RecurringOccurrenceStatus;
+  expenseId?: string;
+  notes?: string;
+  /** Haqiqiy to'langan summa (Expense.amount), agar to'langan bo'lsa */
+  paidAmount?: number;
+}
+
+export interface RecurringPlanSummary {
+  year: number;
+  month: number;
+  paymentPeriodKey: string;
+  occurrences: RecurringOccurrence[];
+  count: number;
+  plannedTotal: number;
+  paidTotal: number;
+  remainingTotal: number;
+  overdueCount: number;
 }
 
 export interface Company {

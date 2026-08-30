@@ -37,6 +37,10 @@ function nextLocalClientNumber(tenants: Tenant[], archives: TenantArchive[]) {
   return formatClientNumber(next);
 }
 
+function isOpenContract(status: Contract["status"]) {
+  return status === "active" || status === "pending" || status === "expired";
+}
+
 export function listLocalTenantArchives() {
   return readArchives().sort(
     (a, b) => new Date(b.leaveDate).getTime() - new Date(a.leaveDate).getTime()
@@ -55,11 +59,12 @@ export async function checkoutTenantLocal(tenantId: string) {
   if (tenant.leftAt) throw new Error("Arendator allaqachon chiqib ketgan");
 
   const contracts = await contractApi.list();
-  const contract = contracts.find(
-    (c) =>
-      c.tenantId === tenantId &&
-      (c.status === "active" || c.status === "pending")
+  const openContracts = contracts.filter(
+    (c) => c.tenantId === tenantId && isOpenContract(c.status)
   );
+  const contract =
+    openContracts.find((c) => c.status === "active" || c.status === "pending") ??
+    openContracts[0];
 
   const payments = await paymentApi.list();
   const contractPayments = contract
@@ -98,15 +103,13 @@ export async function checkoutTenantLocal(tenantId: string) {
 
   writeArchives([archive, ...archives]);
 
-  if (contract) {
-    await contractApi.update(contract.id, {
-      ...contract,
+  for (const c of openContracts) {
+    await contractApi.update(c.id, {
+      ...c,
       status: "terminated",
       endDate: leaveDate,
     });
-    const property = (await propertyApi.list()).find(
-      (p) => p.id === contract.propertyId
-    );
+    const property = (await propertyApi.list()).find((p) => p.id === c.propertyId);
     if (property) {
       await propertyApi.update(property.id, { ...property, status: "available" });
     }

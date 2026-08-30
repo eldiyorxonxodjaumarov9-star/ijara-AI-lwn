@@ -29,24 +29,50 @@ import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { isApiConfigured } from "@/lib/api/client";
 import { MONTHS_UZ_FULL } from "@/lib/analytics";
 import { notifyTenantPaymentLocal } from "@/lib/payment-reminders";
-import { getTashkentDateParts } from "@/lib/payment-due-schedule";
+import { getTashkentDateParts, formatTashkentDate } from "@/lib/payment-due-schedule";
 import { zResolver } from "@/lib/form";
 import { paymentSchema, type PaymentInput } from "@/lib/validations";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import type { Contract, Payment, PaymentMethod } from "@/types";
 
-const today = new Date().toISOString().slice(0, 10);
-const nowParts = getTashkentDateParts();
+function paymentFingerprint(values: {
+  contractId: string;
+  amount: number;
+  periodYear: number;
+  periodMonth: number;
+  method: string;
+}) {
+  return [
+    values.contractId,
+    values.amount,
+    values.periodYear,
+    values.periodMonth,
+    values.method,
+  ].join("|");
+}
 
-const defaults: PaymentInput = {
-  contractId: "",
-  amount: 0,
-  date: today,
-  periodYear: nowParts.year,
-  periodMonth: nowParts.month,
-  method: "cash",
-  note: "",
-};
+const CLIENT_DEDUPE_MS = 10 * 60_000;
+
+function wasRecentlySubmitted(fingerprint: string) {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(`pay:${fingerprint}`);
+    if (!raw) return false;
+    const at = Number(raw);
+    return Number.isFinite(at) && Date.now() - at < CLIENT_DEDUPE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markSubmitted(fingerprint: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(`pay:${fingerprint}`, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
 
 export function PaymentDialog({
   open,
@@ -61,6 +87,17 @@ export function PaymentDialog({
   const { create, update } = useCollectionActions<Payment>("payments");
   const submittingRef = useRef(false);
   const [saving, setSaving] = useState(false);
+  const nowParts = getTashkentDateParts();
+
+  const defaults: PaymentInput = {
+    contractId: "",
+    amount: 0,
+    date: formatTashkentDate(nowParts),
+    periodYear: nowParts.year,
+    periodMonth: nowParts.month,
+    method: "cash",
+    note: "",
+  };
 
   const {
     register,
@@ -94,24 +131,26 @@ export function PaymentDialog({
             }
           : {
               ...defaults,
+              date: formatTashkentDate(dateParts),
               periodYear: dateParts.year,
               periodMonth: dateParts.month,
             }
       );
     }
+    // defaults o'qiladi ochilganda — reset uchun yetarli
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, payment, reset]);
 
   const onContractChange = (contractId: string) => {
-    setValue("contractId", contractId);
+    setValue("contractId", contractId, { shouldValidate: true });
     const contract = contracts.find((c) => c.id === contractId);
     if (contract && !payment) {
-      setValue("amount", contract.monthlyPayment);
+      setValue("amount", contract.monthlyPayment, { shouldValidate: true });
     }
   };
 
   const onSubmit = async (values: PaymentInput) => {
-    // Ikki marta bosish / Enter — faqat 1 marta saqlansin
-    if (submittingRef.current) return;
+    if (submittingRef.current || saving) return;
     submittingRef.current = true;
     setSaving(true);
 
@@ -119,6 +158,22 @@ export function PaymentDialog({
     const periodYear = values.periodYear ?? getTashkentDateParts(values.date).year;
     const periodMonth =
       values.periodMonth ?? getTashkentDateParts(values.date).month;
+    const fingerprint = paymentFingerprint({
+      contractId: values.contractId,
+      amount: values.amount,
+      periodYear,
+      periodMonth,
+      method: values.method,
+    });
+
+    if (!payment && wasRecentlySubmitted(fingerprint)) {
+      toast.success("To'lov allaqachon qo'shilgan");
+      submittingRef.current = false;
+      setSaving(false);
+      onOpenChange(false);
+      return;
+    }
+
     const payload = {
       ...values,
       periodYear,
@@ -130,12 +185,14 @@ export function PaymentDialog({
         values.note?.trim() ||
         `${MONTHS_UZ_FULL[periodMonth - 1]} ${periodYear} oyi uchun`,
     };
+
     try {
       if (payment) {
         await update(payment.id, payload);
         toast.success("To'lov yangilandi");
       } else {
         await create(payload);
+        markSubmitted(fingerprint);
         if (!isApiConfigured && contract?.tenantId) {
           notifyTenantPaymentLocal(
             contract.tenantId,
@@ -147,10 +204,13 @@ export function PaymentDialog({
         toast.success("To'lov qo'shildi");
       }
       onOpenChange(false);
-    } catch {
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Xatolik yuz berdi"
+      );
+    } finally {
       submittingRef.current = false;
       setSaving(false);
-      toast.error("Xatolik yuz berdi");
     }
   };
 
@@ -163,7 +223,7 @@ export function PaymentDialog({
           <DialogTitle>{payment ? "To'lovni tahrirlash" : "Yangi to'lov"}</DialogTitle>
           <DialogDescription>
             To&apos;lov qaysi oy uchun ekanini belgilang — shu oy uchun summa
-            doim saqlanib qoladi.
+            doim saqlanib qoladi. Bir marta «Qo&apos;shish» bosing.
           </DialogDescription>
         </DialogHeader>
 
@@ -171,6 +231,7 @@ export function PaymentDialog({
           onSubmit={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (submittingRef.current || saving) return;
             void handleSubmit(onSubmit)(e);
           }}
           className="space-y-4"
@@ -193,6 +254,11 @@ export function PaymentDialog({
                 ))}
               </SelectContent>
             </Select>
+            {errors.contractId && (
+              <p className="text-xs text-destructive">
+                {errors.contractId.message}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -203,6 +269,7 @@ export function PaymentDialog({
                 onValueChange={(v) =>
                   setValue("periodMonth", Number(v), { shouldValidate: true })
                 }
+                disabled={saving}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -223,6 +290,7 @@ export function PaymentDialog({
                 onValueChange={(v) =>
                   setValue("periodYear", Number(v), { shouldValidate: true })
                 }
+                disabled={saving}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -251,7 +319,7 @@ export function PaymentDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Qabul qilingan sana</Label>
-              <Input type="date" {...register("date")} />
+              <Input type="date" disabled={saving} {...register("date")} />
             </div>
           </div>
 
@@ -260,6 +328,7 @@ export function PaymentDialog({
             <Select
               value={watch("method")}
               onValueChange={(v) => setValue("method", v as PaymentMethod)}
+              disabled={saving}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -276,7 +345,11 @@ export function PaymentDialog({
 
           <div className="space-y-1.5">
             <Label>Izoh</Label>
-            <Textarea placeholder="Ixtiyoriy" {...register("note")} />
+            <Textarea
+              placeholder="Ixtiyoriy"
+              disabled={saving}
+              {...register("note")}
+            />
           </div>
 
           <DialogFooter>

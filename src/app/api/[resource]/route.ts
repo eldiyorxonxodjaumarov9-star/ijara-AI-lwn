@@ -229,6 +229,9 @@ export async function POST(
           monthlyType === "CUSTOM" && monthlyTypeCustomRaw
             ? String(monthlyTypeCustomRaw).trim() || null
             : null;
+        const sourceRaw = String(body.source ?? "MANUAL").toUpperCase();
+        const source =
+          sourceRaw === "RECURRING_EXPENSE" ? "RECURRING_EXPENSE" : "MANUAL";
         return ok(
           await prisma.expense.create({
             data: {
@@ -241,6 +244,18 @@ export async function POST(
               employeeId: employeeId || undefined,
               monthlyType: (monthlyType as never) || undefined,
               monthlyTypeCustom: monthlyTypeCustom || undefined,
+              source: source as never,
+              recurringExpenseId:
+                body.recurringExpenseId != null && body.recurringExpenseId !== ""
+                  ? String(body.recurringExpenseId)
+                  : undefined,
+              paymentPeriodKey:
+                body.paymentPeriodKey != null && body.paymentPeriodKey !== ""
+                  ? String(body.paymentPeriodKey)
+                  : undefined,
+              plannedDueDate: body.plannedDueDate
+                ? new Date(String(body.plannedDueDate))
+                : undefined,
             },
             include: { employee: { include: { company: true } } },
           }),

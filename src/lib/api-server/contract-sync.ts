@@ -1,6 +1,10 @@
 import type { Tenant } from "@prisma/client";
 
 import { prisma } from "@/lib/api-server/prisma";
+import {
+  contractHasOpenDebtMarker,
+  withOpenDebtMarker,
+} from "@/lib/open-debt-marker";
 
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
@@ -16,6 +20,9 @@ async function defaultPropertyId() {
 }
 
 export async function upsertContractFromTenant(tenant: Tenant) {
+  // Chiqib ketgan klientlar uchun shartnomani qayta faollashtirmaslik
+  if (tenant.leftAt) return null;
+
   const propertyId = await defaultPropertyId();
   if (!propertyId) return null;
 
@@ -34,7 +41,10 @@ export async function upsertContractFromTenant(tenant: Tenant) {
     orderBy: { createdAt: "desc" },
   });
 
-  const notes = `Arendatordan avtomatik (${durationMonths} oy)`;
+  let notes = `Arendatordan avtomatik (${durationMonths} oy)`;
+  if (existing && contractHasOpenDebtMarker(existing.notes)) {
+    notes = withOpenDebtMarker(notes);
+  }
 
   if (existing) {
     // startDate ni o'zgartirmaymiz — eski oylar va to'lov tarixi saqlansin
@@ -70,7 +80,10 @@ export async function upsertContractFromTenant(tenant: Tenant) {
 }
 
 export async function syncContractsFromTenants() {
-  const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
+  const tenants = await prisma.tenant.findMany({
+    where: { leftAt: null },
+    orderBy: { createdAt: "desc" },
+  });
   const results = [];
   for (const tenant of tenants) {
     const contract = await upsertContractFromTenant(tenant);

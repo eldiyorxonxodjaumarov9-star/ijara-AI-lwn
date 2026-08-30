@@ -41,11 +41,11 @@ export function SmsComposeDialog({
   useEffect(() => {
     if (!open) return;
     setMessage("");
-    setRecipientIds(new Set(eligible.map((t) => t.tenantId)));
+    setRecipientIds(new Set(eligible.map((t) => t.id)));
   }, [open, eligible]);
 
   const selected = useMemo(
-    () => eligible.filter((t) => recipientIds.has(t.tenantId)),
+    () => eligible.filter((t) => recipientIds.has(t.id)),
     [eligible, recipientIds]
   );
 
@@ -95,16 +95,16 @@ export function SmsComposeDialog({
             ) : (
               <ul className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">
                 {eligible.map((t) => (
-                  <li key={t.tenantId} className="flex items-start gap-2">
+                  <li key={t.id} className="flex items-start gap-2">
                     <input
                       type="checkbox"
-                      id={`sms-recipient-${t.tenantId}`}
+                      id={`sms-recipient-${t.id}`}
                       className="mt-1 size-4 shrink-0 rounded border-input accent-primary"
-                      checked={recipientIds.has(t.tenantId)}
-                      onChange={() => toggleRecipient(t.tenantId)}
+                      checked={recipientIds.has(t.id)}
+                      onChange={() => toggleRecipient(t.id)}
                     />
                     <label
-                      htmlFor={`sms-recipient-${t.tenantId}`}
+                      htmlFor={`sms-recipient-${t.id}`}
                       className="min-w-0 cursor-pointer text-sm"
                     >
                       <span className="font-medium">{t.fullName}</span>

@@ -149,7 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (apiMode) {
       if (tokenStore.access) {
         clearDemoStorage();
-        apiFetch<ApiUser>("/auth/me")
+        const timeout = new Promise<never>((_, reject) => {
+          window.setTimeout(
+            () => reject(new Error("Auth timeout")),
+            8000
+          );
+        });
+        Promise.race([apiFetch<ApiUser>("/auth/me"), timeout])
           .then((u) => setUser(mapApiUser(u)))
           .catch(() => {
             tokenStore.clear();

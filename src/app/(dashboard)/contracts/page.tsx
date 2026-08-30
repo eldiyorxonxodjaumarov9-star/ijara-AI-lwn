@@ -43,17 +43,19 @@ import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
 import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
+import {
+  checkoutTenantApi,
+  checkoutTenantLocal,
+} from "@/lib/tenant-checkout-client";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CONTRACT_STATUS_MAP } from "@/lib/constants";
 import { generateContractPdf } from "@/lib/pdf";
-import type { Client, Contract, Property } from "@/types";
+import type { Client, Contract } from "@/types";
 
 export default function ContractsPage() {
   const { data, loading, api } = useCollection<Contract>("contracts");
   const { data: clients, loading: loadingClients } = useCollection<Client>("clients");
-  const { data: properties } = useCollection<Property>("properties");
-  const { remove, update } = useCollectionActions<Contract>("contracts");
-  const { update: updateProperty } = useCollectionActions<Property>("properties");
+  const { remove } = useCollectionActions<Contract>("contracts");
   const [syncing, setSyncing] = useState(false);
   const autoSynced = useRef(false);
   const [finishId, setFinishId] = useState<string | null>(null);
@@ -112,24 +114,22 @@ export default function ContractsPage() {
       setFinishId(null);
       return;
     }
-    await update(finishId, {
-      ...contract,
-      status: "expired",
-    });
-    const property = properties.find((p) => p.id === contract.propertyId);
-    if (property) {
-      try {
-        await updateProperty(property.id, {
-          ...property,
-          status: "available",
-        });
-      } catch {
-        /* xona bo'shatilmasa ham shartnoma yakunlanadi */
+    try {
+      // Yakunlash = xonadan chiqish: to'lovlar saqlanadi, arendator/qarzdorlardan chiqadi
+      if (isApiConfigured) {
+        await checkoutTenantApi(contract.tenantId);
+      } else {
+        await checkoutTenantLocal(contract.tenantId);
       }
+      await api.list();
+      toast.success(
+        "Shartnoma yakunlandi. Klient arendatorlar va qarzdorlardan chiqarildi, to'lovlar saqlandi."
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Shartnomani yakunlash xatosi"
+      );
     }
-    toast.success(
-      "Shartnoma yakunlandi. To'lovlar va kirish sanasi saqlanib qoldi."
-    );
     setFinishId(null);
   };
 
@@ -358,7 +358,7 @@ export default function ContractsPage() {
         open={!!finishId}
         onOpenChange={(o) => !o && setFinishId(null)}
         title="Shartnomani yakunlash"
-        description="Shartnoma tugaydi, xona bo'shaydi. Eski to'lovlar, summalar va kirish sanasi o'chirilmaydi."
+        description="Shartnoma tugaydi, xona bo'shaydi. Klient Arendatorlar va Qarzdorliklardan chiqadi. Eski to'lovlar saqlanadi."
         confirmText="Yakunlash"
         onConfirm={handleFinish}
       />

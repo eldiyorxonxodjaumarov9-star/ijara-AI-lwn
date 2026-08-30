@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   MessageSquarePlus,
   MoreVertical,
   PlugZap,
+  RefreshCw,
+  Search,
   Settings2,
   UserPlus,
   Users,
@@ -18,8 +21,10 @@ import { SmsComposeDialog } from "@/components/notifications/sms-compose-dialog"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -37,74 +42,163 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTenantPaymentDueMap } from "@/hooks/use-tenant-payment-due-lines";
+import { ApiError, isApiConfigured } from "@/lib/api/client";
+import { smsCandidateKey } from "@/lib/sms-link-candidates";
+import {
+  deleteSmsLink,
+  fetchSmsLinks,
+  updateSmsLink,
+} from "@/lib/sms-links-client";
 import {
   enabledSmsKindLabels,
   formatPhoneDisplay,
   SMS_KIND_LABELS,
 } from "@/lib/sms-notifications";
-import { useTenantPaymentDueMap } from "@/hooks/use-tenant-payment-due-lines";
-import type { SmsLinkedTenant, SmsNotificationSettings } from "@/types/sms-notifications";
+import type { TenantPaymentDueLine } from "@/lib/tenant-payment-due-display";
+import type {
+  SmsLinkedTenant,
+  SmsNotificationSettings,
+} from "@/types/sms-notifications";
+
+function dueLinesForLink(
+  link: SmsLinkedTenant,
+  paymentDueByTenant: Map<string, TenantPaymentDueLine[]>
+): TenantPaymentDueLine[] {
+  const all = paymentDueByTenant.get(link.tenantId) ?? [];
+  if (!link.contractId && link.propertyLabel === "—") {
+    return all.length > 0 ? all : [];
+  }
+  const matched = all.filter(
+    (line) =>
+      line.propertyLabel === link.propertyLabel ||
+      (link.propertyLabel !== "—" &&
+        line.propertyLabel.includes(link.propertyLabel))
+  );
+  if (matched.length > 0) return matched;
+  if (all.length === 1) return all;
+  return [];
+}
 
 export function SmsNotificationsPanel() {
   const [linked, setLinked] = useState<SmsLinkedTenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const paymentDueByTenant = useTenantPaymentDueMap();
 
-  const linkedIds = useMemo(
-    () => new Set(linked.map((t) => t.tenantId)),
-    [linked]
-  );
+  const loadLinks = useCallback(async () => {
+    if (!isApiConfigured) {
+      setError(
+        "API sozlanmagan. NEXT_PUBLIC_API_URL=/api ni o'rnating va qayta ishga tushiring."
+      );
+      setLinked([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await fetchSmsLinks();
+      setLinked(rows);
+    } catch (err) {
+      setLinked([]);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Biriktirilganlar yuklanmadi"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleAssign = (tenants: SmsLinkedTenant[]) => {
-    setLinked((prev) => {
-      const ids = new Set(prev.map((t) => t.tenantId));
-      const merged = [...prev];
-      for (const t of tenants) {
-        if (!ids.has(t.tenantId)) merged.push(t);
-      }
-      return merged;
+  // Serverdan biriktirilganlar — asosiy manba
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (cancelled) return;
+      await loadLinks();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadLinks]);
+
+  const linkedKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of linked) {
+      set.add(smsCandidateKey(t.tenantId, t.scopeKey || "none"));
+    }
+    return set;
+  }, [linked]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return linked;
+    const digits = q.replace(/\D/g, "");
+    return linked.filter((t) => {
+      if (t.fullName.toLowerCase().includes(q)) return true;
+      if (t.propertyLabel.toLowerCase().includes(q)) return true;
+      if (t.phone.toLowerCase().includes(q)) return true;
+      if (digits && t.phone.replace(/\D/g, "").includes(digits)) return true;
+      return false;
     });
-  };
+  }, [linked, search]);
 
-  const updateTenant = (
-    tenantId: string,
-    patch: Partial<SmsLinkedTenant> | ((t: SmsLinkedTenant) => SmsLinkedTenant)
+  const patchLink = async (
+    id: string,
+    patch: {
+      smsEnabled?: boolean;
+      settings?: Partial<SmsNotificationSettings>;
+    }
   ) => {
-    setLinked((prev) =>
-      prev.map((t) => {
-        if (t.tenantId !== tenantId) return t;
-        return typeof patch === "function" ? patch(t) : { ...t, ...patch };
-      })
-    );
+    setBusyId(id);
+    try {
+      const updated = await updateSmsLink(id, patch);
+      setLinked((prev) => prev.map((row) => (row.id === id ? updated : row)));
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Yangilashda xatolik"
+      );
+      await loadLinks();
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const toggleSetting = (
-    tenantId: string,
+  const toggleSetting = async (
+    link: SmsLinkedTenant,
     key: keyof SmsNotificationSettings,
     checked: boolean
   ) => {
-    updateTenant(tenantId, (t) => ({
-      ...t,
-      settings: { ...t.settings, [key]: checked },
-    }));
+    await patchLink(link.id, {
+      settings: { ...link.settings, [key]: checked },
+    });
   };
 
-  const unlink = (tenantId: string) => {
-    setLinked((prev) => prev.filter((t) => t.tenantId !== tenantId));
-    toast.success("Arendator biriktirishdan chiqarildi (vaqtinchalik)");
+  const unlink = async (id: string) => {
+    setBusyId(id);
+    try {
+      const next = await deleteSmsLink(id);
+      setLinked(next);
+      toast.success("Biriktirish bekor qilindi");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "O'chirishda xatolik"
+      );
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div
-        role="note"
-        className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
-      >
-        Interfeysni tayyorlash bosqichi: tanlovlar vaqtinchalik, sahifa
-        yangilanganda saqlanmaydi.
-      </div>
-
       <Card className="border-dashed">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -128,8 +222,8 @@ export function SmsNotificationsPanel() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setAssignOpen(true)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => setAssignOpen(true)} disabled={!!error && !isApiConfigured}>
           <UserPlus className="size-4" /> Arendator biriktirish
         </Button>
         <Button
@@ -139,9 +233,56 @@ export function SmsNotificationsPanel() {
         >
           <MessageSquarePlus className="size-4" /> Xabar tayyorlash
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => void loadLinks()}
+          disabled={loading}
+          aria-label="Yangilash"
+        >
+          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+        </Button>
+        <p className="ml-auto text-sm text-muted-foreground">
+          Jami biriktirilgan:{" "}
+          <span className="font-medium text-foreground">{linked.length} ta</span>
+          {search.trim() && filtered.length !== linked.length && (
+            <span className="ml-2">· Topildi: {filtered.length}</span>
+          )}
+        </p>
       </div>
 
-      {linked.length === 0 ? (
+      {linked.length > 0 && (
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Ism, xona yoki telefon bo'yicha qidirish..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 py-12 text-center">
+          <AlertCircle className="size-10 text-destructive" />
+          <div>
+            <p className="font-medium">Ma&apos;lumotlarni yuklab bo&apos;lmadi</p>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              {error}
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => void loadLinks()}>
+            <RefreshCw className="size-4" /> Qayta urinish
+          </Button>
+        </div>
+      ) : linked.length === 0 ? (
         <EmptyState
           icon={Users}
           title="SMS xabarnomalari uchun arendatorlar tanlanmagan"
@@ -151,6 +292,12 @@ export function SmsNotificationsPanel() {
               <UserPlus className="size-4" /> Arendator biriktirish
             </Button>
           }
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title="Qidiruv bo'yicha topilmadi"
+          description="Barcha biriktirilgan yozuvlar ichidan mos keladigan topilmadi."
         />
       ) : (
         <Card>
@@ -175,15 +322,18 @@ export function SmsNotificationsPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {linked.map((t) => {
+                  {filtered.map((t) => {
                     const kinds = enabledSmsKindLabels(t.settings);
-                    const dueLines = paymentDueByTenant.get(t.tenantId) ?? [];
+                    const dueLines = dueLinesForLink(t, paymentDueByTenant);
+                    const phoneLabel = t.phone.trim()
+                      ? formatPhoneDisplay(t.phone)
+                      : "—";
                     return (
-                      <TableRow key={t.tenantId}>
+                      <TableRow key={t.id}>
                         <TableCell className="font-medium">
                           {t.fullName}
                           <span className="mt-0.5 block text-xs text-muted-foreground sm:hidden">
-                            {formatPhoneDisplay(t.phone)}
+                            {phoneLabel}
                           </span>
                           <span className="mt-0.5 block text-xs text-muted-foreground md:hidden">
                             {t.propertyLabel}
@@ -203,26 +353,33 @@ export function SmsNotificationsPanel() {
                           )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground">
-                          {t.propertyLabel}
+                          {t.propertyLabel || "—"}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell whitespace-nowrap text-sm">
-                          {formatPhoneDisplay(t.phone)}
+                          {phoneLabel}
                         </TableCell>
                         <TableCell className="min-w-[7rem]">
-                          <PaymentDueCell lines={dueLines} />
+                          {dueLines.length === 0 ? (
+                            <span className="text-sm text-muted-foreground">
+                              —
+                            </span>
+                          ) : (
+                            <PaymentDueCell lines={dueLines} />
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Switch
-                              id={`sms-enabled-${t.tenantId}`}
+                              id={`sms-enabled-${t.id}`}
                               checked={t.smsEnabled}
+                              disabled={busyId === t.id}
                               onCheckedChange={(v) =>
-                                updateTenant(t.tenantId, { smsEnabled: v })
+                                void patchLink(t.id, { smsEnabled: v })
                               }
                               aria-label={`${t.fullName} uchun SMS`}
                             />
                             <Label
-                              htmlFor={`sms-enabled-${t.tenantId}`}
+                              htmlFor={`sms-enabled-${t.id}`}
                               className="sr-only"
                             >
                               SMS yoqilgan
@@ -250,13 +407,18 @@ export function SmsNotificationsPanel() {
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="icon" variant="ghost">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                disabled={busyId === t.id}
+                              >
                                 <MoreVertical className="size-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-64">
                               <DropdownMenuLabel className="flex items-center gap-1.5">
-                                <Settings2 className="size-4" /> Xabarnoma turlari
+                                <Settings2 className="size-4" /> Xabarnoma
+                                turlari
                               </DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               {(
@@ -268,7 +430,7 @@ export function SmsNotificationsPanel() {
                                   key={key}
                                   checked={t.settings[key]}
                                   onCheckedChange={(checked) =>
-                                    toggleSetting(t.tenantId, key, checked)
+                                    void toggleSetting(t, key, checked)
                                   }
                                   onSelect={(e) => e.preventDefault()}
                                 >
@@ -278,7 +440,7 @@ export function SmsNotificationsPanel() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
-                                onClick={() => unlink(t.tenantId)}
+                                onClick={() => void unlink(t.id)}
                               >
                                 Biriktirishdan chiqarish
                               </DropdownMenuItem>
@@ -298,8 +460,11 @@ export function SmsNotificationsPanel() {
       <SmsAssignTenantsDialog
         open={assignOpen}
         onOpenChange={setAssignOpen}
-        linkedIds={linkedIds}
-        onAssign={handleAssign}
+        linkedKeys={linkedKeys}
+        onAssigned={(rows) => {
+          setLinked(rows);
+          setError(null);
+        }}
       />
       <SmsComposeDialog
         open={composeOpen}

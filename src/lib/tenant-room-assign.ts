@@ -1,4 +1,8 @@
 import { getCollectionApi } from "@/lib/data/store";
+import {
+  withOpenDebtMarker,
+  withoutOpenDebtMarker,
+} from "@/lib/open-debt-marker";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import type { Contract, Payment, PaymentMethod, Property, Tenant } from "@/types";
 
@@ -30,10 +34,17 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
   const existing = contracts.find((c) => c.tenantId === tenant.id);
 
   if (existing && existing.propertyId !== room.id) {
-    await propertyApi.update(existing.propertyId, { status: "available" });
+    const prev = (await propertyApi.list()).find(
+      (p) => p.id === existing.propertyId
+    );
+    if (prev) {
+      await propertyApi.update(prev.id, { ...prev, status: "available" });
+    } else {
+      await propertyApi.update(existing.propertyId, { status: "available" });
+    }
   }
 
-  await propertyApi.update(room.id, { status: "rented" });
+  await propertyApi.update(room.id, { ...room, status: "rented" });
 
   const durationMonths =
     tenant.contractDuration && tenant.contractDuration > 0
@@ -43,7 +54,16 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
     ? new Date(tenant.entryDate)
     : new Date();
   const endDate = addMonths(startDate, durationMonths);
-  const monthlyPayment = room.price > 0 ? room.price : tenant.rentAmount;
+  const monthlyPayment =
+    room.price > 0 ? room.price : tenant.rentAmount > 0 ? tenant.rentAmount : 0;
+
+  const baseNotes = existing?.notes?.includes("LWN xonaga")
+    ? existing.notes
+    : `LWN xonaga biriktirildi (${room.name})`;
+  const notes =
+    paymentStatus === "debt"
+      ? withOpenDebtMarker(baseNotes)
+      : withoutOpenDebtMarker(baseNotes);
 
   const contractPayload = {
     propertyId: room.id,
@@ -56,24 +76,33 @@ export async function assignTenantToRoom(input: AssignTenantToRoomInput) {
     deposit: tenant.depositAmount ?? 0,
     depositPaid: tenant.depositPaid ?? false,
     status: "active" as const,
-    notes: `LWN xonaga biriktirildi (${room.name})`,
+    notes,
   };
 
   let contractId: string;
   if (existing) {
-    // Kirish sanasi / startDate saqlanadi — eski to'lovlar oylari o'chmasin
     await contractApi.update(existing.id, {
       ...contractPayload,
       startDate: existing.startDate,
-      endDate: addMonths(new Date(existing.startDate), durationMonths).toISOString(),
+      endDate: addMonths(
+        new Date(existing.startDate),
+        durationMonths
+      ).toISOString(),
     });
     contractId = existing.id;
     await tenantApi.update(tenant.id, {
       ...tenant,
       leftAt: undefined,
+      rentAmount: monthlyPayment > 0 ? monthlyPayment : tenant.rentAmount,
     });
   } else {
     contractId = await contractApi.create(contractPayload);
+    if (monthlyPayment > 0 && tenant.rentAmount !== monthlyPayment) {
+      await tenantApi.update(tenant.id, {
+        ...tenant,
+        rentAmount: monthlyPayment,
+      });
+    }
   }
 
   if (paymentStatus === "paid") {

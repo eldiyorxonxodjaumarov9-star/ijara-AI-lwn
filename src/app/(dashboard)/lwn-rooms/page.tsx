@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   DoorOpen,
   Maximize,
@@ -9,6 +10,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Settings2,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -199,6 +201,7 @@ export default function LwnRoomsPage() {
                   <TableHead className="hidden md:table-cell">Narx</TableHead>
                   <TableHead className="hidden sm:table-cell">Kv (m²)</TableHead>
                   <TableHead>Holat</TableHead>
+                  <TableHead className="hidden md:table-cell">Aqlli qulf</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -225,12 +228,20 @@ export default function LwnRoomsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <p className="font-medium">{room.name}</p>
+                        <Link
+                          href={`/lwn-rooms/${room.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {room.name}
+                        </Link>
                         <p className="text-xs text-muted-foreground md:hidden">
                           {formatCurrency(room.price)} · {room.area} m²
                         </p>
                         <p className="text-xs text-muted-foreground lg:hidden">
                           {tenantByRoom.get(room.id) ?? "Bo'sh"}
+                        </p>
+                        <p className="text-xs text-muted-foreground md:hidden">
+                          Aqlli qulf: Ulanmagan
                         </p>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
@@ -250,6 +261,11 @@ export default function LwnRoomsPage() {
                       <TableCell>
                         <Badge variant={status?.variant}>{status?.label}</Badge>
                       </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <span className="text-sm text-muted-foreground">
+                          Ulanmagan
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -258,6 +274,11 @@ export default function LwnRoomsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/lwn-rooms/${room.id}`}>
+                                <Settings2 className="size-4" /> Boshqarish
+                              </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => {
                                 setEditing(room);

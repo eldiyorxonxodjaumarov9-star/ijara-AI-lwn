@@ -334,7 +334,7 @@ export default function TenantsPage() {
         open={!!checkoutId}
         onOpenChange={(o) => !o && setCheckoutId(null)}
         title="Klientni xonadan chiqarish"
-        description="Xona bo'shaydi. Barcha to'lovlar va shartnoma ma'lumotlari Klient bazasida saqlanadi — pul kamaymaydi."
+        description="Xona bo'shaydi. Klient Arendatorlar va Qarzdorliklardan chiqadi. To'lovlar Klient bazasida saqlanadi."
         confirmText={checkingOut ? "Jarayonda..." : "Chiqish"}
         onConfirm={handleCheckout}
       />

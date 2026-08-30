@@ -32,6 +32,7 @@ export type CollectionName =
   | "contracts"
   | "payments"
   | "expenses"
+  | "recurring-expenses"
   | "employees"
   | "companies"
   | "maintenance"

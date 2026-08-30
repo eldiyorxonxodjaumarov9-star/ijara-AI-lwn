@@ -6,7 +6,7 @@ import {
   computeServerDebts,
   sendTelegramPaymentReminders,
 } from "@/lib/api-server/telegram-reminders";
-import { sendAdminReportsToAll } from "@/lib/api-server/telegram-admin";
+import { sendAdminReportsToAll, sendEmployeeSalaryRemindersToAll, sendRecurringExpensesReportToAll } from "@/lib/api-server/telegram-admin";
 import type { ReminderTimeSlot } from "@/lib/payment-reminder-utils";
 
 const VALID_SLOTS: ReminderTimeSlot[] = ["morning", "lunch", "evening"];
@@ -25,7 +25,7 @@ function parseSlot(req: NextRequest): ReminderTimeSlot | null {
     : null;
 }
 
-/** Kunlik avtomatik to'lov eslatmasi — Telegram bot (Vercel Cron, Toshkent vaqti) */
+/** Kunlik avtomatik eslatma — to'lov + ishchilar oyligi (Vercel Cron, Toshkent 3 mahal) */
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET?.trim();
   if (cronSecret) {
@@ -48,6 +48,15 @@ export async function GET(req: NextRequest) {
     const debts = await computeServerDebts();
     const telegram = await sendTelegramPaymentReminders(debts, slot);
     const adminTelegram = await sendAdminReportsToAll(SLOT_LABEL[slot]);
+    // Har mahal: oylik, kunlik va qachon berilishi
+    const salaryTelegram = await sendEmployeeSalaryRemindersToAll(
+      31,
+      SLOT_LABEL[slot]
+    );
+    // Alohida xabar — umumiy hisobotga qo'shilmaydi
+    const recurringTelegram = await sendRecurringExpensesReportToAll(
+      SLOT_LABEL[slot]
+    );
 
     return ok({
       slot,
@@ -56,6 +65,8 @@ export async function GET(req: NextRequest) {
       debtors: debts.length,
       telegram,
       adminTelegram,
+      salaryTelegram,
+      recurringTelegram,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Cron xatosi";

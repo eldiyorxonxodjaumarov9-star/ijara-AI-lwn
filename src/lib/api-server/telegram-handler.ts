@@ -3,6 +3,8 @@ import {
   buildAdminDueSoonMessage,
   buildAdminSummaryMessage,
   buildAdminTenantsMessage,
+  buildEmployeeSalaryMessage,
+  buildRecurringExpensesReportMessage,
   getAdminDashboardRows,
   sendAdminMessage,
   verifyOwnerCredentials,
@@ -165,6 +167,15 @@ async function handleOwnerMenu(chatId: string, text: string) {
   }
   if (text === "📅 To'lov muddati yaqin kelganlar") {
     await sendAdminMessage(chatId, buildAdminDueSoonMessage(rows));
+    return;
+  }
+  if (text === "💰 Ishchilar oyligi") {
+    await sendAdminMessage(chatId, await buildEmployeeSalaryMessage(31));
+    return;
+  }
+  if (text === "📅 Oylik doimiy xarajatlar") {
+    const { text: report } = await buildRecurringExpensesReportMessage();
+    await sendAdminMessage(chatId, report);
     return;
   }
   if (text === "📊 Umumiy hisobot") {

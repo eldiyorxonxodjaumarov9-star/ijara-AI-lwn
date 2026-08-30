@@ -6,25 +6,36 @@ export interface SmsNotificationSettings {
   general: boolean;
 }
 
-/** UI: biriktirilgan arendator (vaqtinchalik state) */
+/** SMS bo‘limiga biriktirilgan yozuv (API / DB) */
 export interface SmsLinkedTenant {
+  id: string;
   tenantId: string;
+  contractId?: string | null;
+  propertyId?: string | null;
+  /** Unique scope: contractId yoki "none" */
+  scopeKey: string;
   fullName: string;
   phone: string;
   propertyLabel: string;
   smsEnabled: boolean;
   settings: SmsNotificationSettings;
+  createdAt?: string;
 }
 
-/** Xabar tayyorlash draft (vaqtinchalik) */
+/** Xabar tayyorlash draft */
 export interface SmsComposeDraft {
   recipientIds: string[];
   message: string;
 }
 
-/** Arendator tanlash uchun ro‘yxat qatori */
+/** Arendator tanlash uchun ro‘yxat qatori (shartnoma/xona bo‘yicha) */
 export interface SmsTenantCandidate {
+  /** UI unique: tenantId:scopeKey */
+  candidateKey: string;
   tenantId: string;
+  contractId: string | null;
+  propertyId: string | null;
+  scopeKey: string;
   fullName: string;
   phone: string;
   propertyLabel: string;

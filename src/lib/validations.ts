@@ -142,6 +142,62 @@ export const companySchema = z.object({
   active: z.coerce.boolean().default(true),
 });
 
+export const recurringExpenseSchema = z
+  .object({
+    name: z.string().min(2, "Xarajat nomini kiriting"),
+    amount: z.coerce.number().min(1, "Summani kiriting"),
+    category: z
+      .enum([
+        "utilities",
+        "salary",
+        "tax",
+        "repair",
+        "marketing",
+        "advance",
+        "other",
+      ])
+      .optional(),
+    monthlyExpenseType: z
+      .enum(["water", "electricity", "office", "custom"])
+      .optional()
+      .nullable(),
+    monthlyExpenseCustomName: z.string().optional().nullable(),
+    notes: z.string().optional(),
+    firstPaymentDate: z.string().min(1, "Birinchi to'lov sanasini tanlang"),
+    interval: z.enum(["monthly", "quarterly", "semiannual", "yearly"]),
+    active: z.coerce.boolean().default(true),
+    companyId: z.string().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.monthlyExpenseType) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Oylik xarajat turini tanlang",
+        path: ["monthlyExpenseType"],
+      });
+    }
+    if (data.monthlyExpenseType === "custom") {
+      const name = data.monthlyExpenseCustomName?.trim() ?? "";
+      if (!name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Xarajat nomini kiriting",
+          path: ["monthlyExpenseCustomName"],
+        });
+      }
+    }
+  });
+
+export const recurringPaySchema = z.object({
+  recurringExpenseId: z.string().min(1),
+  paymentPeriodKey: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/, "Oy kaliti noto'g'ri (YYYY-MM)"),
+  amount: z.coerce.number().min(1).optional(),
+  date: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 export const maintenanceSchema = z.object({
   propertyId: z.string().min(1, "Mulkni tanlang"),
   issue: z.string().min(3, "Muammoni yozing"),
@@ -160,4 +216,6 @@ export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type EmployeeInput = z.infer<typeof employeeSchema>;
 export type CompanyInput = z.infer<typeof companySchema>;
+export type RecurringExpenseInput = z.infer<typeof recurringExpenseSchema>;
+export type RecurringPayInput = z.infer<typeof recurringPaySchema>;
 export type MaintenanceInput = z.infer<typeof maintenanceSchema>;

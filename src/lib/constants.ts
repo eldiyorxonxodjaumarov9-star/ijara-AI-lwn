@@ -95,6 +95,16 @@ export const MONTHLY_EXPENSE_TYPE_CATEGORY: Record<
   custom: "other",
 };
 
+export const RECURRENCE_INTERVAL_MAP: Record<
+  import("@/types").RecurrenceInterval,
+  string
+> = {
+  monthly: "Har oy",
+  quarterly: "Har 3 oy",
+  semiannual: "Har 6 oy",
+  yearly: "Har yil",
+};
+
 export const MAINTENANCE_STATUS_MAP: Record<
   MaintenanceStatus,
   { label: string; variant: "success" | "warning" | "secondary" }

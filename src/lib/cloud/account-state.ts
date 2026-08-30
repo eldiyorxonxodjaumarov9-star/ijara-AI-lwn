@@ -7,6 +7,7 @@ export const SYNC_COLLECTIONS: CollectionName[] = [
   "contracts",
   "payments",
   "expenses",
+  "employees",
   "maintenance",
   "notifications",
   "clients",

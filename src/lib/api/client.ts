@@ -38,9 +38,11 @@ export const tokenStore = {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -130,9 +132,19 @@ export async function apiFetch<T = unknown>(
   const json = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
+    const code =
+      json &&
+      typeof json === "object" &&
+      "error" in json &&
+      json.error &&
+      typeof json.error === "object" &&
+      "code" in json.error
+        ? String((json.error as { code: unknown }).code)
+        : undefined;
     throw new ApiError(
       buildMessage(json, "So'rovda xatolik yuz berdi"),
       response.status,
+      code
     );
   }
 

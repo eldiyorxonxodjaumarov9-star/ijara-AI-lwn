@@ -205,7 +205,7 @@ export async function recordBotStart(
 
 export async function updateBotUserRole(
   chatId: string,
-  role: "tenant" | "owner",
+  role: "tenant" | "owner" | "employee",
   from?: TelegramUserFrom | null
 ) {
   await recordBotStart(chatId, from);

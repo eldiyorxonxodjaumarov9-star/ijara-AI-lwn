@@ -60,6 +60,22 @@ export async function sendContactRequest(chatId: string | number) {
   );
 }
 
+export async function sendEmployeeContactRequest(chatId: string | number) {
+  return sendTelegramMessage(
+    chatId,
+    "👷 <b>Xodim</b> sifatida davom etmoqdasiz.\n\n" +
+      "Vazifalarni olish uchun telefon raqamingizni yuboring.\n" +
+      "Faqat Telegramdagi o‘zingizning kontakt orqali yuboring.",
+    {
+      reply_markup: {
+        keyboard: [[{ text: "📱 Telefon raqamni yuborish", request_contact: true }]],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    }
+  );
+}
+
 export async function sendRoleMenu(chatId: string | number) {
   return sendTelegramMessage(
     chatId,
@@ -70,6 +86,7 @@ export async function sendRoleMenu(chatId: string | number) {
       reply_markup: {
         inline_keyboard: [
           [{ text: "🏢 Arenda egasi", callback_data: "role_owner" }],
+          [{ text: "👷 Xodim", callback_data: "role_employee" }],
           [{ text: "👤 Arendator", callback_data: "role_tenant" }],
         ],
       },
@@ -87,11 +104,34 @@ export async function sendOwnerLoginPrompt(chatId: string | number) {
   );
 }
 
-export async function answerCallbackQuery(callbackQueryId: string) {
+export async function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string
+) {
   if (!isTelegramBotConfigured()) return;
   await telegramRequest("answerCallbackQuery", {
     callback_query_id: callbackQueryId,
+    ...(text ? { text, show_alert: false } : {}),
   });
+}
+
+export async function getTelegramFile(fileId: string) {
+  return telegramRequest<{
+    file_id: string;
+    file_unique_id?: string;
+    file_size?: number;
+    file_path?: string;
+  }>("getFile", { file_id: fileId });
+}
+
+export async function downloadTelegramFile(
+  filePath: string
+): Promise<ArrayBuffer> {
+  const res = await fetch(
+    `${TELEGRAM_API}/file/bot${botToken()}/${filePath}`
+  );
+  if (!res.ok) throw new Error("Telegram fayl yuklab bo‘lmadi");
+  return res.arrayBuffer();
 }
 
 export async function setTelegramWebhook(webhookUrl: string) {
@@ -112,6 +152,7 @@ export async function getTelegramWebhookInfo() {
 }
 
 export type TelegramUpdate = {
+  update_id?: number;
   callback_query?: {
     id: string;
     data?: string;
@@ -121,7 +162,7 @@ export type TelegramUpdate = {
       last_name?: string;
       username?: string;
     };
-    message?: { chat: { id: number } };
+    message?: { chat: { id: number }; message_id?: number };
   };
   message?: {
     message_id: number;
@@ -133,10 +174,33 @@ export type TelegramUpdate = {
       username?: string;
     };
     text?: string;
+    caption?: string;
     contact?: {
       phone_number: string;
       first_name?: string;
       last_name?: string;
+      user_id?: number;
+    };
+    photo?: Array<{
+      file_id: string;
+      file_unique_id?: string;
+      file_size?: number;
+      width?: number;
+      height?: number;
+    }>;
+    video?: {
+      file_id: string;
+      file_unique_id?: string;
+      file_size?: number;
+      mime_type?: string;
+      file_name?: string;
+    };
+    document?: {
+      file_id: string;
+      file_unique_id?: string;
+      file_size?: number;
+      mime_type?: string;
+      file_name?: string;
     };
   };
 };

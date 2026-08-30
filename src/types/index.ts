@@ -148,7 +148,75 @@ export interface Employee {
   companyName?: string;
   /** Ish boshlagan sana (ISO) */
   startedAt?: string | null;
+  telegramChatId?: string | null;
   createdAt: string;
+}
+
+export type WorkTaskStatus =
+  | "NEW"
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "COMPLETED"
+  | "NOT_COMPLETED"
+  | "CANCELLED";
+
+export type WorkTaskUnit = "SUNNUR" | "LWN";
+export type WorkTaskPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+export type WorkTaskSource = "WEB" | "TELEGRAM";
+
+export interface WorkTaskAttachment {
+  id: string;
+  type: "IMAGE" | "VIDEO" | "DOCUMENT";
+  storageUrl: string;
+  originalName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+}
+
+export interface WorkTaskReport {
+  id: string;
+  reportText?: string | null;
+  submittedAt: string;
+  reviewStatus: "SUBMITTED" | "APPROVED" | "RETURNED";
+  reviewComment?: string | null;
+  attachments?: WorkTaskAttachment[];
+}
+
+export interface WorkTask {
+  id: string;
+  title: string;
+  description?: string | null;
+  unit: WorkTaskUnit;
+  unitLabel?: string;
+  assignedEmployeeId: string;
+  employeeName?: string;
+  employeePhone?: string | null;
+  employeePosition?: string | null;
+  companyName?: string | null;
+  createdByUserId: string;
+  createdByName?: string;
+  source: WorkTaskSource;
+  priority: WorkTaskPriority;
+  priorityLabel?: string;
+  dueAt?: string | null;
+  dueAtFormatted?: string;
+  status: WorkTaskStatus;
+  statusLabel?: string;
+  overdue?: boolean;
+  failureReason?: string | null;
+  telegramDelivery?: "PENDING" | "SENT" | "FAILED";
+  telegramLastError?: string | null;
+  reports?: WorkTaskReport[];
+  statusEvents?: Array<{
+    id: string;
+    fromStatus?: WorkTaskStatus | null;
+    toStatus: WorkTaskStatus;
+    comment?: string | null;
+    createdAt: string;
+    source: WorkTaskSource;
+  }>;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export type MaintenanceStatus = "pending" | "in_progress" | "completed";

@@ -109,6 +109,9 @@ model User {
   notifications        Notification[]
   auditLogs            AuditLog[]
   telegramAdminDevices TelegramAdminDevice[]
+  tasksCreated         WorkTask[]             @relation("TaskCreatedBy")
+  taskReviews          WorkTaskReport[]       @relation("TaskReportReviewedBy")
+  taskStatusEvents     WorkTaskStatusEvent[]  @relation("TaskStatusActor")
 
   @@index([role])
   @@map("users")
@@ -267,11 +270,19 @@ model Employee {
    * Ish boshlagan sana
    */
   startedAt     DateTime?
+  /**
+   * Telegram bot bog‘lanishi (xodim vazifalari)
+   */
+  telegramChatId    String?   @unique
+  telegramUserId    String?
+  telegramLinkedAt  DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   company  PartnerCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   expenses Expense[]
+  tasks    WorkTask[]
+  taskReports WorkTaskReport[]
 
   @@unique([phone])
   @@index([active])
@@ -446,9 +457,25 @@ model TelegramSession {
   pendingUserId String?
   pendingOtp    String?
   otpExpiresAt  DateTime?
+  /**
+   * Wizard state (JSON) — serverless-safe, TTL bilan
+   */
+  wizardJson    String?
+  employeeId    String?
+  expiresAt     DateTime?
   updatedAt     DateTime  @updatedAt
 
+  @@index([employeeId])
+  @@index([expiresAt])
   @@map("telegram_sessions")
+}
+
+/// Telegram update_id dedupe (idempotent webhook)
+model TelegramProcessedUpdate {
+  updateId    BigInt   @id
+  processedAt DateTime @default(now())
+
+  @@map("telegram_processed_updates")
 }
 
 model TelegramAdminDevice {
@@ -672,4 +699,153 @@ model TelegramPostingLog {
 
   @@index([jobId])
   @@map("telegram_posting_logs")
+}
+
+// ===================== WORK TASKS (Vazifalar + Telegram) =====================
+
+enum WorkTaskUnit {
+  SUNNUR
+  LWN
+}
+
+enum WorkTaskSource {
+  WEB
+  TELEGRAM
+}
+
+enum WorkTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WorkTaskStatus {
+  NEW
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  NOT_COMPLETED
+  CANCELLED
+}
+
+enum WorkTaskTelegramDelivery {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum WorkTaskReportReviewStatus {
+  SUBMITTED
+  APPROVED
+  RETURNED
+}
+
+enum WorkTaskAttachmentType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+/// Vazifa (WorkTask — Prisma Task rezerv so‘z bilan chalkashmasligi uchun)
+model WorkTask {
+  id                  String                   @id @default(uuid())
+  title               String
+  description         String?
+  unit                WorkTaskUnit
+  assignedEmployeeId  String
+  createdByUserId     String
+  source              WorkTaskSource           @default(WEB)
+  priority            WorkTaskPriority         @default(NORMAL)
+  dueAt               DateTime?
+  status              WorkTaskStatus           @default(NEW)
+  startedAt           DateTime?
+  submittedAt         DateTime?
+  completedAt         DateTime?
+  notCompletedAt      DateTime?
+  failureReason       String?
+  cancelledAt         DateTime?
+  cancelReason        String?
+  telegramDelivery    WorkTaskTelegramDelivery @default(PENDING)
+  telegramLastError   String?
+  telegramMessageId   String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  assignedEmployee Employee              @relation(fields: [assignedEmployeeId], references: [id], onDelete: Restrict)
+  createdBy        User                  @relation("TaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reports          WorkTaskReport[]
+  statusEvents     WorkTaskStatusEvent[]
+
+  @@index([status])
+  @@index([unit])
+  @@index([assignedEmployeeId])
+  @@index([createdByUserId])
+  @@index([dueAt])
+  @@index([priority])
+  @@index([telegramDelivery])
+  @@index([createdAt])
+  @@map("work_tasks")
+}
+
+model WorkTaskReport {
+  id               String                     @id @default(uuid())
+  taskId           String
+  employeeId       String
+  reportText       String?
+  submittedAt      DateTime                   @default(now())
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  reviewComment    String?
+  reviewStatus     WorkTaskReportReviewStatus @default(SUBMITTED)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  task         WorkTask              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee     Employee              @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  reviewedBy   User?                 @relation("TaskReportReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  attachments  WorkTaskAttachment[]
+
+  @@index([taskId])
+  @@index([employeeId])
+  @@index([reviewStatus])
+  @@map("work_task_reports")
+}
+
+model WorkTaskAttachment {
+  id                   String                 @id @default(uuid())
+  taskReportId         String
+  type                 WorkTaskAttachmentType
+  storageUrl           String
+  storageKey           String?
+  telegramFileId       String?
+  telegramFileUniqueId String?
+  originalName         String?
+  mimeType             String?
+  size                 Int?
+  createdAt            DateTime               @default(now())
+
+  report WorkTaskReport @relation(fields: [taskReportId], references: [id], onDelete: Cascade)
+
+  @@index([taskReportId])
+  @@map("work_task_attachments")
+}
+
+model WorkTaskStatusEvent {
+  id           String          @id @default(uuid())
+  taskId       String
+  fromStatus   WorkTaskStatus?
+  toStatus     WorkTaskStatus
+  actorUserId  String?
+  actorKind    String          @default("SYSTEM")
+  source       WorkTaskSource  @default(WEB)
+  comment      String?
+  createdAt    DateTime        @default(now())
+
+  task  WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor User?    @relation("TaskStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([createdAt])
+  @@map("work_task_status_events")
 }

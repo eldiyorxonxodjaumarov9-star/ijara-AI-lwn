@@ -18,10 +18,13 @@ import {
   resetTelegramSession,
   upsertTelegramSession,
   getTelegramSession,
+  parseWizardJson,
+  setWizard,
 } from "@/lib/api-server/telegram-session";
 import {
   answerCallbackQuery,
   sendContactRequest,
+  sendEmployeeContactRequest,
   sendOwnerLoginPrompt,
   sendRoleMenu,
   sendTelegramMessage,
@@ -35,6 +38,20 @@ import {
 } from "@/lib/api-server/telegram-bot-users";
 import { normalizePhone } from "@/lib/api-server/tenant-lookup";
 import { prisma } from "@/lib/api-server/prisma";
+import {
+  getEmployeeByChatId,
+  handleAdminReviewCallback,
+  handleAdminTaskCallback,
+  handleAdminTaskMenuText,
+  handleAdminTaskWizardText,
+  handleEmployeeContactLink,
+  handleEmployeeMenu,
+  handleEmployeeWizardMessage,
+  handleTaskCallback,
+  openEmployeePanel,
+  tryClaimTelegramUpdate,
+} from "@/lib/api-server/tasks/telegram-tasks";
+import { reviewTaskReport } from "@/lib/api-server/tasks/task-service";
 
 async function unlinkTelegramChat(chatId: string) {
   await prisma.tenant.updateMany({
@@ -64,6 +81,12 @@ async function handleStart(chatId: string, from?: TelegramUserFrom | null) {
   await unlinkTelegramChat(chatId);
 
   if (await enterOwnerPanel(chatId)) {
+    return;
+  }
+
+  const employee = await getEmployeeByChatId(chatId);
+  if (employee) {
+    await openEmployeePanel(chatId, employee.id);
     return;
   }
 
@@ -153,6 +176,10 @@ async function handleOwnerMenu(chatId: string, text: string) {
     return;
   }
 
+  if (await handleAdminTaskMenuText(chatId, text)) {
+    return;
+  }
+
   const rows = await getAdminDashboardRows();
 
   if (text === "📋 Arendatorlar") {
@@ -191,6 +218,9 @@ async function handleOwnerMenu(chatId: string, text: string) {
 }
 
 export async function handleTelegramUpdate(update: TelegramUpdate) {
+  const claimed = await tryClaimTelegramUpdate(update.update_id);
+  if (!claimed) return;
+
   if (update.callback_query) {
     const chatId = String(update.callback_query.message?.chat.id ?? "");
     const data = update.callback_query.data ?? "";
@@ -209,6 +239,21 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
       await sendContactRequest(chatId);
       return;
     }
+    if (data === "role_employee") {
+      await updateBotUserRole(
+        chatId,
+        "employee",
+        update.callback_query.from ?? undefined
+      );
+      const existing = await getEmployeeByChatId(chatId);
+      if (existing) {
+        await openEmployeePanel(chatId, existing.id);
+        return;
+      }
+      await upsertTelegramSession(chatId, { mode: "employee_link" });
+      await sendEmployeeContactRequest(chatId);
+      return;
+    }
     if (data === "role_owner") {
       await updateBotUserRole(
         chatId,
@@ -225,6 +270,22 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
         ownerUserId: null,
       });
       await sendOwnerLoginPrompt(chatId);
+      return;
+    }
+    if (data.startsWith("task:")) {
+      await handleTaskCallback(
+        chatId,
+        data,
+        update.callback_query.from?.id
+      );
+      return;
+    }
+    if (data.startsWith("atask:")) {
+      await handleAdminTaskCallback(chatId, data);
+      return;
+    }
+    if (data.startsWith("areview:")) {
+      await handleAdminReviewCallback(chatId, data);
       return;
     }
     return;
@@ -246,12 +307,44 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
     await sendTelegramMessage(
       chatId,
       "<b>ArendaAi bot</b>\n\n" +
-        "/start — menyu yoki saqlangan admin kirish\n\n" +
+        "/start — menyu\n\n" +
+        "<b>Xodim:</b> telefon orqali bog‘lanish + vazifalar.\n" +
         "<b>Arendator:</b> telefon orqali tasdiqlash.\n" +
-        "<b>Arenda egasi:</b> birinchi marta login+parol. Keyin /start bilan to'g'ridan admin panel.\n" +
-        "Boshqa qurilmadan kirishda tasdiqlash kodi asosiy botga yuboriladi.\n\n" +
-        "Qarzdorlik eslatmalari: 🌅 08:00 · ☀️ 13:00 · 🌙 20:00 (Toshkent)."
+        "<b>Arenda egasi:</b> login+parol, vazifa berish."
     );
+    return;
+  }
+
+  // Admin return comment after review
+  if (
+    session?.mode === "admin_task_wizard" &&
+    parseWizardJson(session.wizardJson)?.step === "admin_return"
+  ) {
+    const wizard = parseWizardJson(session.wizardJson);
+    const owner = await getOwnerByAdminChatId(chatId);
+    if (owner && wizard?.taskId && text && !text.startsWith("/")) {
+      try {
+        await reviewTaskReport({
+          taskId: wizard.taskId,
+          reviewerUserId: owner.id,
+          approve: false,
+          comment: text,
+          source: "TELEGRAM",
+        });
+        await setWizard(chatId, null);
+        await upsertTelegramSession(chatId, { mode: "owner" });
+        await sendTelegramMessage(chatId, "↩️ Hisobot qaytarildi.");
+      } catch (err) {
+        await sendTelegramMessage(
+          chatId,
+          err instanceof Error ? err.message : "Xatolik"
+        );
+      }
+      return;
+    }
+  }
+
+  if (await handleAdminTaskWizardText(chatId, text)) {
     return;
   }
 
@@ -277,6 +370,25 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
     return;
   }
 
+  if (session?.mode === "employee_wizard") {
+    await handleEmployeeWizardMessage(chatId, message);
+    return;
+  }
+
+  if (session?.mode === "employee") {
+    await handleEmployeeMenu(chatId, text);
+    return;
+  }
+
+  if (session?.mode === "employee_link") {
+    if (message.contact?.phone_number) {
+      await handleEmployeeContactLink(chatId, message);
+      return;
+    }
+    await sendEmployeeContactRequest(chatId);
+    return;
+  }
+
   const linkedOwner = await getOwnerByAdminChatId(chatId);
   if (linkedOwner && text && !text.startsWith("/")) {
     await upsertTelegramSession(chatId, {
@@ -287,7 +399,18 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
     return;
   }
 
+  const linkedEmployee = await getEmployeeByChatId(chatId);
+  if (linkedEmployee && text && !text.startsWith("/")) {
+    await handleEmployeeMenu(chatId, text);
+    return;
+  }
+
   if (message.contact?.phone_number) {
+    // Prefer employee link if session asked employee; else tenant
+    if (session?.mode === "employee_link") {
+      await handleEmployeeContactLink(chatId, message);
+      return;
+    }
     await upsertTelegramSession(chatId, { mode: "tenant" });
     const result = await processPhoneForBot(chatId, message.contact.phone_number);
     await sendTelegramMessage(chatId, result.message, {

@@ -14,11 +14,12 @@ export async function POST(req: NextRequest) {
   }
 
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
-  if (secret) {
-    const header = req.headers.get("x-telegram-bot-api-secret-token");
-    if (header !== secret) {
-      return fail("Ruxsat yo'q", 403);
-    }
+  if (!secret) {
+    return fail("TELEGRAM_WEBHOOK_SECRET sozlanmagan", 503);
+  }
+  const header = req.headers.get("x-telegram-bot-api-secret-token");
+  if (header !== secret) {
+    return fail("Ruxsat yo'q", 403);
   }
 
   try {
@@ -27,7 +28,9 @@ export async function POST(req: NextRequest) {
     return ok({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Webhook xatosi";
-    return fail(message, 500);
+    // Never echo secrets
+    const safe = message.replace(/bot\d+:[A-Za-z0-9_-]+/g, "bot***");
+    return fail(safe, 500);
   }
 }
 

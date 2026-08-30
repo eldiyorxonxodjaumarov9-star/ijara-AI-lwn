@@ -6,6 +6,7 @@ import {
   BookUser,
   Bot,
   Building2,
+  ClipboardList,
   DoorOpen,
   FileText,
   LayoutDashboard,
@@ -79,6 +80,12 @@ export const navigation: NavSection[] = [
         titleKey: "nav.employees",
         href: "/employees",
         icon: UserCog,
+        roles: ["admin", "manager"],
+      },
+      {
+        titleKey: "nav.tasks",
+        href: "/tasks",
+        icon: ClipboardList,
         roles: ["admin", "manager"],
       },
       {

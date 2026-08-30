@@ -325,6 +325,8 @@ export const ADMIN_MENU_KEYBOARD = {
     [{ text: "📋 Arendatorlar" }, { text: "⚠️ Qarzdorlar" }],
     [{ text: "📅 To'lov muddati yaqin kelganlar" }],
     [{ text: "📊 Umumiy hisobot" }],
+    [{ text: "➕ Vazifa berish" }],
+    [{ text: "📋 Barcha vazifalar" }, { text: "📝 Hisobotlar" }],
     [{ text: "🚪 Chiqish" }],
   ],
   resize_keyboard: true,

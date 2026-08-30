@@ -167,7 +167,8 @@ export type WorkTaskSource = "WEB" | "TELEGRAM";
 export interface WorkTaskAttachment {
   id: string;
   type: "IMAGE" | "VIDEO" | "DOCUMENT";
-  storageUrl: string;
+  /** Authenticated app proxy path — never a raw private Blob URL */
+  downloadPath: string;
   originalName?: string | null;
   mimeType?: string | null;
   size?: number | null;

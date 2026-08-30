@@ -17,7 +17,7 @@ import {
   TASK_UNIT_LABELS,
   type CreateTaskInput,
 } from "@/lib/tasks/task-shared";
-import { MAX_TASK_ATTACHMENTS, dedupeAttachmentsByTelegramId } from "@/lib/api-server/tasks/task-attachments";
+import { MAX_TASK_ATTACHMENTS, dedupeAttachmentsByTelegramId, toPublicAttachmentView } from "@/lib/api-server/tasks/task-attachments";
 import { assertCallbackData, assertTaskTransition } from "@/lib/tasks/task-transitions";
 
 const taskInclude = {
@@ -58,6 +58,11 @@ function mapTask(task: Awaited<ReturnType<typeof getTaskById>>) {
     employeePosition: task.assignedEmployee.position,
     companyName: task.assignedEmployee.company?.name ?? null,
     createdByName: task.createdBy.fullName,
+    // Strip raw private Blob URLs from client payloads
+    reports: task.reports.map((report) => ({
+      ...report,
+      attachments: report.attachments.map((a) => toPublicAttachmentView(a)),
+    })),
   };
 }
 

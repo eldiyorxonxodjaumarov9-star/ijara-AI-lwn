@@ -40,7 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCollection } from "@/hooks/use-collection";
-import { apiFetch, isApiConfigured } from "@/lib/api/client";
+import { apiFetch, apiFetchBlob, isApiConfigured } from "@/lib/api/client";
 import type { Employee, WorkTask, WorkTaskStatus } from "@/types";
 
 type Stats = {
@@ -415,30 +415,26 @@ export default function TasksPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selected.reports[0].attachments?.map((a) => (
-                        <a
+                        <button
                           key={a.id}
-                          href={a.storageUrl.startsWith("data:") ? undefined : a.storageUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
                           className="text-primary underline"
-                          onClick={async (e) => {
-                            if (a.storageUrl.startsWith("data:")) {
-                              e.preventDefault();
-                              toast.message("Fayl data URL (local)");
-                              return;
-                            }
+                          onClick={async () => {
                             try {
-                              const meta = await apiFetch<{ url: string }>(
-                                `/tasks/attachments/${a.id}`
-                              );
-                              window.open(meta.url, "_blank");
+                              const path =
+                                a.downloadPath?.replace(/^\/api/, "") ||
+                                `/tasks/attachments/${a.id}`;
+                              const blob = await apiFetchBlob(path);
+                              const objectUrl = URL.createObjectURL(blob);
+                              window.open(objectUrl, "_blank", "noopener,noreferrer");
+                              window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
                             } catch {
-                              window.open(a.storageUrl, "_blank");
+                              toast.error("Faylni ochib bo‘lmadi");
                             }
                           }}
                         >
                           {a.originalName || a.type}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </div>

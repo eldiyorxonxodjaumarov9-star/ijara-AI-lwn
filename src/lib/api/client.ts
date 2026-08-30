@@ -140,6 +140,47 @@ export async function apiFetch<T = unknown>(
   return (json?.data ?? json) as T;
 }
 
+/** Authenticated binary download (e.g. private task attachments proxy). */
+export async function apiFetchBlob(
+  path: string,
+  options: Omit<RequestOptions, "body" | "isForm"> = {}
+): Promise<Blob> {
+  const { auth = true, headers, ...rest } = options;
+
+  const doRequest = async (): Promise<Response> => {
+    const finalHeaders: Record<string, string> = {
+      ...(headers as Record<string, string>),
+    };
+    if (auth && tokenStore.access) {
+      finalHeaders["Authorization"] = `Bearer ${tokenStore.access}`;
+    }
+    return fetch(`${API_URL}${path}`, {
+      ...rest,
+      headers: finalHeaders,
+    });
+  };
+
+  let response = await doRequest();
+  if (response.status === 401 && auth && tokenStore.refresh) {
+    const okRefresh = await tryRefresh();
+    if (okRefresh) response = await doRequest();
+    else tokenStore.clear();
+  }
+
+  if (!response.ok) {
+    let message = "Faylni yuklab bo‘lmadi";
+    try {
+      const json = await response.json();
+      message = buildMessage(json, message);
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(message, response.status);
+  }
+
+  return response.blob();
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {

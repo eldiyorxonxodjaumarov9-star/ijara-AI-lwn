@@ -15,6 +15,7 @@ import {
   dedupeAttachmentsByTelegramId,
   isDevOrTestStorageFallbackAllowed,
   sanitizeFileName,
+  toPublicAttachmentView,
 } from "@/lib/api-server/tasks/task-attachments";
 import {
   formatTaskDueAt,
@@ -172,6 +173,21 @@ describe("attachment hardening", () => {
   it("STORAGE_NOT_CONFIGURED message shape", () => {
     const msg = "STORAGE_NOT_CONFIGURED: BLOB_READ_WRITE_TOKEN sozlanmagan";
     assert.ok(msg.includes("STORAGE_NOT_CONFIGURED"));
+  });
+
+  it("public attachment view never exposes raw storageUrl", () => {
+    const view = toPublicAttachmentView({
+      id: "att-1",
+      type: "IMAGE",
+      originalName: "a.jpg",
+      mimeType: "image/jpeg",
+      size: 10,
+    });
+    assert.equal(view.downloadPath, "/api/tasks/attachments/att-1");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(view, "storageUrl"),
+      false
+    );
   });
 });
 

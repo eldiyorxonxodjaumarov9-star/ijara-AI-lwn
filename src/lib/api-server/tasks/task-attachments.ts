@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { get, put } from "@vercel/blob";
 
 import {
   getTelegramFile,
@@ -135,12 +135,13 @@ export async function persistTelegramFile(opts: {
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const blob = await put(key, buffer, {
-      access: "public",
+      access: "private",
       addRandomSuffix: true,
       contentType: opts.mimeType ?? undefined,
     });
     return {
       type: classified.type,
+      // Private blob URL — server-only; never return to clients as-is.
       storageUrl: blob.url,
       storageKey: blob.pathname ?? key,
       telegramFileId: opts.fileId,
@@ -170,5 +171,80 @@ export async function persistTelegramFile(opts: {
     originalName: safeName,
     mimeType: opts.mimeType ?? undefined,
     size: buffer.byteLength,
+  };
+}
+
+/** Client-safe attachment fields — never includes raw private Blob URLs. */
+export function toPublicAttachmentView(a: {
+  id: string;
+  type: "IMAGE" | "VIDEO" | "DOCUMENT" | string;
+  originalName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+}) {
+  return {
+    id: a.id,
+    type: a.type as "IMAGE" | "VIDEO" | "DOCUMENT",
+    originalName: a.originalName ?? null,
+    mimeType: a.mimeType ?? null,
+    size: a.size ?? null,
+    downloadPath: `/api/tasks/attachments/${a.id}`,
+  };
+}
+
+export function isDataUrlStorage(storageUrl: string) {
+  return storageUrl.startsWith("data:");
+}
+
+/**
+ * Load private Blob (or local data-URL fallback) for authenticated proxy streaming.
+ * Never logs tokens or full storage URLs.
+ */
+export async function loadTaskAttachmentBytes(opts: {
+  storageUrl: string;
+  storageKey?: string | null;
+  mimeType?: string | null;
+}): Promise<{
+  body: ReadableStream<Uint8Array> | Buffer;
+  contentType: string;
+  size?: number | null;
+}> {
+  if (isDataUrlStorage(opts.storageUrl)) {
+    const comma = opts.storageUrl.indexOf(",");
+    if (comma < 0) {
+      throw Object.assign(new Error("Noto‘g‘ri data URL"), { status: 500 });
+    }
+    const meta = opts.storageUrl.slice(5, comma);
+    const payload = opts.storageUrl.slice(comma + 1);
+    const contentType =
+      meta.split(";")[0] || opts.mimeType || "application/octet-stream";
+    const isBase64 = /;base64/i.test(meta);
+    const buffer = Buffer.from(
+      isBase64 ? payload : decodeURIComponent(payload),
+      isBase64 ? "base64" : "utf8"
+    );
+    return { body: buffer, contentType, size: buffer.byteLength };
+  }
+
+  if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
+    throw Object.assign(
+      new Error("STORAGE_NOT_CONFIGURED: BLOB_READ_WRITE_TOKEN sozlanmagan"),
+      { code: "STORAGE_NOT_CONFIGURED", status: 503 }
+    );
+  }
+
+  const ref = (opts.storageKey?.trim() || opts.storageUrl).trim();
+  const result = await get(ref, { access: "private" });
+  if (!result || result.statusCode !== 200 || !result.stream) {
+    throw Object.assign(new Error("Fayl topilmadi"), { status: 404 });
+  }
+
+  return {
+    body: result.stream,
+    contentType:
+      result.blob.contentType ||
+      opts.mimeType ||
+      "application/octet-stream",
+    size: result.blob.size,
   };
 }

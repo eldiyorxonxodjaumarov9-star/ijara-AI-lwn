@@ -12,12 +12,13 @@ export function ok<T>(data: T, status = 200) {
   );
 }
 
-export function fail(message: string, status = 400) {
+export function fail(message: string, status = 400, code?: string) {
   return NextResponse.json(
     {
       success: false,
       statusCode: status,
       message,
+      ...(code ? { error: { code, message } } : {}),
       timestamp: new Date().toISOString(),
     },
     { status }

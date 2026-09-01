@@ -21,6 +21,25 @@ import {
 } from "@/lib/api-server/ttlock/persistence";
 import type { TtlockConnectionStatus as PublicStatus } from "@/lib/api-server/ttlock/types";
 
+/** Prisma schema enum: TtlockConnectionStatus */
+const TTLOCK_CONNECTION_STATUSES = new Set<string>([
+  "DISCONNECTED",
+  "CONNECTED",
+  "TOKEN_EXPIRED",
+  "ERROR",
+  "SYNCING",
+]);
+
+function assertTtlockConnectionStatus(status: string): void {
+  if (!TTLOCK_CONNECTION_STATUSES.has(status)) {
+    throw new TtlockError(
+      "TTLock connection status noto'g'ri",
+      "TTLOCK_DB_UNAVAILABLE",
+      400
+    );
+  }
+}
+
 export { ttlockGatewayUniqueKey, ttlockLockUniqueKey };
 
 export type TtlockConnectionRow = {
@@ -236,12 +255,13 @@ export async function upsertConnectionForOwner(
     lastErrorMessage?: string | null;
   }
 ): Promise<TtlockConnectionRow> {
+  assertTtlockConnectionStatus(data.status);
   const existing = await findConnectionByOwner(ownerUserId);
   const now = new Date();
   if (existing) {
     await prisma.$executeRawUnsafe(
       `UPDATE "ttlock_connections" SET
-        "status" = $2,
+        "status" = CAST($2 AS "TtlockConnectionStatus"),
         "ttlockUid" = COALESCE($3, "ttlockUid"),
         "accessTokenEncrypted" = COALESCE($4, "accessTokenEncrypted"),
         "refreshTokenEncrypted" = COALESCE($5, "refreshTokenEncrypted"),
@@ -282,7 +302,7 @@ export async function upsertConnectionForOwner(
       "accessTokenEncrypted", "refreshTokenEncrypted", "tokenExpiresAt",
       "lastConnectedAt", "lastSyncedAt", "lastErrorCode", "lastErrorMessage",
       "createdAt", "updatedAt"
-    ) VALUES ($1,$2,'TTLOCK',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    ) VALUES ($1,$2,'TTLOCK',CAST($3 AS "TtlockConnectionStatus"),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
     id,
     ownerUserId,
     data.status,
@@ -314,7 +334,7 @@ export async function clearConnectionTokens(
 ): Promise<boolean> {
   const result = await prisma.$executeRawUnsafe(
     `UPDATE "ttlock_connections" SET
-      "status" = 'DISCONNECTED',
+      "status" = 'DISCONNECTED'::"TtlockConnectionStatus",
       "accessTokenEncrypted" = NULL,
       "refreshTokenEncrypted" = NULL,
       "tokenExpiresAt" = NULL,
@@ -362,7 +382,10 @@ export async function findActiveLockMatchesByExternalId(
     `SELECT l.* FROM "ttlock_cached_locks" l
      JOIN "ttlock_connections" c ON c."id" = l."connectionId"
      WHERE l."externalLockId" = $1 AND l."isActive" = true
-       AND c."status" IN ('CONNECTED', 'SYNCING')`,
+       AND c."status" IN (
+         CAST('CONNECTED' AS "TtlockConnectionStatus"),
+         CAST('SYNCING' AS "TtlockConnectionStatus")
+       )`,
     externalLockId
   );
   const out: LockConnectionMatch[] = [];
@@ -429,7 +452,7 @@ export async function updateGatewayOnlineIfNewer(input: {
 }): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE "ttlock_gateways" SET
-      "onlineStatus" = $2::"TtlockDeviceOnlineStatus",
+      "onlineStatus" = CAST($2 AS "TtlockDeviceOnlineStatus"),
       "lastHeartbeatAt" = $3,
       "lastEventAt" = $3,
       "updatedAt" = $4
@@ -493,7 +516,7 @@ export async function upsertGateway(input: {
       `UPDATE "ttlock_gateways" SET
         "name" = COALESCE($2, "name"),
         "mac" = COALESCE($3, "mac"),
-        "onlineStatus" = $4::"TtlockDeviceOnlineStatus",
+        "onlineStatus" = CAST($4 AS "TtlockDeviceOnlineStatus"),
         "lastHeartbeatAt" = COALESCE($5, "lastHeartbeatAt"),
         "lastSyncedAt" = $6,
         "isActive" = true,
@@ -516,7 +539,7 @@ export async function upsertGateway(input: {
         "id", "connectionId", "externalGatewayId", "name", "mac",
         "onlineStatus", "lastHeartbeatAt", "lastSyncedAt",
         "isActive", "removedAt", "capabilities", "createdAt", "updatedAt"
-      ) VALUES ($1,$2,$3,$4,$5,$6::"TtlockDeviceOnlineStatus",$7,$8,true,NULL,$9::jsonb,$10,$11)`,
+      ) VALUES ($1,$2,$3,$4,$5,CAST($6 AS "TtlockDeviceOnlineStatus"),$7,$8,true,NULL,$9::jsonb,$10,$11)`,
       randomUUID(),
       input.connectionId,
       externalGatewayId,
@@ -618,7 +641,7 @@ export async function upsertCachedLock(input: {
         "remoteUnlock" = $8,
         "passcodeCapable" = COALESCE($9, "passcodeCapable"),
         "eKeyCapable" = COALESCE($10, "eKeyCapable"),
-        "onlineStatus" = $11::"TtlockDeviceOnlineStatus",
+        "onlineStatus" = CAST($11 AS "TtlockDeviceOnlineStatus"),
         "lastOnlineAt" = COALESCE($12, "lastOnlineAt"),
         "gatewayId" = COALESCE($13, "gatewayId"),
         "capabilities" = $14::jsonb,
@@ -655,9 +678,9 @@ export async function upsertCachedLock(input: {
         "lastOnlineAt", "gatewayId", "capabilities", "rawSafe",
         "lastSyncedAt", "isActive", "removedAt", "createdAt", "updatedAt"
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-        $12::"TtlockDeviceOnlineStatus",$13,$14,$15::jsonb,$16::jsonb,
-        $17,true,NULL,$18,$19
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+        CAST($13 AS "TtlockDeviceOnlineStatus"),$14,$15,$16::jsonb,$17::jsonb,
+        $18,true,NULL,$19,$20
       )`,
       randomUUID(),
       input.connectionId,
@@ -799,8 +822,8 @@ export async function upsertAccessCredential(input: {
       `UPDATE "ttlock_access_credentials" SET
         "connectionId" = $2,
         "ttlockCachedLockId" = $3,
-        "accessType" = $4::"TtlockAccessCredentialType",
-        "syncStatus" = COALESCE($5::"TtlockAccessSyncStatus", "syncStatus"),
+        "accessType" = CAST($4 AS "TtlockAccessCredentialType"),
+        "syncStatus" = COALESCE(CAST($5 AS "TtlockAccessSyncStatus"), "syncStatus"),
         "externalAccessId" = COALESCE($6, "externalAccessId"),
         "credentialEncrypted" = COALESCE($7, "credentialEncrypted"),
         "sentAt" = COALESCE($8, "sentAt"),
@@ -832,8 +855,8 @@ export async function upsertAccessCredential(input: {
         "credentialEncrypted", "sentAt", "lastSyncedAt",
         "revokedAt", "lastErrorCode", "lastErrorMessage", "createdAt", "updatedAt"
       ) VALUES (
-        $1,$2,$3,$4,$5::"TtlockAccessCredentialType",
-        $6::"TtlockAccessSyncStatus",$7,$8,$9,$10,$11,$12,$13,$14,$15
+        $1,$2,$3,$4,CAST($5 AS "TtlockAccessCredentialType"),
+        CAST($6 AS "TtlockAccessSyncStatus"),$7,$8,$9,$10,$11,$12,$13,$14,$15
       )`,
       randomUUID(),
       input.roomAccessGrantId,

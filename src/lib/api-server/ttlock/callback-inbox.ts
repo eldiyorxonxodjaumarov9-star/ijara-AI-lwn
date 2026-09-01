@@ -99,21 +99,21 @@ export async function claimCallbackInbox(input: {
 
   const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
     `UPDATE "ttlock_callback_inbox"
-     SET "status" = 'PROCESSING',
+     SET "status" = CAST('PROCESSING' AS "TtlockCallbackInboxStatus"),
          "processingStartedAt" = $2,
          "processingLeaseUntil" = $3,
          "processingWorkerId" = $4,
          "updatedAt" = $2
      WHERE "id" = $1
        AND (
-         "status" = 'RECEIVED'
+         "status" = CAST('RECEIVED' AS "TtlockCallbackInboxStatus")
          OR (
-           "status" = 'FAILED'
+           "status" = CAST('FAILED' AS "TtlockCallbackInboxStatus")
            AND "attempts" < 5
            AND ("nextRetryAt" IS NULL OR "nextRetryAt" <= $2)
          )
          OR (
-           "status" = 'PROCESSING'
+           "status" = CAST('PROCESSING' AS "TtlockCallbackInboxStatus")
            AND "processingLeaseUntil" IS NOT NULL
            AND "processingLeaseUntil" < $2
          )
@@ -138,7 +138,7 @@ export async function claimCallbackInboxBatch(input: {
 
   const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
     `UPDATE "ttlock_callback_inbox" AS t
-     SET "status" = 'PROCESSING',
+     SET "status" = CAST('PROCESSING' AS "TtlockCallbackInboxStatus"),
          "processingStartedAt" = $2,
          "processingLeaseUntil" = $3,
          "processingWorkerId" = $4,
@@ -146,14 +146,14 @@ export async function claimCallbackInboxBatch(input: {
      FROM (
        SELECT "id"
        FROM "ttlock_callback_inbox"
-       WHERE "status" = 'RECEIVED'
+       WHERE "status" = CAST('RECEIVED' AS "TtlockCallbackInboxStatus")
           OR (
-            "status" = 'FAILED'
+            "status" = CAST('FAILED' AS "TtlockCallbackInboxStatus")
             AND "attempts" < 5
             AND ("nextRetryAt" IS NULL OR "nextRetryAt" <= $2)
           )
           OR (
-            "status" = 'PROCESSING'
+            "status" = CAST('PROCESSING' AS "TtlockCallbackInboxStatus")
             AND "processingLeaseUntil" IS NOT NULL
             AND "processingLeaseUntil" < $2
           )

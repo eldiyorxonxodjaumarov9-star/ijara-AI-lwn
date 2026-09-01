@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/telegram-distribution",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/ttlock-callback-retry",
+      "schedule": "15 3 * * *"
     }
   ]
 }

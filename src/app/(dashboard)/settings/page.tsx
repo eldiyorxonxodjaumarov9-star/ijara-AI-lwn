@@ -1,9 +1,9 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { Building2, Cloud, Globe, Loader2, Moon, Radio, User } from "lucide-react";
+import { Building2, Cloud, Globe, KeyRound, Loader2, Moon, Radio, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
@@ -35,10 +35,11 @@ import {
 } from "@/lib/cloud/sync-client";
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
-import type { Language } from "@/types";
+import type { AppUser, Language } from "@/types";
 import { PostingChannelsPanel } from "@/components/listings/posting-channels-panel";
 import { InstagramSettingsPanel } from "@/components/listings/instagram-settings-panel";
 import { TelegramDistributionPanel } from "@/components/listings/telegram-distribution-panel";
+import { TtlockSettingsPanel } from "@/components/settings/ttlock-settings-panel";
 
 export default function SettingsPage() {
   return (
@@ -48,53 +49,79 @@ export default function SettingsPage() {
   );
 }
 
+function useClientMounted() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
+
+function profileFromUser(user: AppUser | null) {
+  return {
+    displayName: user?.displayName ?? "",
+    phone: user?.phone ?? "",
+    email: user?.email ?? "",
+    company: user?.company ?? "",
+    language: (user?.language ?? "uz") as Language,
+  };
+}
+
 function SettingsPageContent() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") ?? "profile";
+  const pathname = usePathname();
+  const router = useRouter();
+  const urlTab = searchParams.get("tab") ?? "profile";
   const { user, updateUser, demoMode } = useAuth();
   const { t, setLanguage: setAppLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientMounted();
 
-  const [displayName, setDisplayName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
-  const [language, setLanguage] = useState<Language>("uz");
+  const [profile, setProfile] = useState(() => profileFromUser(user));
+  const [profileUserId, setProfileUserId] = useState(user?.id ?? "");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [cloudAvailable, setCloudAvailable] = useState<boolean | null>(null);
 
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(urlTab);
+  const [prevUrlTab, setPrevUrlTab] = useState(urlTab);
 
-  useEffect(() => setMounted(true), []);
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab) setActiveTab(tab);
-  }, [searchParams]);
+  if (urlTab !== prevUrlTab) {
+    setPrevUrlTab(urlTab);
+    setActiveTab(urlTab);
+  }
+
+  const nextUserId = user?.id ?? "";
+  if (nextUserId !== profileUserId) {
+    setProfileUserId(nextUserId);
+    setProfile(profileFromUser(user));
+  }
+
   useEffect(() => {
     if (!demoMode) return;
     void checkCloudSyncAvailable().then(setCloudAvailable);
   }, [demoMode]);
-  useEffect(() => {
-    if (user) {
-      setDisplayName(user.displayName ?? "");
-      setPhone(user.phone ?? "");
-      setEmail(user.email ?? "");
-      setCompany(user.company ?? "");
-      setLanguage(user.language ?? "uz");
-    }
-  }, [user]);
+
+  const onTabChange = (value: string) => {
+    setActiveTab(value);
+    router.replace(`${pathname}?tab=${encodeURIComponent(value)}`, {
+      scroll: false,
+    });
+  };
 
   const saveProfile = async () => {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = profile.email.trim();
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       toast.error(t("settings.emailInvalid"));
       return;
     }
     try {
       setSaving(true);
-      await updateUser({ displayName, phone, email: trimmedEmail });
+      await updateUser({
+        displayName: profile.displayName,
+        phone: profile.phone,
+        email: trimmedEmail,
+      });
       toast.success(t("settings.savedProfile"));
     } catch (err) {
       toast.error(
@@ -106,12 +133,12 @@ function SettingsPageContent() {
   };
 
   const saveCompany = async () => {
-    await updateUser({ company });
+    await updateUser({ company: profile.company });
     toast.success(t("settings.savedCompany"));
   };
 
   const saveLanguage = async (lang: Language) => {
-    setLanguage(lang);
+    setProfile((p) => ({ ...p, language: lang }));
     setAppLanguage(lang);
     await updateUser({ language: lang });
     toast.success(translateAt(lang, "settings.savedLanguage"));
@@ -143,8 +170,8 @@ function SettingsPageContent() {
     <div className="space-y-6">
       <PageHeader title={t("settings.title")} description={t("settings.desc")} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={onTabChange}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 overflow-x-auto sm:flex-nowrap">
           <TabsTrigger value="profile">
             <User className="mr-1.5 size-4" /> {t("settings.profile")}
           </TabsTrigger>
@@ -156,6 +183,9 @@ function SettingsPageContent() {
           </TabsTrigger>
           <TabsTrigger value="posting">
             <Radio className="mr-1.5 size-4" /> Posting sozlamalari
+          </TabsTrigger>
+          <TabsTrigger value="integrations">
+            <KeyRound className="mr-1.5 size-4" /> Integratsiyalar
           </TabsTrigger>
         </TabsList>
 
@@ -181,28 +211,33 @@ function SettingsPageContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>{t("settings.fullName")}</Label>
                   <Input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    value={profile.displayName}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, displayName: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>{t("settings.phone")}</Label>
                   <Input
-                    value={phone}
-                    placeholder="+998..."
-                    onChange={(e) => setPhone(e.target.value)}
+                    value={profile.phone}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, phone: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>{t("settings.email")}</Label>
                   <Input
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={profile.email}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, email: e.target.value }))
+                    }
                   />
                   <p className="text-xs text-muted-foreground">
                     {t("settings.emailHint")}
@@ -210,37 +245,38 @@ function SettingsPageContent() {
                 </div>
               </div>
 
-              <Button onClick={saveProfile} disabled={saving}>
-                {saving && <Loader2 className="size-4 animate-spin" />}
-                {t("common.save")}
-              </Button>
-
               {demoMode && (
-                <div className="rounded-lg border border-dashed p-4">
-                  <div className="flex items-start gap-3">
-                    <Cloud className="mt-0.5 size-5 text-muted-foreground" />
-                    <div className="flex-1 space-y-2">
-                      <p className="font-medium">{t("settings.syncTitle")}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {cloudAvailable === false
-                          ? t("settings.syncOfflineHint")
-                          : t("settings.syncDesc")}
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={runCloudSync}
-                        disabled={syncing || cloudAvailable === false}
-                      >
-                        {syncing && (
-                          <Loader2 className="size-4 animate-spin" />
-                        )}
-                        {t("settings.syncNow")}
-                      </Button>
+                <div className="rounded-lg border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Cloud className="size-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{t("settings.syncTitle")}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {cloudAvailable === false
+                            ? t("settings.syncOfflineHint")
+                            : t("settings.syncDesc")}
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      variant="outline"
+                      disabled={syncing || cloudAvailable === false}
+                      onClick={() => void runCloudSync()}
+                    >
+                      {syncing ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      {t("settings.syncNow")}
+                    </Button>
                   </div>
                 </div>
               )}
+
+              <Button onClick={() => void saveProfile()} disabled={saving}>
+                {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                {t("common.save")}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -255,11 +291,13 @@ function SettingsPageContent() {
               <div className="space-y-1.5">
                 <Label>{t("settings.companyName")}</Label>
                 <Input
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
+                  value={profile.company}
+                  onChange={(e) =>
+                    setProfile((p) => ({ ...p, company: e.target.value }))
+                  }
                 />
               </div>
-              <Button onClick={saveCompany}>{t("common.save")}</Button>
+              <Button onClick={() => void saveCompany()}>{t("common.save")}</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -276,6 +314,10 @@ function SettingsPageContent() {
               <PostingChannelsPanel hideInstagram />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations" className="space-y-6">
+          <TtlockSettingsPanel />
         </TabsContent>
 
         <TabsContent value="appearance">
@@ -314,8 +356,8 @@ function SettingsPageContent() {
                   </div>
                 </div>
                 <Select
-                  value={language}
-                  onValueChange={(v) => saveLanguage(v as Language)}
+                  value={profile.language}
+                  onValueChange={(v) => void saveLanguage(v as Language)}
                 >
                   <SelectTrigger className="w-36">
                     <SelectValue />

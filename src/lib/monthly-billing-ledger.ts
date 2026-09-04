@@ -3,11 +3,15 @@
  * Unique kalit: contractId + billingYear-month (Asia/Tashkent).
  */
 import type { Contract, Payment, PaymentMethod, Tenant } from "@/types";
-import { contractHasOpenDebtMarker } from "@/lib/open-debt-marker";
 import {
   paymentBillingPeriod,
   resolvePaymentDay,
 } from "@/lib/debt-calculator";
+
+/** «Qarzga» biriktirilganda — muddat kelmasa ham joriy oy hisobga tushadi */
+function contractHasOpenDebtMarker(notes?: string | null) {
+  return (notes ?? "").includes("[qarzga]");
+}
 import {
   formatTashkentDate,
   getTashkentDateParts,

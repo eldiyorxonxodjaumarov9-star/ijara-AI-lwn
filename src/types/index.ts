@@ -73,7 +73,7 @@ export interface Contract {
   createdAt: string;
 }
 
-export type PaymentMethod = "cash" | "card" | "bank";
+export type PaymentMethod = "cash" | "card" | "bank" | "other";
 
 export interface Payment {
   id: string;

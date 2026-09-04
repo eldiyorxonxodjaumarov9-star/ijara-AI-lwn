@@ -49,9 +49,15 @@ const PAYMENT_METHOD_TO_API: Record<PaymentMethod, string> = {
   cash: "CASH",
   card: "CARD",
   bank: "BANK",
+  other: "OTHER",
 };
-const paymentMethodFromApi = (v: unknown): PaymentMethod =>
-  String(v ?? "CASH").toLowerCase() as PaymentMethod;
+const paymentMethodFromApi = (v: unknown): PaymentMethod => {
+  const key = String(v ?? "CASH").toLowerCase();
+  if (key === "cash" || key === "card" || key === "bank" || key === "other") {
+    return key;
+  }
+  return "cash";
+};
 
 const EXPENSE_CATEGORY_TO_API: Record<ExpenseCategory, string> = {
   utilities: "UTILITIES",

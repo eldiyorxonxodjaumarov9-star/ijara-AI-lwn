@@ -38,6 +38,7 @@ enum PaymentMethod {
   CASH
   CARD
   BANK
+  OTHER
 }
 
 enum ExpenseCategory {

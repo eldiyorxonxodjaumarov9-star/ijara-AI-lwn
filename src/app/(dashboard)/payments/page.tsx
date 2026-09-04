@@ -40,26 +40,36 @@ import {
 import { useTashkentNow } from "@/context/tashkent-time-context";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
-import { computeDebts } from "@/lib/analytics";
-import { MONTHS_UZ_FULL } from "@/lib/analytics";
 import { paymentBillingPeriod } from "@/lib/debt-calculator";
+import {
+  BILLING_STATUS_LABEL,
+  buildMonthlyBillingLedger,
+  summarizeBillingLedger,
+  type BillingInvoiceStatus,
+  type MonthlyBillingInvoice,
+} from "@/lib/monthly-billing-ledger";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import type { Contract, Payment, Tenant } from "@/types";
 
-type PaymentTableRow = {
-  id: string;
-  tenantName: string;
-  propertyName: string;
-  dateLabel: string;
-  periodLabel: string;
-  methodLabel: string;
-  amount: number;
-  isDebtor: boolean;
-  isDebtOnly: boolean;
-  payment?: Payment;
-};
+function statusClass(status: BillingInvoiceStatus) {
+  switch (status) {
+    case "PAID":
+      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+    case "PARTIALLY_PAID":
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
+    case "OVERDUE":
+      return "bg-destructive/10 text-destructive";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+}
+
+function methodLabel(row: MonthlyBillingInvoice) {
+  if (row.paymentMethods.length === 0) return "—";
+  return row.paymentMethods.map((m) => PAYMENT_METHOD_MAP[m]).join(", ");
+}
 
 export default function PaymentsPage() {
   const { data, loading: loadingPayments } = useCollection<Payment>("payments");
@@ -75,67 +85,28 @@ export default function PaymentsPage() {
   const [editing, setEditing] = useState<Payment | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const debts = useMemo(
-    () => computeDebts(contracts, data, tenants, tashkentNow),
+  const ledger = useMemo(
+    () => buildMonthlyBillingLedger(contracts, data, tenants, tashkentNow),
     [contracts, data, tenants, tashkentNow]
   );
 
-  const debtorContractIds = useMemo(
-    () => new Set(debts.map((d) => d.contractId)),
-    [debts]
+  const debtSummary = useMemo(
+    () => summarizeBillingLedger(ledger),
+    [ledger]
   );
 
-  const tableRows = useMemo<PaymentTableRow[]>(() => {
-    const contractsWithPayment = new Set(
-      data.map((p) => p.contractId).filter(Boolean) as string[]
-    );
+  const paymentsById = useMemo(() => {
+    const map = new Map<string, Payment>();
+    for (const p of data) map.set(p.id, p);
+    return map;
+  }, [data]);
 
-    const rows: PaymentTableRow[] = [];
-
-    for (const d of debts) {
-      if (!contractsWithPayment.has(d.contractId)) {
-        rows.push({
-          id: `debt-${d.contractId}`,
-          tenantName: d.tenantName,
-          propertyName: d.propertyName,
-          dateLabel:
-            d.overdueDays > 0
-              ? `Kechikkan (${d.overdueDays} kun)`
-              : "Muddati o'tgan",
-          periodLabel: "—",
-          methodLabel: "Qarzdor",
-          amount: d.debt,
-          isDebtor: true,
-          isDebtOnly: true,
-        });
-      }
-    }
-
-    for (const p of data) {
-      const isDebtor = !!p.contractId && debtorContractIds.has(p.contractId);
-      const period = paymentBillingPeriod(p);
-      rows.push({
-        id: p.id,
-        tenantName: p.tenantName ?? "—",
-        propertyName: p.propertyName ?? "—",
-        dateLabel: formatDate(p.date),
-        periodLabel: `${MONTHS_UZ_FULL[period.month - 1]} ${period.year}`,
-        methodLabel: PAYMENT_METHOD_MAP[p.method],
-        amount: p.amount,
-        isDebtor,
-        isDebtOnly: false,
-        payment: p,
-      });
-    }
-
-    return rows.sort((a, b) => Number(b.isDebtor) - Number(a.isDebtor));
-  }, [data, debts, debtorContractIds]);
-
-  const total = useMemo(
+  /** Faqat haqiqiy qabul qilingan to'lovlar — qarzdorlik tushumga kirmaydi */
+  const totalRevenue = useMemo(
     () => data.reduce((s, p) => s + (p.amount || 0), 0),
     [data]
   );
-  const thisMonth = useMemo(() => {
+  const thisMonthRevenue = useMemo(() => {
     const today = getTashkentDateParts(tashkentNow);
     return data
       .filter((p) => {
@@ -153,9 +124,14 @@ export default function PaymentsPage() {
     totalPages,
     total: count,
     paged,
-  } = useTableData<PaymentTableRow>({
-    data: tableRows,
-    searchFields: ["tenantName", "propertyName", "dateLabel", "periodLabel"],
+  } = useTableData<MonthlyBillingInvoice>({
+    data: ledger,
+    searchFields: [
+      "tenantName",
+      "propertyName",
+      "billingMonthLabel",
+      "status",
+    ],
     pageSize: 10,
   });
 
@@ -166,11 +142,23 @@ export default function PaymentsPage() {
     setDeleteId(null);
   };
 
+  const openEditForRow = (row: MonthlyBillingInvoice) => {
+    const lastId = row.paymentIds[row.paymentIds.length - 1];
+    const payment = lastId ? paymentsById.get(lastId) : undefined;
+    if (!payment) {
+      setEditing(null);
+      setDialogOpen(true);
+      return;
+    }
+    setEditing(payment);
+    setDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="To'lovlar"
-        description="Qarzdorlar qizil rangda — to'lov muddati o'tgan arendatorlar."
+        description="Har bir shartnoma va oy uchun bitta hisob. Holat va to'lov usuli alohida."
         action={
           <Button
             onClick={() => {
@@ -186,14 +174,14 @@ export default function PaymentsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="Jami tushum"
-          value={formatCurrency(total)}
+          value={formatCurrency(totalRevenue)}
           icon={Banknote}
           tone="primary"
           loading={loading}
         />
         <StatCard
           title="Bu oy uchun"
-          value={formatCurrency(thisMonth)}
+          value={formatCurrency(thisMonthRevenue)}
           icon={Banknote}
           tone="blue"
           loading={loading}
@@ -201,7 +189,7 @@ export default function PaymentsPage() {
         />
         <StatCard
           title="Qarzdorlar"
-          value={String(debts.length)}
+          value={`${debtSummary.uniqueDebtorCount} · ${formatCurrency(debtSummary.totalDebtAmount)}`}
           icon={AlertTriangle}
           tone="rose"
           loading={loading}
@@ -231,116 +219,124 @@ export default function PaymentsPage() {
             <div className="p-6">
               <EmptyState
                 icon={Banknote}
-                title="To'lovlar yo'q"
-                description="Birinchi to'lovni qo'shing."
+                title="Hisoblar yo'q"
+                description="Faol shartnomalar uchun oylik hisoblar shu yerda chiqadi."
               />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Arendator</TableHead>
-                  <TableHead className="hidden md:table-cell">Mulk</TableHead>
-                  <TableHead>Oy uchun</TableHead>
-                  <TableHead className="hidden sm:table-cell">Qabul</TableHead>
-                  <TableHead>Usul</TableHead>
-                  <TableHead>Summa</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paged.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className={cn(
-                      row.isDebtor && "bg-destructive/[0.05]"
-                    )}
-                  >
-                    <TableCell
-                      className={cn(
-                        "font-medium",
-                        row.isDebtor && "text-destructive"
-                      )}
-                    >
-                      {row.tenantName}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "hidden md:table-cell",
-                        row.isDebtor
-                          ? "text-destructive/80"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {row.propertyName}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "whitespace-nowrap",
-                        row.isDebtor && "text-destructive"
-                      )}
-                    >
-                      {row.periodLabel}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "hidden whitespace-nowrap sm:table-cell",
-                        row.isDebtor
-                          ? "text-destructive/80"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {row.dateLabel}
-                    </TableCell>
-                    <TableCell>
-                      {row.isDebtor ? (
-                        <Badge variant="destructive">
-                          <AlertTriangle className="mr-1 size-3" />
-                          {row.isDebtOnly ? "Qarzdor" : "Qarzdorlik"}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">{row.methodLabel}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "font-semibold",
-                        row.isDebtor ? "text-destructive" : "text-primary"
-                      )}
-                    >
-                      {formatCurrency(row.amount)}
-                    </TableCell>
-                    <TableCell>
-                      {row.payment ? (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost">
-                              <MoreVertical className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEditing(row.payment!);
-                                setDialogOpen(true);
-                              }}
-                            >
-                              <Pencil className="size-4" /> Tahrirlash
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteId(row.payment!.id)}
-                            >
-                              <Trash2 className="size-4" /> O&apos;chirish
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      ) : null}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Arendator</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Mulk yoki xona
+                    </TableHead>
+                    <TableHead>Hisoblangan oy</TableHead>
+                    <TableHead className="hidden sm:table-cell">
+                      To&apos;lov muddati
+                    </TableHead>
+                    <TableHead className="hidden lg:table-cell">
+                      Hisoblangan summa
+                    </TableHead>
+                    <TableHead>To&apos;langan summa</TableHead>
+                    <TableHead>Qolgan qarz</TableHead>
+                    <TableHead>Holat</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      To&apos;lov usuli
+                    </TableHead>
+                    <TableHead className="w-12" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paged.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className={cn(
+                        row.status === "OVERDUE" && "bg-destructive/[0.04]",
+                        row.status === "PARTIALLY_PAID" && "bg-amber-500/[0.04]",
+                        row.status === "PAID" && "bg-emerald-500/[0.03]"
+                      )}
+                    >
+                      <TableCell className="font-medium">
+                        {row.tenantName}
+                      </TableCell>
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
+                        {row.propertyName}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {row.billingMonthLabel}
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
+                        {formatDate(row.dueDate)}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {formatCurrency(row.invoiceAmount)}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "font-semibold",
+                          row.paidAmount > 0 && "text-emerald-700 dark:text-emerald-400"
+                        )}
+                      >
+                        {formatCurrency(row.paidAmount)}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "font-semibold",
+                          row.remainingAmount > 0
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {formatCurrency(row.remainingAmount)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className={cn("border-0", statusClass(row.status))}
+                        >
+                          {BILLING_STATUS_LABEL[row.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge variant="outline">{methodLabel(row)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {row.paymentIds.length > 0 ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost">
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => openEditForRow(row)}
+                              >
+                                <Pencil className="size-4" /> Oxirgi to&apos;lovni
+                                tahrirlash
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  const last =
+                                    row.paymentIds[row.paymentIds.length - 1];
+                                  if (last) setDeleteId(last);
+                                }}
+                              >
+                                <Trash2 className="size-4" /> Oxirgi to&apos;lovni
+                                o&apos;chirish
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

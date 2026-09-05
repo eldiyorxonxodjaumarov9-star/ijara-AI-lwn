@@ -143,6 +143,46 @@ export type CategoryComparisonRow = {
   diffLabel: string;
   percentLabel: string;
   direction: DiffDirection;
+  /** Umumiy o'sishga hissasi (faqat o'sganlar), foiz */
+  shareOfIncreasePercent: number | null;
+  shareLabel: string;
+};
+
+export type ExpenseNameComparisonRow = {
+  key: string;
+  name: string;
+  categoryLabel: string;
+  baseAmount: number;
+  compareAmount: number;
+  diff: number;
+  percent: PercentChange;
+  statusLabel: string;
+  diffLabel: string;
+  percentLabel: string;
+  direction: DiffDirection;
+};
+
+export type ExpenseChangeExplanation = {
+  /** "Avgust 2026 xarajatlari Iyul 2026ga nisbatan" */
+  title: string;
+  /** Avtomatik xulosa jumlasi */
+  headline: string;
+  /** Rule-based tushuntirish */
+  narrative: string;
+  baseLabel: string;
+  compareLabel: string;
+  totalIncrease: number;
+  totalDecrease: number;
+  /** sof farq = o'sish − |kamayish| (= listedTotal.diff) */
+  netDiff: number;
+  totalIncreaseLabel: string;
+  totalDecreaseLabel: string;
+  netDiffLabel: string;
+  /** Eng ko'p oshgan kategoriyalar (share bilan) */
+  risingCategories: CategoryComparisonRow[];
+  fallingCategories: CategoryComparisonRow[];
+  risingNames: ExpenseNameComparisonRow[];
+  fallingNames: ExpenseNameComparisonRow[];
 };
 
 export type MetricDelta = {
@@ -191,6 +231,7 @@ export type MonthlyComparisonResult = {
   categories: CategoryComparisonRow[];
   topIncreases: CategoryComparisonRow[];
   topDecreases: CategoryComparisonRow[];
+  expenseExplanation: ExpenseChangeExplanation;
   chart: Array<{
     metric: string;
     base: number;
@@ -279,6 +320,10 @@ export function computeDiffMetric(
       direction = "same";
       statusLabel = "O'zgarmadi";
       percentLabel = formatSignedPercent(0);
+    } else if (b > 0 && c === 0) {
+      direction = "down";
+      statusLabel = "To'liq kamaygan";
+      percentLabel = "To'liq kamaygan";
     } else if (diff > 0) {
       direction = "up";
       statusLabel = "O'sdi";
@@ -316,6 +361,234 @@ export function computeDiffMetric(
     arrow,
     diffLabel,
     percentLabel,
+  };
+}
+
+/**
+ * Xarajat kartalari uchun aniq matn:
+ * Ko'proq | Kamroq | O'zgarmagan | Yangi | To'liq kamaygan
+ */
+export function expenseOutcomeLabels(metric: DiffMetric): {
+  word: string;
+  phrase: string;
+} {
+  if (metric.direction === "new") {
+    return { word: "Yangi", phrase: "Yangi" };
+  }
+  if (metric.base > 0 && metric.compare === 0) {
+    return { word: "To'liq kamaygan", phrase: "To'liq kamaygan" };
+  }
+  if (metric.direction === "same" || metric.diff === 0) {
+    return { word: "O'zgarmagan", phrase: "O'zgarmagan" };
+  }
+  if (metric.direction === "up") {
+    if (metric.percent == null) {
+      return { word: "Ko'proq", phrase: "Ko'proq" };
+    }
+    return {
+      word: "Ko'proq",
+      phrase: `${Math.abs(metric.percent).toFixed(2)}% ko'proq`,
+    };
+  }
+  if (metric.percent == null) {
+    return { word: "Kamroq", phrase: "Kamroq" };
+  }
+  return {
+    word: "Kamroq",
+    phrase: `${Math.abs(metric.percent).toFixed(2)}% kamaygan`,
+  };
+}
+
+export function buildExpenseHeadline(
+  baseLabel: string,
+  compareLabel: string,
+  metric: DiffMetric
+): string {
+  const absAmt = formatAbsCurrency(Math.abs(metric.diff));
+  if (metric.diff === 0) {
+    return `${compareLabel}da ${baseLabel}ga nisbatan umumiy xarajat o'zgarmagan.`;
+  }
+  if (metric.direction === "new" || (metric.base === 0 && metric.compare > 0)) {
+    return `${compareLabel}da ${baseLabel}ga nisbatan ${absAmt} yangi xarajat paydo bo'lgan.`;
+  }
+  if (metric.diff > 0) {
+    const pct =
+      metric.percent != null
+        ? ` yoki ${Math.abs(metric.percent).toFixed(2)}%`
+        : "";
+    return `${compareLabel}da ${baseLabel}ga nisbatan ${absAmt}${pct} ko'proq xarajat qilingan.`;
+  }
+  const pct =
+    metric.percent != null
+      ? ` yoki ${Math.abs(metric.percent).toFixed(2)}%`
+      : "";
+  return `${compareLabel}da ${baseLabel}ga nisbatan ${absAmt}${pct} kamroq xarajat qilingan.`;
+}
+
+function expenseNameKey(row: ExpenseDetailRow): string {
+  return `${row.name.trim().toLowerCase()}|${row.typeKey}|${row.category}`;
+}
+
+/** Faqat haqiqiy chiqim (paid) — tushuntirish uchun */
+export function aggregateExpenseNames(
+  baseRows: ExpenseDetailRow[],
+  compareRows: ExpenseDetailRow[]
+): ExpenseNameComparisonRow[] {
+  const baseMap = new Map<string, { amount: number; sample: ExpenseDetailRow }>();
+  const compareMap = new Map<
+    string,
+    { amount: number; sample: ExpenseDetailRow }
+  >();
+
+  for (const r of baseRows) {
+    if (!r.countsTowardCashOutflow) continue;
+    const k = expenseNameKey(r);
+    const prev = baseMap.get(k);
+    if (prev) prev.amount += r.amount;
+    else baseMap.set(k, { amount: r.amount, sample: r });
+  }
+  for (const r of compareRows) {
+    if (!r.countsTowardCashOutflow) continue;
+    const k = expenseNameKey(r);
+    const prev = compareMap.get(k);
+    if (prev) prev.amount += r.amount;
+    else compareMap.set(k, { amount: r.amount, sample: r });
+  }
+
+  const keys = new Set([...baseMap.keys(), ...compareMap.keys()]);
+  const out: ExpenseNameComparisonRow[] = [];
+  for (const key of keys) {
+    const b = baseMap.get(key)?.amount ?? 0;
+    const c = compareMap.get(key)?.amount ?? 0;
+    if (b === 0 && c === 0) continue;
+    const sample = compareMap.get(key)?.sample ?? baseMap.get(key)!.sample;
+    const metric = computeDiffMetric(b, c, "currency");
+    const outcome = expenseOutcomeLabels(metric);
+    out.push({
+      key,
+      name: sample.name,
+      categoryLabel: sample.typeLabel || sample.categoryLabel,
+      baseAmount: b,
+      compareAmount: c,
+      diff: metric.diff,
+      percent: percentChange(b, c, { asExpenseCategory: true }),
+      statusLabel: outcome.word,
+      diffLabel: metric.diffLabel,
+      percentLabel:
+        metric.direction === "new"
+          ? "Yangi xarajat"
+          : metric.base > 0 && metric.compare === 0
+            ? "To'liq kamaygan"
+            : metric.percentLabel,
+      direction: metric.direction,
+    });
+  }
+  out.sort((a, b) => b.diff - a.diff);
+  return out;
+}
+
+export function buildExpenseChangeExplanation(input: {
+  baseLabel: string;
+  compareLabel: string;
+  listedDiff: DiffMetric;
+  categories: CategoryComparisonRow[];
+  baseExpenses: ExpenseDetailRow[];
+  compareExpenses: ExpenseDetailRow[];
+}): ExpenseChangeExplanation {
+  const { baseLabel, compareLabel, listedDiff, categories } = input;
+  const rising = categories.filter((c) => c.diff > 0);
+  const falling = categories.filter((c) => c.diff < 0);
+  const totalIncrease = rising.reduce((s, c) => s + c.diff, 0);
+  const totalDecreaseAbs = falling.reduce((s, c) => s + Math.abs(c.diff), 0);
+  const netDiff = totalIncrease - totalDecreaseAbs;
+
+  const withShare = categories.map((c) => {
+    if (c.diff <= 0 || totalIncrease <= 0) {
+      return {
+        ...c,
+        shareOfIncreasePercent: null as number | null,
+        shareLabel: "—",
+      };
+    }
+    const share = (c.diff / totalIncrease) * 100;
+    return {
+      ...c,
+      shareOfIncreasePercent: share,
+      shareLabel: `${share.toFixed(2)}%`,
+      percentLabel:
+        c.direction === "new"
+          ? "Yangi xarajat"
+          : c.baseAmount > 0 && c.compareAmount === 0
+            ? "To'liq kamaygan"
+            : c.percentLabel,
+      statusLabel: expenseOutcomeLabels(
+        computeDiffMetric(c.baseAmount, c.compareAmount, "currency")
+      ).word,
+    };
+  });
+
+  const risingCategories = [...withShare]
+    .filter((c) => c.diff > 0)
+    .sort((a, b) => b.diff - a.diff);
+  const fallingCategories = [...withShare]
+    .filter((c) => c.diff < 0)
+    .sort((a, b) => a.diff - b.diff);
+
+  const names = aggregateExpenseNames(
+    input.baseExpenses,
+    input.compareExpenses
+  );
+  const risingNames = names.filter((n) => n.diff > 0);
+  const fallingNames = names.filter((n) => n.diff < 0).sort((a, b) => a.diff - b.diff);
+
+  const title = `${compareLabel} xarajatlari ${baseLabel}ga nisbatan`;
+  const headline = buildExpenseHeadline(baseLabel, compareLabel, listedDiff);
+
+  let narrative: string;
+  if (listedDiff.diff <= 0) {
+    narrative = "Tanlangan oyda xarajatlarning umumiy oshishi aniqlanmadi.";
+  } else {
+    const top = risingNames.slice(0, 2);
+    const topParts =
+      top.length > 0
+        ? top
+            .map((n) =>
+              n.direction === "new"
+                ? `${n.name} — ${formatAbsCurrency(n.compareAmount)}lik yangi xarajat`
+                : `${n.name} — ${formatAbsCurrency(Math.abs(n.diff))}ga oshgan`
+            )
+            .join("; ")
+        : risingCategories
+            .slice(0, 2)
+            .map((c) =>
+              c.direction === "new"
+                ? `${c.label} — ${formatAbsCurrency(c.compareAmount)}lik yangi xarajat`
+                : `${c.label} — ${formatAbsCurrency(Math.abs(c.diff))}ga oshgan`
+            )
+            .join("; ");
+
+    narrative = `${compareLabel.replace(/\s+\d{4}$/, "")}da xarajatlar ${baseLabel.replace(/\s+\d{4}$/, "")}ga nisbatan ${formatAbsCurrency(listedDiff.diff)}ga oshgan. O'sishga eng katta ta'sir qilgan xarajatlar: ${topParts || "—"}.`;
+    if (totalDecreaseAbs > 0) {
+      narrative += ` Ayrim xarajatlar kamaygani sababli yakuniy o'sish ${formatAbsCurrency(netDiff)}ni tashkil qilgan.`;
+    }
+  }
+
+  return {
+    title,
+    headline,
+    narrative,
+    baseLabel,
+    compareLabel,
+    totalIncrease,
+    totalDecrease: totalDecreaseAbs,
+    netDiff,
+    totalIncreaseLabel: formatSignedCurrency(totalIncrease),
+    totalDecreaseLabel: formatSignedCurrency(-totalDecreaseAbs),
+    netDiffLabel: formatSignedCurrency(netDiff),
+    risingCategories,
+    fallingCategories,
+    risingNames,
+    fallingNames,
   };
 }
 
@@ -900,8 +1173,15 @@ export function buildMonthlyComparison(input: {
       ),
       statusLabel: metric.statusLabel,
       diffLabel: metric.diffLabel,
-      percentLabel: metric.percentLabel,
+      percentLabel:
+        metric.direction === "new"
+          ? "Yangi xarajat"
+          : baseAmount > 0 && compareAmount === 0
+            ? "To'liq kamaygan"
+            : metric.percentLabel,
       direction: metric.direction,
+      shareOfIncreasePercent: null,
+      shareLabel: "—",
     });
   }
 
@@ -964,6 +1244,32 @@ export function buildMonthlyComparison(input: {
       "currency"
     ),
   };
+
+  const expenseExplanation = buildExpenseChangeExplanation({
+    baseLabel: base.label,
+    compareLabel: compare.label,
+    listedDiff: expenseDiffs.listedTotal,
+    categories,
+    baseExpenses: base.expenseRows,
+    compareExpenses: compare.expenseRows,
+  });
+
+  // Kategoriyalarga o'sish hissasini biriktirish
+  for (const c of categories) {
+    const enriched = expenseExplanation.risingCategories.find(
+      (r) => r.key === c.key
+    );
+    if (enriched) {
+      c.shareOfIncreasePercent = enriched.shareOfIncreasePercent;
+      c.shareLabel = enriched.shareLabel;
+      c.statusLabel = enriched.statusLabel;
+      c.percentLabel = enriched.percentLabel;
+    } else if (c.diff < 0) {
+      c.statusLabel = expenseOutcomeLabels(
+        computeDiffMetric(c.baseAmount, c.compareAmount, "currency")
+      ).word;
+    }
+  }
 
   const baseRatio = base.expenseToIncomeRatioPercent ?? 0;
   const compareRatio = compare.expenseToIncomeRatioPercent ?? 0;
@@ -1058,6 +1364,7 @@ export function buildMonthlyComparison(input: {
     categories,
     topIncreases,
     topDecreases,
+    expenseExplanation,
     chart: [
       { metric: "Kirim", base: base.income, compare: compare.income },
       {

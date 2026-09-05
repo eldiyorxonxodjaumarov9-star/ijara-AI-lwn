@@ -15,6 +15,7 @@ import {
 import { MonthCompareBarChart } from "@/components/charts/month-compare-bar-chart";
 import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -47,12 +48,14 @@ import {
   COMPARISON_PAGE_SIZE,
   defaultComparisonMonths,
   expenseFilterOptions,
+  expenseOutcomeLabels,
   filterExpenseRows,
   formatYearMonth,
   paginateRows,
   type CategoryComparisonRow,
   type DiffMetric,
   type ExpenseDetailRow,
+  type ExpenseNameComparisonRow,
   type IncomeDetailRow,
   type MetricDelta,
   type MonthlyComparisonResult,
@@ -111,20 +114,84 @@ function DiffMetricCard({
   unit = "currency",
   invertColors = false,
   loading,
+  baseMonthLabel,
+  compareMonthLabel,
+  expenseMode = false,
 }: {
   title: string;
   metric: DiffMetric;
   unit?: "currency" | "count" | "percent_points";
   invertColors?: boolean;
   loading?: boolean;
+  baseMonthLabel?: string;
+  compareMonthLabel?: string;
+  /** Xarajat: Ko'proq/Kamroq matnlari */
+  expenseMode?: boolean;
 }) {
   const tone = directionTone(metric, invertColors);
+  const outcome = expenseMode ? expenseOutcomeLabels(metric) : null;
+  const labeled = Boolean(baseMonthLabel && compareMonthLabel);
+
   return (
     <Card>
       <CardContent className="p-5">
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
         {loading ? (
-          <Skeleton className="mt-2 h-20 w-full" />
+          <Skeleton className="mt-2 h-28 w-full" />
+        ) : labeled ? (
+          <>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Bazaviy oy
+                </p>
+                <p className="mt-1 text-sm font-semibold">{baseMonthLabel}</p>
+                <p className="mt-1 text-lg font-bold">
+                  {formatValue(metric.base, unit)}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Taqqoslanayotgan oy
+                </p>
+                <p className="mt-1 text-sm font-semibold">{compareMonthLabel}</p>
+                <p className="mt-1 text-lg font-bold">
+                  {formatValue(metric.compare, unit)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-1 border-t pt-3">
+              <p className="text-xs text-muted-foreground">Farq</p>
+              <p className={cn("text-xl font-bold tracking-tight", toneClass(tone))}>
+                {metric.diffLabel}
+              </p>
+              <p className="text-xs text-muted-foreground">Natija</p>
+              <p className={cn("text-sm font-semibold", toneClass(tone))}>
+                {outcome
+                  ? unit === "count" &&
+                    (outcome.word === "Ko'proq" || outcome.word === "Kamroq")
+                    ? `${outcome.phrase} xarajat yozuvi`
+                    : outcome.phrase
+                  : metric.percentLabel}
+              </p>
+              {outcome && (
+                <Badge
+                  variant={
+                    metric.direction === "up"
+                      ? "destructive"
+                      : metric.direction === "down"
+                        ? "success"
+                        : metric.direction === "new"
+                          ? "warning"
+                          : "secondary"
+                  }
+                  className="mt-1"
+                >
+                  {outcome.word}
+                </Badge>
+              )}
+            </div>
+          </>
         ) : (
           <>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -827,6 +894,359 @@ function OverviewTab({
   );
 }
 
+function ExpenseNameRowsTable({
+  rows,
+  baseLabel,
+  compareLabel,
+  emptyText,
+}: {
+  rows: ExpenseNameComparisonRow[];
+  baseLabel: string;
+  compareLabel: string;
+  emptyText: string;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="py-4 text-center text-sm text-muted-foreground">{emptyText}</p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Xarajat nomi</TableHead>
+            <TableHead>Kategoriya</TableHead>
+            <TableHead>{baseLabel}</TableHead>
+            <TableHead>{compareLabel}</TableHead>
+            <TableHead>Farq</TableHead>
+            <TableHead>Foiz</TableHead>
+            <TableHead>Holat</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.key}>
+              <TableCell className="font-medium">{row.name}</TableCell>
+              <TableCell>{row.categoryLabel}</TableCell>
+              <TableCell>{formatCurrency(row.baseAmount)}</TableCell>
+              <TableCell>{formatCurrency(row.compareAmount)}</TableCell>
+              <TableCell
+                className={toneClass(
+                  row.direction === "up"
+                    ? "bad"
+                    : row.direction === "down"
+                      ? "good"
+                      : "neutral"
+                )}
+              >
+                {row.diffLabel}
+              </TableCell>
+              <TableCell>{row.percentLabel}</TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    row.direction === "up"
+                      ? "destructive"
+                      : row.direction === "down"
+                        ? "success"
+                        : row.direction === "new"
+                          ? "warning"
+                          : "secondary"
+                  }
+                >
+                  {row.statusLabel}
+                </Badge>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function ExpenseDiffExplainSection({
+  result,
+  loading,
+}: {
+  result: MonthlyComparisonResult;
+  loading?: boolean;
+}) {
+  const [showAllRisingNames, setShowAllRisingNames] = useState(false);
+  const [showAllFallingNames, setShowAllFallingNames] = useState(false);
+  const expl = result.expenseExplanation;
+  const baseLabel = expl?.baseLabel ?? result.base.label;
+  const compareLabel = expl?.compareLabel ?? result.compare.label;
+
+  const categoriesSorted = useMemo(() => {
+    return [...result.categories].sort((a, b) => b.diff - a.diff);
+  }, [result.categories]);
+
+  const risingNamesVisible = useMemo(() => {
+    const all = expl?.risingNames ?? [];
+    return showAllRisingNames ? all : all.slice(0, 5);
+  }, [expl?.risingNames, showAllRisingNames]);
+
+  const fallingNamesVisible = useMemo(() => {
+    const all = expl?.fallingNames ?? [];
+    return showAllFallingNames ? all : all.slice(0, 5);
+  }, [expl?.fallingNames, showAllFallingNames]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold sm:text-lg">
+          {loading ? "Xarajatlar farqi" : expl?.title ?? "Xarajatlar farqi"}
+        </h3>
+        {loading ? (
+          <Skeleton className="mt-2 h-5 w-full max-w-xl" />
+        ) : (
+          <p className="mt-1 text-sm text-muted-foreground">{expl?.headline}</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <DiffMetricCard
+          title="Jami kiritilgan xarajat"
+          metric={result.expenseDiffs.listedTotal}
+          invertColors
+          loading={loading}
+          baseMonthLabel={baseLabel}
+          compareMonthLabel={compareLabel}
+          expenseMode
+        />
+        <DiffMetricCard
+          title="Haqiqiy to'langan chiqim"
+          metric={result.expenseDiffs.paidOutflow}
+          invertColors
+          loading={loading}
+          baseMonthLabel={baseLabel}
+          compareMonthLabel={compareLabel}
+          expenseMode
+        />
+        <DiffMetricCard
+          title="Rejalashtirilgan/to'lanmagan"
+          metric={result.expenseDiffs.planned}
+          invertColors
+          loading={loading}
+          baseMonthLabel={baseLabel}
+          compareMonthLabel={compareLabel}
+          expenseMode
+        />
+        <DiffMetricCard
+          title="Xarajatlar soni"
+          metric={result.expenseDiffs.expenseCount}
+          unit="count"
+          invertColors
+          loading={loading}
+          baseMonthLabel={baseLabel}
+          compareMonthLabel={compareLabel}
+          expenseMode
+        />
+        <DiffMetricCard
+          title="O'rtacha xarajat"
+          metric={result.expenseDiffs.averageExpense}
+          invertColors
+          loading={loading}
+          baseMonthLabel={baseLabel}
+          compareMonthLabel={compareLabel}
+          expenseMode
+        />
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Xarajat o&apos;zgarishining sabablari
+          </CardTitle>
+          <CardDescription>
+            Faqat haqiqiy to&apos;langan chiqim kategoriyalari asosida
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loading || !expl ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Xarajatlar oshishi
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-rose-500">
+                    {expl.totalIncreaseLabel}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Xarajatlar kamayishi
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-emerald-500">
+                    {expl.totalDecreaseLabel}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">Yakuniy farq</p>
+                  <p
+                    className={cn(
+                      "mt-1 text-lg font-bold",
+                      expl.netDiff > 0
+                        ? "text-rose-500"
+                        : expl.netDiff < 0
+                          ? "text-emerald-500"
+                          : "text-muted-foreground"
+                    )}
+                  >
+                    {expl.netDiffLabel}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {expl.narrative}
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Qaysi xarajatlar oshgan?</CardTitle>
+          <CardDescription>
+            Kategoriyalar eng ko&apos;p oshgan summadan boshlab
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : categoriesSorted.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Kategoriya farqlari yo&apos;q
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Xarajat kategoriyasi</TableHead>
+                    <TableHead>{baseLabel}</TableHead>
+                    <TableHead>{compareLabel}</TableHead>
+                    <TableHead>Farq</TableHead>
+                    <TableHead>Foiz</TableHead>
+                    <TableHead>Umumiy o&apos;sishga hissasi</TableHead>
+                    <TableHead>Holat</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categoriesSorted.map((row: CategoryComparisonRow) => (
+                    <TableRow key={`exp-cat-${row.key}`}>
+                      <TableCell className="font-medium">{row.label}</TableCell>
+                      <TableCell>{formatCurrency(row.baseAmount)}</TableCell>
+                      <TableCell>{formatCurrency(row.compareAmount)}</TableCell>
+                      <TableCell
+                        className={toneClass(
+                          row.direction === "up"
+                            ? "bad"
+                            : row.direction === "down"
+                              ? "good"
+                              : "neutral"
+                        )}
+                      >
+                        {row.diffLabel}
+                      </TableCell>
+                      <TableCell>{row.percentLabel}</TableCell>
+                      <TableCell>{row.shareLabel || "—"}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            row.direction === "up"
+                              ? "destructive"
+                              : row.direction === "down"
+                                ? "success"
+                                : row.direction === "new"
+                                  ? "warning"
+                                  : "secondary"
+                          }
+                        >
+                          {row.statusLabel}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Eng ko&apos;p pul ishlatilgan xarajatlar
+          </CardTitle>
+          <CardDescription>
+            Bir xil nom va kategoriya bo&apos;yicha jamlangan (haqiqiy chiqim)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {loading || !expl ? (
+            <Skeleton className="h-40 w-full" />
+          ) : (
+            <>
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold">
+                  Ko&apos;paygan va yangi xarajatlar
+                </h4>
+                <ExpenseNameRowsTable
+                  rows={risingNamesVisible}
+                  baseLabel={baseLabel}
+                  compareLabel={compareLabel}
+                  emptyText="Ko'paygan yoki yangi xarajat yo'q"
+                />
+                {(expl.risingNames?.length ?? 0) > 5 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllRisingNames((v) => !v)}
+                  >
+                    {showAllRisingNames
+                      ? "Yig'ish"
+                      : `Barchasini ko'rish (${expl.risingNames.length})`}
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold">Kamaygan xarajatlar</h4>
+                <ExpenseNameRowsTable
+                  rows={fallingNamesVisible}
+                  baseLabel={baseLabel}
+                  compareLabel={compareLabel}
+                  emptyText="Kamaygan xarajat yo'q"
+                />
+                {(expl.fallingNames?.length ?? 0) > 5 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllFallingNames((v) => !v)}
+                  >
+                    {showAllFallingNames
+                      ? "Yig'ish"
+                      : `Barchasini ko'rish (${expl.fallingNames.length})`}
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function MonthlyComparisonSection({
   payments,
   expenses,
@@ -910,7 +1330,8 @@ export function MonthlyComparisonSection({
     Array.isArray(apiData.baseIncomes) &&
     apiData.incomeDiffs &&
     apiData.expenseDiffs &&
-    apiData.overviewDiffs
+    apiData.overviewDiffs &&
+    apiData.expenseExplanation
       ? apiData
       : localResult;
 
@@ -1058,117 +1479,10 @@ export function MonthlyComparisonSection({
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-4">
-          <div>
-            <h3 className="mb-3 text-sm font-semibold">Xarajatlar farqi</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <DiffMetricCard
-                title="Jami kiritilgan xarajat"
-                metric={result.expenseDiffs.listedTotal}
-                invertColors
-                loading={loading}
-              />
-              <DiffMetricCard
-                title="Haqiqiy to'langan chiqim"
-                metric={result.expenseDiffs.paidOutflow}
-                invertColors
-                loading={loading}
-              />
-              <DiffMetricCard
-                title="Rejalashtirilgan/to'lanmagan"
-                metric={result.expenseDiffs.planned}
-                invertColors
-                loading={loading}
-              />
-              <DiffMetricCard
-                title="Xarajatlar soni"
-                metric={result.expenseDiffs.expenseCount}
-                unit="count"
-                invertColors
-                loading={loading}
-              />
-              <DiffMetricCard
-                title="O'rtacha xarajat"
-                metric={result.expenseDiffs.averageExpense}
-                invertColors
-                loading={loading}
-              />
-            </div>
-          </div>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Kategoriyalar farqi</CardTitle>
-              <CardDescription>
-                Faqat haqiqiy to&apos;langan chiqim bo&apos;yicha
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-40 w-full" />
-              ) : result.categories.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Kategoriya farqlari yo&apos;q
-                </p>
-              ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Xarajat turi</TableHead>
-                        <TableHead>1-oy</TableHead>
-                        <TableHead>2-oy</TableHead>
-                        <TableHead>Farq</TableHead>
-                        <TableHead>O&apos;zgarish %</TableHead>
-                        <TableHead>Holat</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {result.categories.map((row) => (
-                        <TableRow key={`exp-cat-${row.key}`}>
-                          <TableCell className="font-medium">
-                            {row.label}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(row.baseAmount)}
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(row.compareAmount)}
-                          </TableCell>
-                          <TableCell
-                            className={toneClass(
-                              row.direction === "up"
-                                ? "bad"
-                                : row.direction === "down"
-                                  ? "good"
-                                  : "neutral"
-                            )}
-                          >
-                            {row.diffLabel}
-                          </TableCell>
-                          <TableCell>{row.percentLabel}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                row.direction === "up"
-                                  ? "destructive"
-                                  : row.direction === "down"
-                                    ? "success"
-                                    : row.direction === "new"
-                                      ? "warning"
-                                      : "secondary"
-                              }
-                            >
-                              {row.statusLabel}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ExpenseDiffExplainSection
+            result={result}
+            loading={loading}
+          />
 
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
@@ -1198,7 +1512,7 @@ export function MonthlyComparisonSection({
 
           <ExpenseMonthBlock
             key={`exp-base-${result.base.label}-${expenseFilter}-${expenseSearch}`}
-            title="1-oy xarajatlari"
+            title={`${result.base.label} xarajatlari`}
             totals={result.base}
             rows={result.baseExpenses}
             filter={expenseFilter}
@@ -1207,7 +1521,7 @@ export function MonthlyComparisonSection({
           />
           <ExpenseMonthBlock
             key={`exp-compare-${result.compare.label}-${expenseFilter}-${expenseSearch}`}
-            title="2-oy xarajatlari"
+            title={`${result.compare.label} xarajatlari`}
             totals={result.compare}
             rows={result.compareExpenses}
             filter={expenseFilter}

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildExpenseHeadline,
   buildMonthlyComparison,
   computeDiffMetric,
+  expenseOutcomeLabels,
   filterExpenseRows,
   formatSignedCount,
   formatSignedCurrency,
@@ -502,13 +504,13 @@ describe("monthly-comparison: net, percent, zero base", () => {
     assert.ok(el);
     assert.equal(el!.status, "high_increase");
     assert.match(el!.recommendation, /25\.00%ga oshgan/i);
-    assert.equal(el!.statusLabel, "O'sdi");
+    assert.equal(el!.statusLabel, "Ko'proq");
     assert.equal(el!.diffLabel, "+25 UZS");
 
     const su = result.categories.find((c) => c.key === "monthly:water");
     assert.ok(su);
     assert.equal(su!.status, "saving");
-    assert.equal(su!.statusLabel, "Kamaydi");
+    assert.equal(su!.statusLabel, "Kamroq");
 
     const office = result.categories.find((c) => c.key === "monthly:office");
     assert.ok(office);
@@ -520,5 +522,185 @@ describe("monthly-comparison: net, percent, zero base", () => {
     assert.ok(result.incomeDiffs);
     assert.ok(result.expenseDiffs);
     assert.ok(result.overviewDiffs);
+    assert.ok(result.expenseExplanation);
+    assert.match(
+      result.expenseExplanation.title,
+      /Avgust 2026 xarajatlari Iyul 2026ga nisbatan/
+    );
+  });
+});
+
+describe("monthly-comparison: expense change explanation", () => {
+  it("matches July→August expense headline numbers", () => {
+    const total = computeDiffMetric(23285, 25925, "currency");
+    assert.equal(total.diff, 2640);
+    assert.equal(total.diffLabel, "+2 640 UZS");
+    assert.equal(total.percentLabel, "+11.34%");
+
+    const count = computeDiffMetric(61, 71, "count");
+    assert.equal(count.diffLabel, "+10 ta");
+    assert.equal(count.percentLabel, "+16.39%");
+
+    // Aniq o'rtacha: 23285/61 va 25925/71 — foiz yaxlitlashsiz o'rtachadan
+    const avgExact = computeDiffMetric(23285 / 61, 25925 / 71, "currency");
+    assert.ok(Math.abs(avgExact.diff - -16.58) < 0.02);
+    assert.match(avgExact.percentLabel, /\u22124\.34%/);
+
+    const avgRounded = computeDiffMetric(382, 365, "currency");
+    assert.equal(avgRounded.diff, -17);
+    assert.equal(avgRounded.diffLabel, "\u221217 UZS");
+
+    const headline = buildExpenseHeadline(
+      "Iyul 2026",
+      "Avgust 2026",
+      total
+    );
+    assert.match(headline, /2 640 UZS/);
+    assert.match(headline, /11\.34%/);
+    assert.match(headline, /ko'proq xarajat qilingan/);
+
+    const outcome = expenseOutcomeLabels(total);
+    assert.equal(outcome.word, "Ko'proq");
+    assert.equal(outcome.phrase, "11.34% ko'proq");
+  });
+
+  it("explains increase/decrease/new/gone by category and name", () => {
+    const result = buildMonthlyComparison({
+      payments: [],
+      expenses: [
+        expense({
+          id: "j-maosh",
+          amount: 10000,
+          date: "2026-07-10T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "Maosh",
+        }),
+        expense({
+          id: "j-gone",
+          amount: 2360,
+          date: "2026-07-11T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "Eski",
+        }),
+        expense({
+          id: "a-maosh",
+          amount: 12676,
+          date: "2026-08-10T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "Maosh",
+        }),
+        expense({
+          id: "a-mahalla",
+          amount: 1000,
+          date: "2026-08-12T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "Mahalla",
+        }),
+      ],
+      baseMonth: { year: 2026, month: 7 },
+      compareMonth: { year: 2026, month: 8 },
+    });
+
+    const expl = result.expenseExplanation;
+    assert.equal(expl.totalIncrease, 2676 + 1000);
+    assert.equal(expl.totalDecrease, 2360);
+    assert.equal(expl.netDiff, 2676 + 1000 - 2360);
+    assert.equal(expl.netDiff, result.expenseDiffs.listedTotal.diff);
+    assert.equal(expl.netDiffLabel, formatSignedCurrency(expl.netDiff));
+
+    const maosh = expl.risingCategories.find((c) =>
+      c.label.toLowerCase().includes("maosh")
+    );
+    assert.ok(maosh);
+    assert.equal(maosh!.diff, 2676);
+    assert.ok(maosh!.shareOfIncreasePercent != null);
+
+    const mahalla = result.categories.find((c) =>
+      c.label.toLowerCase().includes("mahalla")
+    );
+    assert.ok(mahalla);
+    assert.equal(mahalla!.direction, "new");
+    assert.equal(mahalla!.percentLabel, "Yangi xarajat");
+    assert.equal(mahalla!.statusLabel, "Yangi");
+
+    const eski = result.categories.find((c) =>
+      c.label.toLowerCase().includes("eski")
+    );
+    assert.ok(eski);
+    assert.equal(eski!.compareAmount, 0);
+    assert.equal(eski!.percentLabel, "To'liq kamaygan");
+    assert.equal(eski!.statusLabel, "To'liq kamaygan");
+
+    assert.ok(expl.risingNames.length >= 1);
+    assert.ok(expl.fallingNames.length >= 1);
+    assert.match(expl.narrative, /oshgan|yangi/i);
+    assert.doesNotMatch(expl.narrative, /Infinity|NaN/);
+  });
+
+  it("does not invent narrative when expenses did not rise", () => {
+    const result = buildMonthlyComparison({
+      payments: [],
+      expenses: [
+        expense({
+          id: "j1",
+          amount: 5000,
+          date: "2026-07-05T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "A",
+        }),
+        expense({
+          id: "a1",
+          amount: 4000,
+          date: "2026-08-05T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "A",
+        }),
+      ],
+      baseMonth: { year: 2026, month: 7 },
+      compareMonth: { year: 2026, month: 8 },
+    });
+    assert.equal(result.expenseDiffs.listedTotal.diff, -1000);
+    assert.match(
+      result.expenseExplanation.narrative,
+      /oshishi aniqlanmadi/
+    );
+  });
+
+  it("aggregates same name+category and ignores pagination slice", () => {
+    const expenses = [
+      ...Array.from({ length: 30 }, (_, i) =>
+        expense({
+          id: `j-${i}`,
+          amount: 100,
+          date: "2026-07-15T12:00:00+05:00",
+          monthlyExpenseType: "custom",
+          monthlyExpenseCustomName: "Takror",
+        })
+      ),
+      expense({
+        id: "a-1",
+        amount: 5000,
+        date: "2026-08-15T12:00:00+05:00",
+        monthlyExpenseType: "custom",
+        monthlyExpenseCustomName: "Takror",
+      }),
+    ];
+    const result = buildMonthlyComparison({
+      payments: [],
+      expenses,
+      baseMonth: { year: 2026, month: 7 },
+      compareMonth: { year: 2026, month: 8 },
+    });
+    assert.equal(result.expenseDiffs.listedTotal.base, 3000);
+    assert.equal(result.expenseDiffs.expenseCount.base, 30);
+    const page = paginateRows(result.baseExpenses, 1, 25);
+    assert.equal(page.items.length, 25);
+    const name = result.expenseExplanation.risingNames.find(
+      (n) => n.name === "Takror"
+    );
+    assert.ok(name);
+    assert.equal(name!.baseAmount, 3000);
+    assert.equal(name!.compareAmount, 5000);
+    assert.equal(name!.diff, 2000);
   });
 });

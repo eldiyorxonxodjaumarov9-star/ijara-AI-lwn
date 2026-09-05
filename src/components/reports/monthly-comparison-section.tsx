@@ -2,11 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   Banknote,
   Lightbulb,
-  Minus,
   PiggyBank,
   Receipt,
   Scale,
@@ -54,13 +51,12 @@ import {
   formatYearMonth,
   paginateRows,
   type CategoryComparisonRow,
-  type CategoryStatus,
+  type DiffMetric,
   type ExpenseDetailRow,
   type IncomeDetailRow,
   type MetricDelta,
   type MonthlyComparisonResult,
   type MonthTotals,
-  type PercentChange,
   type YearMonth,
 } from "@/lib/monthly-comparison";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -75,13 +71,18 @@ function ymFromParts(year: string, monthIndex0: string): YearMonth {
   return { year: Number(year), month: Number(monthIndex0) + 1 };
 }
 
-function deltaTone(
-  improved: boolean | null,
-  invertExpense = false
+/** income/net: up=green; expense: up=red */
+function directionTone(
+  metric: DiffMetric,
+  invertUpIsBad = false
 ): "good" | "bad" | "neutral" {
-  if (improved === null) return "neutral";
-  if (invertExpense) return improved ? "good" : "bad";
-  return improved ? "good" : "bad";
+  if (metric.direction === "same") return "neutral";
+  if (metric.direction === "new") {
+    return invertUpIsBad ? "bad" : "good";
+  }
+  const up = metric.direction === "up";
+  if (invertUpIsBad) return up ? "bad" : "good";
+  return up ? "good" : "bad";
 }
 
 function toneClass(tone: "good" | "bad" | "neutral") {
@@ -95,35 +96,70 @@ function toneClass(tone: "good" | "bad" | "neutral") {
   }
 }
 
-function formatPercentLabel(p: PercentChange) {
-  if (p.kind !== "ok" || p.percent === null) return p.label;
-  const sign = p.percent > 0 ? "+" : "";
-  return `${sign}${p.percent.toFixed(1)}%`;
+function formatValue(
+  value: number,
+  unit: "currency" | "count" | "percent_points"
+) {
+  if (unit === "count") return `${Math.round(value)} ta`;
+  if (unit === "percent_points") return `${value.toFixed(2)}%`;
+  return formatCurrency(value);
 }
 
-function statusBadge(status: CategoryStatus): {
-  label: string;
-  variant: "success" | "destructive" | "warning" | "secondary";
-} {
-  switch (status) {
-    case "high_increase":
-      return { label: "Yuqori o'sish", variant: "destructive" };
-    case "increase":
-      return { label: "O'sish", variant: "warning" };
-    case "saving":
-      return { label: "Tejash", variant: "success" };
-    case "new_expense":
-      return { label: "Yangi", variant: "warning" };
-    default:
-      return { label: "Barqaror", variant: "secondary" };
-  }
-}
-
-function paymentStatusBadge(status: ExpenseDetailRow["paymentStatus"]) {
-  if (status === "paid") return { label: "To'langan", variant: "success" as const };
-  if (status === "unpaid")
-    return { label: "To'lanmagan", variant: "warning" as const };
-  return { label: "Rejalashtirilgan", variant: "secondary" as const };
+function DiffMetricCard({
+  title,
+  metric,
+  unit = "currency",
+  invertColors = false,
+  loading,
+}: {
+  title: string;
+  metric: DiffMetric;
+  unit?: "currency" | "count" | "percent_points";
+  invertColors?: boolean;
+  loading?: boolean;
+}) {
+  const tone = directionTone(metric, invertColors);
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        {loading ? (
+          <Skeleton className="mt-2 h-20 w-full" />
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {formatValue(metric.base, unit)} → {formatValue(metric.compare, unit)}
+            </p>
+            <p className={cn("mt-2 text-xl font-bold tracking-tight", toneClass(tone))}>
+              {metric.arrow} {metric.diffLabel}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span className={cn("font-semibold", toneClass(tone))}>
+                {metric.percentLabel}
+              </span>
+              <Badge
+                variant={
+                  metric.direction === "up"
+                    ? invertColors
+                      ? "destructive"
+                      : "success"
+                    : metric.direction === "down"
+                      ? invertColors
+                        ? "success"
+                        : "destructive"
+                      : metric.direction === "new"
+                        ? "warning"
+                        : "secondary"
+                }
+              >
+                {metric.statusLabel}
+              </Badge>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function ComparisonMetricCard({
@@ -139,7 +175,7 @@ function ComparisonMetricCard({
   loading?: boolean;
   expenseStyle?: boolean;
 }) {
-  const tone = deltaTone(metric.improved, expenseStyle);
+  const tone = directionTone(metric.metric, expenseStyle);
   return (
     <Card>
       <CardContent className="p-5">
@@ -154,8 +190,9 @@ function ComparisonMetricCard({
                   {formatCurrency(metric.compare)}
                 </p>
                 <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                  <p>1-oy: {formatCurrency(metric.base)}</p>
-                  <p>2-oy: {formatCurrency(metric.compare)}</p>
+                  <p>
+                    {formatCurrency(metric.base)} → {formatCurrency(metric.compare)}
+                  </p>
                 </div>
               </>
             )}
@@ -171,25 +208,25 @@ function ComparisonMetricCard({
               toneClass(tone)
             )}
           >
-            {metric.diff === 0 ? (
-              <Minus className="size-4" />
-            ) : metric.diff > 0 ? (
-              <ArrowUpRight className="size-4" />
-            ) : (
-              <ArrowDownRight className="size-4" />
-            )}
             <span>
-              Farq: {metric.diff > 0 ? "+" : ""}
-              {formatCurrency(metric.diff)}
+              {metric.metric.arrow} {metric.metric.diffLabel}
             </span>
-            <span className="font-medium">
-              ({formatPercentLabel(metric.percent)})
+            <span className="font-medium">({metric.metric.percentLabel})</span>
+            <span className="text-xs font-normal opacity-80">
+              {metric.metric.statusLabel}
             </span>
           </div>
         )}
       </CardContent>
     </Card>
   );
+}
+
+function paymentStatusBadge(status: ExpenseDetailRow["paymentStatus"]) {
+  if (status === "paid") return { label: "To'langan", variant: "success" as const };
+  if (status === "unpaid")
+    return { label: "To'lanmagan", variant: "warning" as const };
+  return { label: "Rejalashtirilgan", variant: "secondary" as const };
 }
 
 function MonthSummaryCard({
@@ -537,8 +574,44 @@ function OverviewTab({
   result: MonthlyComparisonResult;
   loading: boolean;
 }) {
+  const d = result.overviewDiffs;
   return (
     <div className="space-y-6">
+      <div>
+        <h3 className="mb-3 text-sm font-semibold">Umumiy farqlar</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <DiffMetricCard
+            title="Jami kirim farqi"
+            metric={d.income}
+            loading={loading}
+          />
+          <DiffMetricCard
+            title="Haqiqiy chiqim farqi"
+            metric={d.paidExpense}
+            invertColors
+            loading={loading}
+          />
+          <DiffMetricCard
+            title="Sof natija farqi"
+            metric={d.net}
+            loading={loading}
+          />
+          <DiffMetricCard
+            title="Xarajat/kirim nisbati farqi"
+            metric={d.expenseToIncomeRatio}
+            unit="percent_points"
+            invertColors
+            loading={loading}
+          />
+          <DiffMetricCard
+            title="Taxminiy tejash imkoniyati"
+            metric={d.estimatedSavings}
+            invertColors
+            loading={loading}
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <MonthSummaryCard
           title="1-oy xulosasi"
@@ -691,9 +764,25 @@ function OverviewTab({
                 </TableHeader>
                 <TableBody>
                   {result.categories.map((row) => {
-                    const badge = statusBadge(row.status);
-                    const tone =
-                      row.diff > 0 ? "bad" : row.diff < 0 ? "good" : "neutral";
+                    const tone = directionTone(
+                      {
+                        direction: row.direction,
+                        base: row.baseAmount,
+                        compare: row.compareAmount,
+                        diff: row.diff,
+                        percent: row.percent.percent,
+                        statusLabel: row.statusLabel,
+                        arrow:
+                          row.direction === "up"
+                            ? "↑"
+                            : row.direction === "down"
+                              ? "↓"
+                              : "→",
+                        diffLabel: row.diffLabel,
+                        percentLabel: row.percentLabel,
+                      },
+                      true
+                    );
                     return (
                       <TableRow key={row.key}>
                         <TableCell className="font-medium">{row.label}</TableCell>
@@ -702,12 +791,25 @@ function OverviewTab({
                           {formatCurrency(row.compareAmount)}
                         </TableCell>
                         <TableCell className={toneClass(tone)}>
-                          {row.diff > 0 ? "+" : ""}
-                          {formatCurrency(row.diff)}
+                          {row.diffLabel}
                         </TableCell>
-                        <TableCell>{formatPercentLabel(row.percent)}</TableCell>
+                        <TableCell className={toneClass(tone)}>
+                          {row.percentLabel}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                          <Badge
+                            variant={
+                              row.direction === "up"
+                                ? "destructive"
+                                : row.direction === "down"
+                                  ? "success"
+                                  : row.direction === "new"
+                                    ? "warning"
+                                    : "secondary"
+                            }
+                          >
+                            {row.statusLabel}
+                          </Badge>
                         </TableCell>
                         <TableCell className="max-w-[220px] text-sm text-muted-foreground">
                           {row.recommendation}
@@ -805,7 +907,10 @@ export function MonthlyComparisonSection({
     apiData.compare.year === compareMonth.year &&
     apiData.compare.month === compareMonth.month &&
     Array.isArray(apiData.baseExpenses) &&
-    Array.isArray(apiData.baseIncomes)
+    Array.isArray(apiData.baseIncomes) &&
+    apiData.incomeDiffs &&
+    apiData.expenseDiffs &&
+    apiData.overviewDiffs
       ? apiData
       : localResult;
 
@@ -915,6 +1020,27 @@ export function MonthlyComparisonSection({
         </TabsContent>
 
         <TabsContent value="income" className="space-y-4">
+          <div>
+            <h3 className="mb-3 text-sm font-semibold">Kirimlar farqi</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <DiffMetricCard
+                title="Jami kirim farqi"
+                metric={result.incomeDiffs.totalIncome}
+                loading={loading}
+              />
+              <DiffMetricCard
+                title="To'lovlar soni farqi"
+                metric={result.incomeDiffs.paymentCount}
+                unit="count"
+                loading={loading}
+              />
+              <DiffMetricCard
+                title="O'rtacha to'lov farqi"
+                metric={result.incomeDiffs.averagePayment}
+                loading={loading}
+              />
+            </div>
+          </div>
           <IncomeMonthBlock
             key={`income-base-${result.base.label}`}
             title="1-oy kirimlari"
@@ -932,6 +1058,118 @@ export function MonthlyComparisonSection({
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-4">
+          <div>
+            <h3 className="mb-3 text-sm font-semibold">Xarajatlar farqi</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <DiffMetricCard
+                title="Jami kiritilgan xarajat"
+                metric={result.expenseDiffs.listedTotal}
+                invertColors
+                loading={loading}
+              />
+              <DiffMetricCard
+                title="Haqiqiy to'langan chiqim"
+                metric={result.expenseDiffs.paidOutflow}
+                invertColors
+                loading={loading}
+              />
+              <DiffMetricCard
+                title="Rejalashtirilgan/to'lanmagan"
+                metric={result.expenseDiffs.planned}
+                invertColors
+                loading={loading}
+              />
+              <DiffMetricCard
+                title="Xarajatlar soni"
+                metric={result.expenseDiffs.expenseCount}
+                unit="count"
+                invertColors
+                loading={loading}
+              />
+              <DiffMetricCard
+                title="O'rtacha xarajat"
+                metric={result.expenseDiffs.averageExpense}
+                invertColors
+                loading={loading}
+              />
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Kategoriyalar farqi</CardTitle>
+              <CardDescription>
+                Faqat haqiqiy to&apos;langan chiqim bo&apos;yicha
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-40 w-full" />
+              ) : result.categories.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Kategoriya farqlari yo&apos;q
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Xarajat turi</TableHead>
+                        <TableHead>1-oy</TableHead>
+                        <TableHead>2-oy</TableHead>
+                        <TableHead>Farq</TableHead>
+                        <TableHead>O&apos;zgarish %</TableHead>
+                        <TableHead>Holat</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.categories.map((row) => (
+                        <TableRow key={`exp-cat-${row.key}`}>
+                          <TableCell className="font-medium">
+                            {row.label}
+                          </TableCell>
+                          <TableCell>
+                            {formatCurrency(row.baseAmount)}
+                          </TableCell>
+                          <TableCell>
+                            {formatCurrency(row.compareAmount)}
+                          </TableCell>
+                          <TableCell
+                            className={toneClass(
+                              row.direction === "up"
+                                ? "bad"
+                                : row.direction === "down"
+                                  ? "good"
+                                  : "neutral"
+                            )}
+                          >
+                            {row.diffLabel}
+                          </TableCell>
+                          <TableCell>{row.percentLabel}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                row.direction === "up"
+                                  ? "destructive"
+                                  : row.direction === "down"
+                                    ? "success"
+                                    : row.direction === "new"
+                                      ? "warning"
+                                      : "secondary"
+                              }
+                            >
+                              {row.statusLabel}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
               <div className="relative min-w-0 flex-1">

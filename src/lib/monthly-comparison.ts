@@ -36,6 +36,31 @@ export type PercentChange = {
   label: string;
 };
 
+/** O'sish / kamayish yo'nalishi */
+export type DiffDirection = "up" | "down" | "same" | "new";
+
+export type DiffUnit = "currency" | "count" | "percent_points";
+
+/**
+ * farq = compare − base
+ * foiz = (farq / base) × 100  (2 kasr)
+ */
+export type DiffMetric = {
+  base: number;
+  compare: number;
+  diff: number;
+  percent: number | null;
+  direction: DiffDirection;
+  /** O'sdi | Kamaydi | O'zgarmadi | Yangi */
+  statusLabel: string;
+  /** ↑ +… | ↓ −… | → */
+  arrow: "↑" | "↓" | "→";
+  /** Masalan: +4 150 UZS yoki +5 ta */
+  diffLabel: string;
+  /** Masalan: +4.62% yoki Yangi */
+  percentLabel: string;
+};
+
 export type ExpensePaymentStatus = "paid" | "planned" | "unpaid";
 
 export type IncomeDetailRow = {
@@ -92,6 +117,8 @@ export type MonthTotals = {
   expenseCount: number;
   paidExpenseCount: number;
   plannedExpenseCount: number;
+  /** O'rtacha xarajat (barcha ro'yxatdagi) */
+  averageExpense: number;
 };
 
 export type CategoryStatus =
@@ -111,6 +138,11 @@ export type CategoryComparisonRow = {
   percent: PercentChange;
   status: CategoryStatus;
   recommendation: string;
+  /** Holat: O'sdi / Kamaydi / … */
+  statusLabel: string;
+  diffLabel: string;
+  percentLabel: string;
+  direction: DiffDirection;
 };
 
 export type MetricDelta = {
@@ -119,6 +151,29 @@ export type MetricDelta = {
   diff: number;
   percent: PercentChange;
   improved: boolean | null;
+  metric: DiffMetric;
+};
+
+export type IncomeDiffPanel = {
+  totalIncome: DiffMetric;
+  paymentCount: DiffMetric;
+  averagePayment: DiffMetric;
+};
+
+export type ExpenseDiffPanel = {
+  listedTotal: DiffMetric;
+  paidOutflow: DiffMetric;
+  planned: DiffMetric;
+  expenseCount: DiffMetric;
+  averageExpense: DiffMetric;
+};
+
+export type OverviewDiffPanel = {
+  income: DiffMetric;
+  paidExpense: DiffMetric;
+  net: DiffMetric;
+  expenseToIncomeRatio: DiffMetric;
+  estimatedSavings: DiffMetric;
 };
 
 export type MonthlyComparisonResult = {
@@ -130,6 +185,9 @@ export type MonthlyComparisonResult = {
   plannedExpense: MetricDelta;
   net: MetricDelta;
   estimatedSavingsOpportunity: number;
+  incomeDiffs: IncomeDiffPanel;
+  expenseDiffs: ExpenseDiffPanel;
+  overviewDiffs: OverviewDiffPanel;
   categories: CategoryComparisonRow[];
   topIncreases: CategoryComparisonRow[];
   topDecreases: CategoryComparisonRow[];
@@ -145,6 +203,121 @@ export type MonthlyComparisonResult = {
   baseExpenses: ExpenseDetailRow[];
   compareExpenses: ExpenseDetailRow[];
 };
+
+/** Unicode minus (−), ASCII hyphen emas */
+const MINUS = "\u2212";
+
+/** Raqamni bo'shliqli format: 4150 → "4 150" (oddiy space) */
+export function formatAmountSpaces(value: number): string {
+  const n = Math.round(Number.isFinite(value) ? value : 0);
+  const abs = Math.abs(n);
+  return new Intl.NumberFormat("uz-UZ", { maximumFractionDigits: 0 })
+    .format(abs)
+    .replace(/[\u00a0\u202f]/g, " ");
+}
+
+/** Absolut summa: 1 000 000 UZS */
+export function formatAbsCurrency(value: number): string {
+  return `${formatAmountSpaces(value)} UZS`;
+}
+
+/** +4 150 UZS | −733 UZS | 0 UZS */
+export function formatSignedCurrency(diff: number): string {
+  if (!Number.isFinite(diff) || diff === 0) return `0 UZS`;
+  const sign = diff > 0 ? "+" : MINUS;
+  return `${sign}${formatAmountSpaces(diff)} UZS`;
+}
+
+/** +5 ta | −3 ta | 0 ta */
+export function formatSignedCount(diff: number): string {
+  if (!Number.isFinite(diff) || diff === 0) return `0 ta`;
+  const sign = diff > 0 ? "+" : MINUS;
+  return `${sign}${formatAmountSpaces(diff)} ta`;
+}
+
+/** +4.62% | −16.31% | 0.00% */
+export function formatSignedPercent(percent: number): string {
+  if (!Number.isFinite(percent)) return "O'zgarish yo'q";
+  if (percent === 0) return "0.00%";
+  const sign = percent > 0 ? "+" : MINUS;
+  return `${sign}${Math.abs(percent).toFixed(2)}%`;
+}
+
+/**
+ * farq = compare − base
+ * foiz = (farq / base) × 100
+ */
+export function computeDiffMetric(
+  base: number,
+  compare: number,
+  unit: DiffUnit = "currency"
+): DiffMetric {
+  const b = Number.isFinite(base) ? base : 0;
+  const c = Number.isFinite(compare) ? compare : 0;
+  const diff = c - b;
+
+  let percent: number | null;
+  let direction: DiffDirection;
+  let statusLabel: string;
+  let percentLabel: string;
+
+  if (b === 0 && c === 0) {
+    percent = 0;
+    direction = "same";
+    statusLabel = "O'zgarmadi";
+    percentLabel = "O'zgarish yo'q";
+  } else if (b === 0 && c !== 0) {
+    percent = null;
+    direction = "new";
+    statusLabel = "Yangi";
+    percentLabel = "Yangi";
+  } else {
+    percent = (diff / Math.abs(b)) * 100;
+    // Floating noise → 0
+    if (Math.abs(percent) < 0.005) percent = 0;
+    if (diff === 0 || percent === 0) {
+      direction = "same";
+      statusLabel = "O'zgarmadi";
+      percentLabel = formatSignedPercent(0);
+    } else if (diff > 0) {
+      direction = "up";
+      statusLabel = "O'sdi";
+      percentLabel = formatSignedPercent(percent);
+    } else {
+      direction = "down";
+      statusLabel = "Kamaydi";
+      percentLabel = formatSignedPercent(percent);
+    }
+  }
+
+  const arrow: DiffMetric["arrow"] =
+    direction === "up" ? "↑" : direction === "down" ? "↓" : "→";
+
+  let diffLabel: string;
+  if (unit === "count") {
+    diffLabel = formatSignedCount(diff);
+  } else if (unit === "percent_points") {
+    if (diff === 0) diffLabel = "0.00 p.p.";
+    else {
+      const sign = diff > 0 ? "+" : MINUS;
+      diffLabel = `${sign}${Math.abs(diff).toFixed(2)} p.p.`;
+    }
+  } else {
+    diffLabel = formatSignedCurrency(diff);
+  }
+
+  return {
+    base: b,
+    compare: c,
+    diff,
+    percent,
+    direction,
+    statusLabel,
+    arrow,
+    diffLabel,
+    percentLabel,
+  };
+}
 
 export const COMPARISON_PAGE_SIZE = 25;
 
@@ -218,24 +391,18 @@ export function percentChange(
     return { kind: "ok", percent: 0, label: "O'zgarish yo'q" };
   }
   if (base === 0 && compare !== 0) {
-    if (opts?.asExpenseCategory) {
-      return {
-        kind: "new_expense",
-        percent: null,
-        label: "Yangi xarajat",
-      };
-    }
     return {
-      kind: "no_base",
+      kind: opts?.asExpenseCategory ? "new_expense" : "no_base",
       percent: null,
-      label: "Taqqoslash uchun baza yo'q",
+      label: "Yangi",
     };
   }
-  const percent = ((compare - base) / Math.abs(base)) * 100;
+  let percent = ((compare - base) / Math.abs(base)) * 100;
+  if (Math.abs(percent) < 0.005) percent = 0;
   return {
     kind: "ok",
     percent,
-    label: `${percent >= 0 ? "+" : ""}${percent.toFixed(1)}%`,
+    label: formatSignedPercent(percent),
   };
 }
 
@@ -545,11 +712,13 @@ export function classifyCategoryChange(
   compare: number
 ): { status: CategoryStatus; recommendation: string; percent: PercentChange } {
   const percent = percentChange(base, compare, { asExpenseCategory: true });
+  const diff = compare - base;
+  const metric = computeDiffMetric(base, compare, "currency");
 
-  if (percent.kind === "new_expense") {
+  if (percent.kind === "new_expense" || metric.direction === "new") {
     return {
       status: "new_expense",
-      recommendation: "Yangi xarajat paydo bo'lgan",
+      recommendation: `Yangi xarajat: ${formatSignedCurrency(compare).replace(/^\+/, "")}`,
       percent,
     };
   }
@@ -565,10 +734,9 @@ export function classifyCategoryChange(
   const pct = percent.percent ?? 0;
 
   if (pct <= -0.01) {
-    const abs = Math.abs(pct).toFixed(0);
     return {
       status: "saving",
-      recommendation: `Xarajat ${abs}% kamaygan`,
+      recommendation: `Xarajat ${formatAbsCurrency(Math.abs(diff))}ga yoki ${formatSignedPercent(pct)}ga kamaygan`,
       percent,
     };
   }
@@ -584,14 +752,14 @@ export function classifyCategoryChange(
   if (pct >= 20) {
     return {
       status: "high_increase",
-      recommendation: `Xarajat ${pct.toFixed(0)}% oshgan — sarfni tekshiring`,
+      recommendation: `Xarajat ${formatAbsCurrency(Math.abs(diff))}ga yoki ${formatSignedPercent(pct)}ga oshgan — sarfni tekshiring`,
       percent,
     };
   }
 
   return {
     status: "increase",
-    recommendation: `Xarajat ${pct.toFixed(0)}% oshgan — sarfni tekshiring`,
+    recommendation: `Xarajat ${formatAbsCurrency(Math.abs(diff))}ga yoki ${formatSignedPercent(pct)}ga oshgan — sarfni tekshiring`,
     percent,
   };
 }
@@ -599,23 +767,24 @@ export function classifyCategoryChange(
 function refineRecommendation(
   label: string,
   status: CategoryStatus,
-  percent: PercentChange
+  percent: PercentChange,
+  diff: number
 ): string {
-  const pct =
-    percent.percent != null ? Math.abs(percent.percent).toFixed(0) : null;
+  const pct = percent.percent;
+  const absAmt = formatAbsCurrency(Math.abs(diff));
 
   switch (status) {
     case "new_expense":
       return "Yangi xarajat paydo bo'lgan";
     case "saving":
-      return pct
-        ? `${label} xarajati ${pct}% kamaygan`
+      return pct != null
+        ? `${label} xarajati ${absAmt}ga yoki ${formatSignedPercent(pct)}ga kamaygan`
         : `${label} xarajati kamaygan`;
     case "high_increase":
     case "increase":
-      return pct
-        ? `${label} xarajati ${pct}% oshgan — sarfni tekshiring`
-        : `${label} xarajati oshgan — sarfni tekshiring`;
+      return pct != null
+        ? `${label} xarajati ${absAmt}ga yoki ${formatSignedPercent(pct)}ga oshgan`
+        : `${label} xarajati oshgan`;
     case "stable":
     case "unchanged":
     default:
@@ -673,6 +842,8 @@ function buildMonthTotals(
     expenseCount: expenseRows.length,
     paidExpenseCount: paid.length,
     plannedExpenseCount: planned.length,
+    averageExpense:
+      expenseRows.length > 0 ? listedTotal / expenseRows.length : 0,
     byCategory,
     labels,
     incomes,
@@ -711,19 +882,26 @@ export function buildMonthlyComparison(input: {
       labelForCategoryKey(key);
 
     const classified = classifyCategoryChange(baseAmount, compareAmount);
+    const metric = computeDiffMetric(baseAmount, compareAmount, "currency");
+    const diff = compareAmount - baseAmount;
     categories.push({
       key,
       label,
       baseAmount,
       compareAmount,
-      diff: compareAmount - baseAmount,
+      diff,
       percent: classified.percent,
       status: classified.status,
       recommendation: refineRecommendation(
         label,
         classified.status,
-        classified.percent
+        classified.percent,
+        diff
       ),
+      statusLabel: metric.statusLabel,
+      diffLabel: metric.diffLabel,
+      percentLabel: metric.percentLabel,
+      direction: metric.direction,
     });
   }
 
@@ -749,6 +927,80 @@ export function buildMonthlyComparison(input: {
   const netPct = percentChange(base.net, compare.net);
   const netDiff = compare.net - base.net;
 
+  const incomeDiffs: IncomeDiffPanel = {
+    totalIncome: computeDiffMetric(base.income, compare.income, "currency"),
+    paymentCount: computeDiffMetric(
+      base.paymentCount,
+      compare.paymentCount,
+      "count"
+    ),
+    averagePayment: computeDiffMetric(
+      base.averagePayment,
+      compare.averagePayment,
+      "currency"
+    ),
+  };
+
+  const expenseDiffs: ExpenseDiffPanel = {
+    listedTotal: computeDiffMetric(
+      base.listedExpenseTotal,
+      compare.listedExpenseTotal,
+      "currency"
+    ),
+    paidOutflow: computeDiffMetric(base.expense, compare.expense, "currency"),
+    planned: computeDiffMetric(
+      base.plannedExpense,
+      compare.plannedExpense,
+      "currency"
+    ),
+    expenseCount: computeDiffMetric(
+      base.expenseCount,
+      compare.expenseCount,
+      "count"
+    ),
+    averageExpense: computeDiffMetric(
+      base.averageExpense,
+      compare.averageExpense,
+      "currency"
+    ),
+  };
+
+  const baseRatio = base.expenseToIncomeRatioPercent ?? 0;
+  const compareRatio = compare.expenseToIncomeRatioPercent ?? 0;
+  const overviewDiffs: OverviewDiffPanel = {
+    income: incomeDiffs.totalIncome,
+    paidExpense: expenseDiffs.paidOutflow,
+    net: computeDiffMetric(base.net, compare.net, "currency"),
+    expenseToIncomeRatio: computeDiffMetric(
+      baseRatio,
+      compareRatio,
+      "percent_points"
+    ),
+    estimatedSavings: computeDiffMetric(
+      0,
+      estimatedSavingsOpportunity,
+      "currency"
+    ),
+  };
+
+  function toMetricDelta(
+    b: number,
+    c: number,
+    pct: PercentChange,
+    unit: DiffUnit,
+    improved: boolean | null
+  ): MetricDelta {
+    const metric = computeDiffMetric(b, c, unit);
+    return {
+      base: b,
+      compare: c,
+      diff: c - b,
+      percent: pct,
+      improved,
+      metric,
+    };
+  }
+
   const toPublic = (m: typeof base): MonthTotals => ({
     year: m.year,
     month: m.month,
@@ -764,45 +1016,45 @@ export function buildMonthlyComparison(input: {
     expenseCount: m.expenseCount,
     paidExpenseCount: m.paidExpenseCount,
     plannedExpenseCount: m.plannedExpenseCount,
+    averageExpense: m.averageExpense,
   });
 
   return {
     base: toPublic(base),
     compare: toPublic(compare),
     sameMonth,
-    income: {
-      base: base.income,
-      compare: compare.income,
-      diff: compare.income - base.income,
-      percent: incomePct,
-      improved:
-        compare.income === base.income ? null : compare.income > base.income,
-    },
-    expense: {
-      base: base.expense,
-      compare: compare.expense,
-      diff: compare.expense - base.expense,
-      percent: expensePct,
-      improved:
-        compare.expense === base.expense
-          ? null
-          : compare.expense < base.expense,
-    },
-    plannedExpense: {
-      base: base.plannedExpense,
-      compare: compare.plannedExpense,
-      diff: compare.plannedExpense - base.plannedExpense,
-      percent: plannedPct,
-      improved: null,
-    },
-    net: {
-      base: base.net,
-      compare: compare.net,
-      diff: netDiff,
-      percent: netPct,
-      improved: netDiff === 0 ? null : netDiff > 0,
-    },
+    income: toMetricDelta(
+      base.income,
+      compare.income,
+      incomePct,
+      "currency",
+      compare.income === base.income ? null : compare.income > base.income
+    ),
+    expense: toMetricDelta(
+      base.expense,
+      compare.expense,
+      expensePct,
+      "currency",
+      compare.expense === base.expense ? null : compare.expense < base.expense
+    ),
+    plannedExpense: toMetricDelta(
+      base.plannedExpense,
+      compare.plannedExpense,
+      plannedPct,
+      "currency",
+      null
+    ),
+    net: toMetricDelta(
+      base.net,
+      compare.net,
+      netPct,
+      "currency",
+      netDiff === 0 ? null : netDiff > 0
+    ),
     estimatedSavingsOpportunity,
+    incomeDiffs,
+    expenseDiffs,
+    overviewDiffs,
     categories,
     topIncreases,
     topDecreases,

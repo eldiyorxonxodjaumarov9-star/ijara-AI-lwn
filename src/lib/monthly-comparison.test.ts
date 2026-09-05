@@ -3,7 +3,11 @@ import { describe, it } from "node:test";
 
 import {
   buildMonthlyComparison,
+  computeDiffMetric,
   filterExpenseRows,
+  formatSignedCount,
+  formatSignedCurrency,
+  formatSignedPercent,
   isInTashkentMonth,
   isPlannedUnpaidExpense,
   listExpenseRows,
@@ -286,6 +290,79 @@ describe("monthly-comparison: expenses detail", () => {
   });
 });
 
+describe("monthly-comparison: signed diffs and formats", () => {
+  it("formats positive/negative UZS and percent with 2 decimals", () => {
+    assert.equal(formatSignedCurrency(4150), "+4 150 UZS");
+    assert.equal(formatSignedCurrency(-733), "\u2212733 UZS");
+    assert.equal(formatSignedCurrency(0), "0 UZS");
+    assert.equal(formatSignedPercent(4.617), "+4.62%");
+    assert.equal(formatSignedPercent(-16.311), "\u221216.31%");
+    assert.equal(formatSignedCount(5), "+5 ta");
+  });
+
+  it("handles zero base without Infinity/NaN", () => {
+    const zero = computeDiffMetric(0, 0, "currency");
+    assert.equal(zero.statusLabel, "O'zgarmadi");
+    assert.equal(zero.percentLabel, "O'zgarish yo'q");
+    assert.equal(zero.percent, 0);
+
+    const neu = computeDiffMetric(0, 100, "currency");
+    assert.equal(neu.direction, "new");
+    assert.equal(neu.statusLabel, "Yangi");
+    assert.equal(neu.percent, null);
+    assert.equal(neu.percentLabel, "Yangi");
+  });
+
+  it("matches July→August income example numbers", () => {
+    const total = computeDiffMetric(89880, 94030, "currency");
+    assert.equal(total.diff, 4150);
+    assert.equal(total.diffLabel, "+4 150 UZS");
+    assert.equal(total.statusLabel, "O'sdi");
+    assert.equal(total.percentLabel, "+4.62%");
+
+    const count = computeDiffMetric(20, 25, "count");
+    assert.equal(count.diffLabel, "+5 ta");
+    assert.equal(count.percentLabel, "+25.00%");
+
+    const avg = computeDiffMetric(4494, 3761, "currency");
+    assert.equal(avg.diff, -733);
+    assert.equal(avg.diffLabel, "\u2212733 UZS");
+    assert.equal(avg.statusLabel, "Kamaydi");
+    assert.equal(avg.percentLabel, "\u221216.31%");
+  });
+
+  it("marks expense increase as up (red in UI)", () => {
+    const exp = computeDiffMetric(1000000, 1200000, "currency");
+    assert.equal(exp.direction, "up");
+    assert.equal(exp.diffLabel, "+200 000 UZS");
+    assert.equal(exp.percentLabel, "+20.00%");
+  });
+
+  it("builds incomeDiffs on full totals not page slice", () => {
+    const payments = Array.from({ length: 30 }, (_, i) =>
+      payment({
+        id: `p${i}`,
+        amount: i < 20 ? 1000 : 2000,
+        periodYear: 2026,
+        periodMonth: i < 20 ? 7 : 8,
+      })
+    );
+    // July: 20 * 1000 = 20000; Aug: 10 * 2000 = 20000
+    const result = buildMonthlyComparison({
+      payments,
+      expenses: [],
+      baseMonth: { year: 2026, month: 7 },
+      compareMonth: { year: 2026, month: 8 },
+    });
+    assert.equal(result.incomeDiffs.paymentCount.base, 20);
+    assert.equal(result.incomeDiffs.paymentCount.compare, 10);
+    assert.equal(result.baseIncomes.length, 20);
+    const page = paginateRows(result.baseIncomes, 1, 25);
+    assert.equal(page.items.length, 20);
+    assert.equal(result.incomeDiffs.totalIncome.base, 20000);
+  });
+});
+
 describe("monthly-comparison: net, percent, zero base", () => {
   it("computes net = income - paid expense (not planned)", () => {
     const result = buildMonthlyComparison({
@@ -340,16 +417,17 @@ describe("monthly-comparison: net, percent, zero base", () => {
     const p = percentChange(0, 500, { asExpenseCategory: true });
     assert.equal(p.kind, "new_expense");
     assert.equal(p.percent, null);
-    assert.match(p.label, /Yangi xarajat/i);
+    assert.equal(p.label, "Yangi");
 
     const p2 = percentChange(0, 500);
     assert.equal(p2.kind, "no_base");
     assert.equal(p2.percent, null);
-    assert.match(p2.label, /baza yo'q/i);
+    assert.equal(p2.label, "Yangi");
 
     const p3 = percentChange(100, 125);
     assert.equal(p3.kind, "ok");
     assert.equal(p3.percent, 25);
+    assert.equal(p3.label, "+25.00%");
   });
 
   it("July vs August comparison with category recommendations", () => {
@@ -423,17 +501,24 @@ describe("monthly-comparison: net, percent, zero base", () => {
     const el = result.categories.find((c) => c.key === "monthly:electricity");
     assert.ok(el);
     assert.equal(el!.status, "high_increase");
-    assert.match(el!.recommendation, /25% oshgan/i);
+    assert.match(el!.recommendation, /25\.00%ga oshgan/i);
+    assert.equal(el!.statusLabel, "O'sdi");
+    assert.equal(el!.diffLabel, "+25 UZS");
 
     const su = result.categories.find((c) => c.key === "monthly:water");
     assert.ok(su);
     assert.equal(su!.status, "saving");
+    assert.equal(su!.statusLabel, "Kamaydi");
 
     const office = result.categories.find((c) => c.key === "monthly:office");
     assert.ok(office);
     assert.equal(office!.status, "new_expense");
+    assert.equal(office!.statusLabel, "Yangi");
 
     assert.equal(result.estimatedSavingsOpportunity, 25 + 50);
     assert.equal(result.sameMonth, false);
+    assert.ok(result.incomeDiffs);
+    assert.ok(result.expenseDiffs);
+    assert.ok(result.overviewDiffs);
   });
 });

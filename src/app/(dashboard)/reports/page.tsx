@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { BarCompareChart } from "@/components/charts/bar-compare-chart";
+import { MonthlyComparisonSection } from "@/components/reports/monthly-comparison-section";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCollection } from "@/hooks/use-collection";
 import {
   buildPaymentReportRows,
@@ -152,8 +154,16 @@ function ReportsContent() {
     <div className="space-y-6">
       <PageHeader
         title="Hisobotlar"
-        description="To'lovlar ro'yxati, ism-familiya va umumiy summa."
-        action={
+        description="To'lovlar, oylik xulosa va oylarni solishtirish."
+      />
+
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:w-auto">
+          <TabsTrigger value="overview">Oylik hisobot</TabsTrigger>
+          <TabsTrigger value="compare">Oylarni solishtirish</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
             <Select value={month} onValueChange={setMonth}>
               <SelectTrigger className="w-36">
@@ -186,100 +196,113 @@ function ReportsContent() {
               <FileText className="size-4" /> PDF
             </Button>
           </div>
-        }
-      />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
-          title="Jami to'langan"
-          value={formatCurrency(totals.income)}
-          icon={Banknote}
-          tone="primary"
-          loading={loading}
-        />
-        <StatCard
-          title="Jami xarajat"
-          value={formatCurrency(totals.expense)}
-          icon={Receipt}
-          tone="rose"
-          loading={loading}
-          index={1}
-        />
-        <StatCard
-          title="Sof foyda"
-          value={formatCurrency(totals.profit)}
-          icon={TrendingUp}
-          tone="violet"
-          loading={loading}
-          index={2}
-        />
-      </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <StatCard
+              title="Jami to'langan"
+              value={formatCurrency(totals.income)}
+              icon={Banknote}
+              tone="primary"
+              loading={loading}
+            />
+            <StatCard
+              title="Jami xarajat"
+              value={formatCurrency(totals.expense)}
+              icon={Receipt}
+              tone="rose"
+              loading={loading}
+              index={1}
+            />
+            <StatCard
+              title="Sof foyda"
+              value={formatCurrency(totals.profit)}
+              icon={TrendingUp}
+              tone="violet"
+              loading={loading}
+              index={2}
+            />
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>To&apos;lovlar ro&apos;yxati</CardTitle>
-          <CardDescription>
-            Har bir arendatorning ism-familiyasi va berilgan summa ({periodLabel})
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-[280px] w-full" />
-          ) : paymentRows.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              Tanlangan davrda to&apos;lovlar yo&apos;q
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {reportHead.map((h) => (
-                      <TableHead key={h}>{h}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentRows.map((r) => (
-                    <TableRow key={`${r.index}-${r.date}-${r.tenantName}`}>
-                      <TableCell>{r.index}</TableCell>
-                      <TableCell className="font-medium">{r.tenantName}</TableCell>
-                      <TableCell>{r.propertyName}</TableCell>
-                      <TableCell>{formatDate(r.date)}</TableCell>
-                      <TableCell>{formatCurrency(r.amount)}</TableCell>
-                      <TableCell>{PAYMENT_METHOD_MAP[r.method] ?? r.method}</TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell />
-                    <TableCell>JAMI</TableCell>
-                    <TableCell />
-                    <TableCell>{paymentRows.length} ta</TableCell>
-                    <TableCell className="text-primary">
-                      {formatCurrency(totals.income)}
-                    </TableCell>
-                    <TableCell />
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>To&apos;lovlar ro&apos;yxati</CardTitle>
+              <CardDescription>
+                Har bir arendatorning ism-familiyasi va berilgan summa (
+                {periodLabel})
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-[280px] w-full" />
+              ) : paymentRows.length === 0 ? (
+                <p className="py-12 text-center text-sm text-muted-foreground">
+                  Tanlangan davrda to&apos;lovlar yo&apos;q
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {reportHead.map((h) => (
+                          <TableHead key={h}>{h}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paymentRows.map((r) => (
+                        <TableRow key={`${r.index}-${r.date}-${r.tenantName}`}>
+                          <TableCell>{r.index}</TableCell>
+                          <TableCell className="font-medium">
+                            {r.tenantName}
+                          </TableCell>
+                          <TableCell>{r.propertyName}</TableCell>
+                          <TableCell>{formatDate(r.date)}</TableCell>
+                          <TableCell>{formatCurrency(r.amount)}</TableCell>
+                          <TableCell>
+                            {PAYMENT_METHOD_MAP[r.method] ?? r.method}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell />
+                        <TableCell>JAMI</TableCell>
+                        <TableCell />
+                        <TableCell>{paymentRows.length} ta</TableCell>
+                        <TableCell className="text-primary">
+                          {formatCurrency(totals.income)}
+                        </TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daromad va xarajat taqqoslamasi</CardTitle>
-          <CardDescription>Oylik kesimda</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-[320px] w-full" />
-          ) : (
-            <BarCompareChart data={series} />
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Daromad va xarajat taqqoslamasi</CardTitle>
+              <CardDescription>Oylik kesimda</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-[320px] w-full" />
+              ) : (
+                <BarCompareChart data={series} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="compare">
+          <MonthlyComparisonSection
+            payments={payments}
+            expenses={expenses}
+            collectionLoading={loading}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

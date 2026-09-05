@@ -1,7 +1,7 @@
 /**
  * Oylarni solishtirish — sof hisob-kitob (UI/API umumiy).
- * Kirim: faqat haqiqiy Payment yozuvlari.
- * Xarajat: faqat haqiqiy Expense yozuvlari (reja/takroriy shablon qo'shilmaydi).
+ * Kirim: faqat haqiqiy Payment yozuvlari (qarz/sintetik emas).
+ * Xarajat: barcha Expense yozuvlari ro'yxatda; reja/to'lanmagan chiqimga qo'shilmaydi.
  * Sana chegaralari: Asia/Tashkent (oy boshi inclusive, keyingi oy exclusive).
  */
 
@@ -9,13 +9,18 @@ import { MONTHS_UZ_FULL } from "@/lib/analytics";
 import {
   EXPENSE_CATEGORY_MAP,
   MONTHLY_EXPENSE_TYPE_MAP,
+  PAYMENT_METHOD_MAP,
 } from "@/lib/constants";
 import { paymentBillingPeriod } from "@/lib/debt-calculator";
-import {
-  resolveMonthlyExpenseLabel,
-} from "@/lib/monthly-expense-type";
+import { resolveMonthlyExpenseLabel } from "@/lib/monthly-expense-type";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
-import type { Expense, ExpenseCategory, Payment } from "@/types";
+import type {
+  Expense,
+  ExpenseCategory,
+  MonthlyExpenseType,
+  Payment,
+  PaymentMethod,
+} from "@/types";
 
 export type YearMonth = { year: number; month: number };
 
@@ -27,21 +32,66 @@ export type PercentChangeKind =
 
 export type PercentChange = {
   kind: PercentChangeKind;
-  /** Foiz qiymati; kind !== "ok" bo'lsa null */
   percent: number | null;
   label: string;
+};
+
+export type ExpensePaymentStatus = "paid" | "planned" | "unpaid";
+
+export type IncomeDetailRow = {
+  id: string;
+  date: string;
+  tenantName: string;
+  propertyName: string;
+  periodLabel: string;
+  periodYear: number;
+  periodMonth: number;
+  method: PaymentMethod;
+  methodLabel: string;
+  note: string;
+  amount: number;
+};
+
+export type ExpenseDetailRow = {
+  id: string;
+  date: string;
+  name: string;
+  category: ExpenseCategory;
+  categoryLabel: string;
+  typeKey: string;
+  typeLabel: string;
+  cadence: "one_time" | "monthly";
+  cadenceLabel: string;
+  paymentStatus: ExpensePaymentStatus;
+  paymentStatusLabel: string;
+  countsTowardCashOutflow: boolean;
+  methodLabel: string;
+  note: string;
+  amount: number;
+  searchText: string;
 };
 
 export type MonthTotals = {
   year: number;
   month: number;
   label: string;
+  /** Haqiqiy kirim */
   income: number;
+  /** Haqiqiy to'langan chiqim */
   expense: number;
+  /** Rejalashtirilgan / to'lanmagan (chiqimga kirmaydi) */
+  plannedExpense: number;
+  /** Ro'yxatdagi barcha xarajatlar summasi (paid + planned) */
+  listedExpenseTotal: number;
+  /** Sof natija = haqiqiy kirim − haqiqiy chiqim */
   net: number;
   expenseToIncomeRatioPercent: number | null;
   paymentCount: number;
+  averagePayment: number;
+  /** Ro'yxatdagi barcha xarajatlar soni */
   expenseCount: number;
+  paidExpenseCount: number;
+  plannedExpenseCount: number;
 };
 
 export type CategoryStatus =
@@ -68,7 +118,6 @@ export type MetricDelta = {
   compare: number;
   diff: number;
   percent: PercentChange;
-  /** Sof natija uchun: musbat = yaxshilanish */
   improved: boolean | null;
 };
 
@@ -78,8 +127,8 @@ export type MonthlyComparisonResult = {
   sameMonth: boolean;
   income: MetricDelta;
   expense: MetricDelta;
+  plannedExpense: MetricDelta;
   net: MetricDelta;
-  /** Taxminiy tejash imkoniyati — oshgan toifalar farqlari yig'indisi */
   estimatedSavingsOpportunity: number;
   categories: CategoryComparisonRow[];
   topIncreases: CategoryComparisonRow[];
@@ -89,9 +138,18 @@ export type MonthlyComparisonResult = {
     base: number;
     compare: number;
   }>;
+  /** Barcha haqiqiy kirimlar (oy bo'yicha) — cheklovsiz */
+  baseIncomes: IncomeDetailRow[];
+  compareIncomes: IncomeDetailRow[];
+  /** Barcha xarajatlar (paid + planned) — cheklovsiz */
+  baseExpenses: ExpenseDetailRow[];
+  compareExpenses: ExpenseDetailRow[];
 };
 
+export const COMPARISON_PAGE_SIZE = 25;
+
 const PLANNED_NOTE_RE = /^\[reja\]/i;
+const UNPAID_NOTE_RE = /^\[to'?lanmagan\]/i;
 
 /** YYYY-MM → { year, month: 1–12 } */
 export function parseYearMonth(raw: string): YearMonth | null {
@@ -112,7 +170,6 @@ export function yearMonthLabel(ym: YearMonth): string {
   return `${MONTHS_UZ_FULL[ym.month - 1]} ${ym.year}`;
 }
 
-/** Joriy va oldingi oy (Asia/Tashkent) */
 export function defaultComparisonMonths(now = new Date()): {
   base: YearMonth;
   compare: YearMonth;
@@ -128,10 +185,6 @@ export function defaultComparisonMonths(now = new Date()): {
   return { base: { year: by, month: bm }, compare };
 }
 
-/**
- * Toshkent oy chegaralari (UTC+5, DST yo'q).
- * start inclusive, end exclusive — ISO string.
- */
 export function tashkentMonthBounds(ym: YearMonth): {
   startInclusive: string;
   endExclusive: string;
@@ -156,9 +209,6 @@ export function isInTashkentMonth(
   return p.year === ym.year && p.month === ym.month;
 }
 
-/**
- * Foiz o'zgarishi. base=0 bo'lsa Infinity/NaN qaytarmaydi.
- */
 export function percentChange(
   base: number,
   compare: number,
@@ -189,34 +239,7 @@ export function percentChange(
   };
 }
 
-/** Haqiqiy kirim — faqat Payment; qarz/sintetik yozuvlar yo'q */
-export function sumRealIncome(
-  payments: Payment[],
-  ym: YearMonth
-): { total: number; count: number } {
-  let total = 0;
-  let count = 0;
-  const seen = new Set<string>();
-
-  for (const p of payments) {
-    if (!p?.id || seen.has(p.id)) continue;
-    // Sintetik / qarzga yozuvlar (agar kelib qolsa) — kirim emas
-    if (isSyntheticOrDebtPayment(p)) continue;
-    const amount = Number(p.amount) || 0;
-    if (amount <= 0) continue;
-
-    const period = paymentBillingPeriod(p);
-    if (period.year !== ym.year || period.month !== ym.month) continue;
-
-    seen.add(p.id);
-    total += amount;
-    count += 1;
-  }
-
-  return { total, count };
-}
-
-function isSyntheticOrDebtPayment(p: Payment): boolean {
+export function isSyntheticOrDebtPayment(p: Payment): boolean {
   const note = (p.note ?? "").toLowerCase();
   if (note.includes("[qarzga]") || note.includes("[qarz]")) return true;
   if (note.includes("[sintetik]") || note.includes("[synthetic]")) return true;
@@ -224,41 +247,11 @@ function isSyntheticOrDebtPayment(p: Payment): boolean {
   return false;
 }
 
-/**
- * Haqiqiy xarajatlar. Rejalashtirilgan (to'lanmagan) yozuvlar chiqarib tashlanadi.
- * Har bir expense id bir marta — takroriy shablon + real expense ikki marta hisoblanmaydi.
- */
-export function sumRealExpenses(
-  expenses: Expense[],
-  ym: YearMonth
-): { total: number; count: number; byCategory: Map<string, number> } {
-  let total = 0;
-  let count = 0;
-  const byCategory = new Map<string, number>();
-  const seen = new Set<string>();
-
-  for (const e of expenses) {
-    if (!e?.id || seen.has(e.id)) continue;
-    if (isPlannedUnpaidExpense(e)) continue;
-    const amount = Number(e.amount) || 0;
-    if (amount <= 0) continue;
-    if (!isInTashkentMonth(e.date, ym)) continue;
-
-    seen.add(e.id);
-    total += amount;
-    count += 1;
-    const key = expenseCategoryKey(e);
-    byCategory.set(key, (byCategory.get(key) ?? 0) + amount);
-  }
-
-  return { total, count, byCategory };
-}
-
-/** Reja / to'lanmagan takroriy — pul chiqimiga kirmaydi */
+/** Reja / to'lanmagan — ro'yxatda ko'rinadi, chiqimga kirmaydi */
 export function isPlannedUnpaidExpense(e: Expense): boolean {
   const note = (e.note ?? "").trim();
   if (PLANNED_NOTE_RE.test(note)) return true;
-  // Kelajakdagi maydonlar uchun xavfsiz tekshiruv
+  if (UNPAID_NOTE_RE.test(note)) return true;
   const extra = e as Expense & { planned?: boolean; status?: string };
   if (extra.planned === true) return true;
   if (typeof extra.status === "string") {
@@ -266,6 +259,19 @@ export function isPlannedUnpaidExpense(e: Expense): boolean {
     if (s === "planned" || s === "scheduled" || s === "unpaid") return true;
   }
   return false;
+}
+
+export function resolveExpensePaymentStatus(
+  e: Expense
+): ExpensePaymentStatus {
+  if (!isPlannedUnpaidExpense(e)) return "paid";
+  const note = (e.note ?? "").trim();
+  if (UNPAID_NOTE_RE.test(note)) return "unpaid";
+  const extra = e as Expense & { status?: string };
+  if (typeof extra.status === "string" && extra.status.toLowerCase() === "unpaid") {
+    return "unpaid";
+  }
+  return "planned";
 }
 
 export function expenseCategoryKey(e: Expense): string {
@@ -297,13 +303,26 @@ export function expenseCategoryLabel(e: Expense): string {
   return EXPENSE_CATEGORY_MAP[e.category as ExpenseCategory] ?? "Boshqa";
 }
 
+export function expenseDisplayName(e: Expense): string {
+  const typeLabel = expenseCategoryLabel(e);
+  const note = (e.note ?? "").replace(PLANNED_NOTE_RE, "").replace(UNPAID_NOTE_RE, "").trim();
+  if (e.employeeName?.trim()) {
+    return note && note !== e.employeeName.trim()
+      ? `${e.employeeName.trim()} · ${note}`
+      : e.employeeName.trim();
+  }
+  if (typeLabel && typeLabel !== "Boshqa") return typeLabel;
+  if (note) return note;
+  return EXPENSE_CATEGORY_MAP[e.category] ?? "Xarajat";
+}
+
 export function labelForCategoryKey(
   key: string,
   sampleLabel?: string
 ): string {
   if (sampleLabel) return sampleLabel;
   if (key.startsWith("monthly:")) {
-    const t = key.slice("monthly:".length) as keyof typeof MONTHLY_EXPENSE_TYPE_MAP;
+    const t = key.slice("monthly:".length) as MonthlyExpenseType;
     return MONTHLY_EXPENSE_TYPE_MAP[t] ?? key;
   }
   if (key.startsWith("custom:")) {
@@ -315,6 +334,210 @@ export function labelForCategoryKey(
     return EXPENSE_CATEGORY_MAP[c] ?? "Boshqa";
   }
   return key;
+}
+
+/** Filtr kalitlari: monthly types + asosiy kategoriyalar */
+export type ExpenseFilterOption = { value: string; label: string };
+
+export function expenseFilterOptions(): ExpenseFilterOption[] {
+  return [
+    { value: "all", label: "Barchasi" },
+    { value: "monthly:water", label: MONTHLY_EXPENSE_TYPE_MAP.water },
+    {
+      value: "monthly:electricity",
+      label: MONTHLY_EXPENSE_TYPE_MAP.electricity,
+    },
+    { value: "monthly:office", label: MONTHLY_EXPENSE_TYPE_MAP.office },
+    { value: "monthly:custom", label: MONTHLY_EXPENSE_TYPE_MAP.custom },
+    ...Object.entries(EXPENSE_CATEGORY_MAP).map(([value, label]) => ({
+      value: `cat:${value}`,
+      label,
+    })),
+  ];
+}
+
+export function matchesExpenseFilter(
+  row: ExpenseDetailRow,
+  filter: string
+): boolean {
+  if (!filter || filter === "all") return true;
+  if (filter.startsWith("monthly:")) {
+    if (filter === "monthly:custom") {
+      return row.typeKey.startsWith("custom:") || row.typeKey === "monthly:custom";
+    }
+    return row.typeKey === filter;
+  }
+  if (filter.startsWith("cat:")) {
+    return `cat:${row.category}` === filter;
+  }
+  return true;
+}
+
+export function filterExpenseRows(
+  rows: ExpenseDetailRow[],
+  opts: { filter?: string; search?: string }
+): ExpenseDetailRow[] {
+  const filter = opts.filter ?? "all";
+  const term = (opts.search ?? "").trim().toLowerCase();
+  return rows.filter((row) => {
+    if (!matchesExpenseFilter(row, filter)) return false;
+    if (!term) return true;
+    return row.searchText.includes(term);
+  });
+}
+
+export function paginateRows<T>(
+  rows: T[],
+  page: number,
+  pageSize = COMPARISON_PAGE_SIZE
+): { page: number; totalPages: number; total: number; items: T[] } {
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const start = (safePage - 1) * pageSize;
+  return {
+    page: safePage,
+    totalPages,
+    total,
+    items: rows.slice(start, start + pageSize),
+  };
+}
+
+/** Haqiqiy kirim — faqat Payment; qarz/sintetik yo'q */
+export function sumRealIncome(
+  payments: Payment[],
+  ym: YearMonth
+): { total: number; count: number } {
+  const rows = listIncomeRows(payments, ym);
+  return {
+    total: rows.reduce((s, r) => s + r.amount, 0),
+    count: rows.length,
+  };
+}
+
+export function listIncomeRows(
+  payments: Payment[],
+  ym: YearMonth
+): IncomeDetailRow[] {
+  const seen = new Set<string>();
+  const rows: IncomeDetailRow[] = [];
+
+  for (const p of payments) {
+    if (!p?.id || seen.has(p.id)) continue;
+    if (isSyntheticOrDebtPayment(p)) continue;
+    const amount = Number(p.amount) || 0;
+    if (amount <= 0) continue;
+
+    const period = paymentBillingPeriod(p);
+    if (period.year !== ym.year || period.month !== ym.month) continue;
+
+    seen.add(p.id);
+    rows.push({
+      id: p.id,
+      date: p.date,
+      tenantName: p.tenantName?.trim() || "Noma'lum",
+      propertyName: p.propertyName?.trim() || "—",
+      periodLabel: yearMonthLabel({
+        year: period.year,
+        month: period.month,
+      }),
+      periodYear: period.year,
+      periodMonth: period.month,
+      method: p.method,
+      methodLabel: PAYMENT_METHOD_MAP[p.method] ?? p.method,
+      note: p.note?.trim() || "—",
+      amount,
+    });
+  }
+
+  rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return rows;
+}
+
+/**
+ * Haqiqiy (to'langan) xarajatlar yig'indisi.
+ * Reja/to'lanmagan chiqarib tashlanadi; id bo'yicha dedupe.
+ */
+export function sumRealExpenses(
+  expenses: Expense[],
+  ym: YearMonth
+): { total: number; count: number; byCategory: Map<string, number> } {
+  let total = 0;
+  let count = 0;
+  const byCategory = new Map<string, number>();
+  const seen = new Set<string>();
+
+  for (const e of expenses) {
+    if (!e?.id || seen.has(e.id)) continue;
+    if (isPlannedUnpaidExpense(e)) continue;
+    const amount = Number(e.amount) || 0;
+    if (amount <= 0) continue;
+    if (!isInTashkentMonth(e.date, ym)) continue;
+
+    seen.add(e.id);
+    total += amount;
+    count += 1;
+    const key = expenseCategoryKey(e);
+    byCategory.set(key, (byCategory.get(key) ?? 0) + amount);
+  }
+
+  return { total, count, byCategory };
+}
+
+/** Barcha xarajatlar (paid + planned), dedupe, oy bo'yicha */
+export function listExpenseRows(
+  expenses: Expense[],
+  ym: YearMonth
+): ExpenseDetailRow[] {
+  const seen = new Set<string>();
+  const rows: ExpenseDetailRow[] = [];
+
+  for (const e of expenses) {
+    if (!e?.id || seen.has(e.id)) continue;
+    const amount = Number(e.amount) || 0;
+    if (amount <= 0) continue;
+    if (!isInTashkentMonth(e.date, ym)) continue;
+
+    seen.add(e.id);
+    const status = resolveExpensePaymentStatus(e);
+    const typeKey = expenseCategoryKey(e);
+    const typeLabel = expenseCategoryLabel(e);
+    const name = expenseDisplayName(e);
+    const note = (e.note ?? "").trim() || "—";
+    const cadence: "one_time" | "monthly" = e.monthlyExpenseType
+      ? "monthly"
+      : "one_time";
+
+    rows.push({
+      id: e.id,
+      date: e.date,
+      name,
+      category: e.category,
+      categoryLabel: EXPENSE_CATEGORY_MAP[e.category] ?? "Boshqa",
+      typeKey,
+      typeLabel,
+      cadence,
+      cadenceLabel: cadence === "monthly" ? "Oylik" : "Bir martalik",
+      paymentStatus: status,
+      paymentStatusLabel:
+        status === "paid"
+          ? "To'langan"
+          : status === "unpaid"
+            ? "To'lanmagan"
+            : "Rejalashtirilgan",
+      countsTowardCashOutflow: status === "paid",
+      methodLabel: "—",
+      note,
+      amount,
+      searchText: [name, note, typeLabel, e.employeeName, e.companyName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    });
+  }
+
+  rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return rows;
 }
 
 export function classifyCategoryChange(
@@ -366,7 +589,6 @@ export function classifyCategoryChange(
     };
   }
 
-  // 5–19.99%
   return {
     status: "increase",
     recommendation: `Xarajat ${pct.toFixed(0)}% oshgan — sarfni tekshiring`,
@@ -405,36 +627,56 @@ function buildMonthTotals(
   payments: Payment[],
   expenses: Expense[],
   ym: YearMonth
-): MonthTotals & { byCategory: Map<string, number>; labels: Map<string, string> } {
-  const income = sumRealIncome(payments, ym);
-  const expense = sumRealExpenses(expenses, ym);
-  const net = income.total - expense.total;
+): MonthTotals & {
+  byCategory: Map<string, number>;
+  labels: Map<string, string>;
+  incomes: IncomeDetailRow[];
+  expenseRows: ExpenseDetailRow[];
+} {
+  const incomes = listIncomeRows(payments, ym);
+  const expenseRows = listExpenseRows(expenses, ym);
+  const paid = expenseRows.filter((r) => r.countsTowardCashOutflow);
+  const planned = expenseRows.filter((r) => !r.countsTowardCashOutflow);
+
+  const incomeTotal = incomes.reduce((s, r) => s + r.amount, 0);
+  const expenseTotal = paid.reduce((s, r) => s + r.amount, 0);
+  const plannedTotal = planned.reduce((s, r) => s + r.amount, 0);
+  const listedTotal = expenseRows.reduce((s, r) => s + r.amount, 0);
+  const net = incomeTotal - expenseTotal;
   const ratio =
-    income.total > 0
-      ? (expense.total / income.total) * 100
-      : income.total === 0 && expense.total === 0
+    incomeTotal > 0
+      ? (expenseTotal / incomeTotal) * 100
+      : incomeTotal === 0 && expenseTotal === 0
         ? 0
         : null;
 
+  const byCategory = new Map<string, number>();
   const labels = new Map<string, string>();
-  for (const e of expenses) {
-    if (isPlannedUnpaidExpense(e)) continue;
-    if (!isInTashkentMonth(e.date, ym)) continue;
-    labels.set(expenseCategoryKey(e), expenseCategoryLabel(e));
+  for (const r of paid) {
+    byCategory.set(r.typeKey, (byCategory.get(r.typeKey) ?? 0) + r.amount);
+    labels.set(r.typeKey, r.typeLabel);
   }
 
   return {
     year: ym.year,
     month: ym.month,
     label: yearMonthLabel(ym),
-    income: income.total,
-    expense: expense.total,
+    income: incomeTotal,
+    expense: expenseTotal,
+    plannedExpense: plannedTotal,
+    listedExpenseTotal: listedTotal,
     net,
     expenseToIncomeRatioPercent: ratio,
-    paymentCount: income.count,
-    expenseCount: expense.count,
-    byCategory: expense.byCategory,
+    paymentCount: incomes.length,
+    averagePayment:
+      incomes.length > 0 ? incomeTotal / incomes.length : 0,
+    expenseCount: expenseRows.length,
+    paidExpenseCount: paid.length,
+    plannedExpenseCount: planned.length,
+    byCategory,
     labels,
+    incomes,
+    expenseRows,
   };
 }
 
@@ -503,39 +745,38 @@ export function buildMonthlyComparison(input: {
 
   const incomePct = percentChange(base.income, compare.income);
   const expensePct = percentChange(base.expense, compare.expense);
+  const plannedPct = percentChange(base.plannedExpense, compare.plannedExpense);
   const netPct = percentChange(base.net, compare.net);
   const netDiff = compare.net - base.net;
 
+  const toPublic = (m: typeof base): MonthTotals => ({
+    year: m.year,
+    month: m.month,
+    label: m.label,
+    income: m.income,
+    expense: m.expense,
+    plannedExpense: m.plannedExpense,
+    listedExpenseTotal: m.listedExpenseTotal,
+    net: m.net,
+    expenseToIncomeRatioPercent: m.expenseToIncomeRatioPercent,
+    paymentCount: m.paymentCount,
+    averagePayment: m.averagePayment,
+    expenseCount: m.expenseCount,
+    paidExpenseCount: m.paidExpenseCount,
+    plannedExpenseCount: m.plannedExpenseCount,
+  });
+
   return {
-    base: {
-      year: base.year,
-      month: base.month,
-      label: base.label,
-      income: base.income,
-      expense: base.expense,
-      net: base.net,
-      expenseToIncomeRatioPercent: base.expenseToIncomeRatioPercent,
-      paymentCount: base.paymentCount,
-      expenseCount: base.expenseCount,
-    },
-    compare: {
-      year: compare.year,
-      month: compare.month,
-      label: compare.label,
-      income: compare.income,
-      expense: compare.expense,
-      net: compare.net,
-      expenseToIncomeRatioPercent: compare.expenseToIncomeRatioPercent,
-      paymentCount: compare.paymentCount,
-      expenseCount: compare.expenseCount,
-    },
+    base: toPublic(base),
+    compare: toPublic(compare),
     sameMonth,
     income: {
       base: base.income,
       compare: compare.income,
       diff: compare.income - base.income,
       percent: incomePct,
-      improved: compare.income === base.income ? null : compare.income > base.income,
+      improved:
+        compare.income === base.income ? null : compare.income > base.income,
     },
     expense: {
       base: base.expense,
@@ -543,7 +784,16 @@ export function buildMonthlyComparison(input: {
       diff: compare.expense - base.expense,
       percent: expensePct,
       improved:
-        compare.expense === base.expense ? null : compare.expense < base.expense,
+        compare.expense === base.expense
+          ? null
+          : compare.expense < base.expense,
+    },
+    plannedExpense: {
+      base: base.plannedExpense,
+      compare: compare.plannedExpense,
+      diff: compare.plannedExpense - base.plannedExpense,
+      percent: plannedPct,
+      improved: null,
     },
     net: {
       base: base.net,
@@ -558,8 +808,21 @@ export function buildMonthlyComparison(input: {
     topDecreases,
     chart: [
       { metric: "Kirim", base: base.income, compare: compare.income },
-      { metric: "Xarajat", base: base.expense, compare: compare.expense },
+      {
+        metric: "Haqiqiy chiqim",
+        base: base.expense,
+        compare: compare.expense,
+      },
+      {
+        metric: "Rejalashtirilgan",
+        base: base.plannedExpense,
+        compare: compare.plannedExpense,
+      },
       { metric: "Sof natija", base: base.net, compare: compare.net },
     ],
+    baseIncomes: base.incomes,
+    compareIncomes: compare.incomes,
+    baseExpenses: base.expenseRows,
+    compareExpenses: compare.expenseRows,
   };
 }

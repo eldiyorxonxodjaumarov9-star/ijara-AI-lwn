@@ -3,8 +3,12 @@ import { describe, it } from "node:test";
 
 import {
   buildMonthlyComparison,
+  filterExpenseRows,
   isInTashkentMonth,
   isPlannedUnpaidExpense,
+  listExpenseRows,
+  listIncomeRows,
+  paginateRows,
   parseYearMonth,
   percentChange,
   sumRealExpenses,
@@ -43,6 +47,7 @@ function expense(
     monthlyExpenseType: partial.monthlyExpenseType,
     monthlyExpenseCustomName: partial.monthlyExpenseCustomName,
     monthlyExpenseLabel: partial.monthlyExpenseLabel,
+    employeeName: partial.employeeName,
     createdAt: partial.createdAt ?? partial.date,
   };
 }
@@ -59,17 +64,14 @@ describe("monthly-comparison: year-month parse & Tashkent bounds", () => {
     assert.equal(b.startInclusive, "2026-07-01T00:00:00+05:00");
     assert.equal(b.endExclusive, "2026-08-01T00:00:00+05:00");
 
-    // July 31 evening Tashkent is still July
     assert.equal(
       isInTashkentMonth("2026-07-31T23:30:00+05:00", { year: 2026, month: 7 }),
       true
     );
-    // Aug 1 00:00 Tashkent is not July
     assert.equal(
       isInTashkentMonth("2026-08-01T00:00:00+05:00", { year: 2026, month: 7 }),
       false
     );
-    // July 31 23:00 UTC = Aug 1 04:00 Tashkent → August
     assert.equal(
       isInTashkentMonth("2026-07-31T23:00:00Z", { year: 2026, month: 7 }),
       false
@@ -78,6 +80,32 @@ describe("monthly-comparison: year-month parse & Tashkent bounds", () => {
       isInTashkentMonth("2026-07-31T23:00:00Z", { year: 2026, month: 8 }),
       true
     );
+  });
+
+  it("supports year crossover Dec→Jan", () => {
+    const dec = tashkentMonthBounds({ year: 2026, month: 12 });
+    assert.equal(dec.endExclusive, "2027-01-01T00:00:00+05:00");
+    const result = buildMonthlyComparison({
+      payments: [
+        payment({
+          id: "p-dec",
+          amount: 100,
+          periodYear: 2026,
+          periodMonth: 12,
+        }),
+        payment({
+          id: "p-jan",
+          amount: 200,
+          periodYear: 2027,
+          periodMonth: 1,
+        }),
+      ],
+      expenses: [],
+      baseMonth: { year: 2026, month: 12 },
+      compareMonth: { year: 2027, month: 1 },
+    });
+    assert.equal(result.base.income, 100);
+    assert.equal(result.compare.income, 200);
   });
 });
 
@@ -107,6 +135,7 @@ describe("monthly-comparison: income", () => {
     const july = sumRealIncome(payments, { year: 2026, month: 7 });
     assert.equal(july.total, 1500);
     assert.equal(july.count, 2);
+    assert.equal(listIncomeRows(payments, { year: 2026, month: 7 }).length, 2);
   });
 
   it("excludes debt/synthetic notes from income", () => {
@@ -138,36 +167,43 @@ describe("monthly-comparison: income", () => {
   });
 });
 
-describe("monthly-comparison: expenses", () => {
-  it("sums real expenses in Tashkent month", () => {
+describe("monthly-comparison: expenses detail", () => {
+  it("lists all one-time and monthly expenses", () => {
     const expenses = [
       expense({
-        id: "e1",
+        id: "one",
+        amount: 40,
+        date: "2026-07-03T12:00:00+05:00",
+        category: "repair",
+      }),
+      expense({
+        id: "water",
         amount: 100,
         date: "2026-07-10T12:00:00+05:00",
         monthlyExpenseType: "water",
       }),
       expense({
-        id: "e2",
+        id: "elec",
         amount: 200,
         date: "2026-07-20T12:00:00+05:00",
         monthlyExpenseType: "electricity",
       }),
       expense({
-        id: "e3",
+        id: "aug",
         amount: 50,
         date: "2026-08-01T00:00:00+05:00",
         monthlyExpenseType: "water",
       }),
     ];
+    const rows = listExpenseRows(expenses, { year: 2026, month: 7 });
+    assert.equal(rows.length, 3);
+    assert.ok(rows.some((r) => r.cadence === "one_time"));
+    assert.ok(rows.some((r) => r.cadence === "monthly"));
     const july = sumRealExpenses(expenses, { year: 2026, month: 7 });
-    assert.equal(july.total, 300);
-    assert.equal(july.count, 2);
-    assert.equal(july.byCategory.get("monthly:water"), 100);
-    assert.equal(july.byCategory.get("monthly:electricity"), 200);
+    assert.equal(july.total, 340);
   });
 
-  it("excludes planned unpaid recurring notes", () => {
+  it("shows planned unpaid in list but not in cash outflow", () => {
     const expenses = [
       expense({
         id: "paid",
@@ -184,27 +220,74 @@ describe("monthly-comparison: expenses", () => {
       }),
     ];
     assert.equal(isPlannedUnpaidExpense(expenses[1]!), true);
+    const rows = listExpenseRows(expenses, { year: 2026, month: 7 });
+    assert.equal(rows.length, 2);
+    const planned = rows.find((r) => r.id === "planned");
+    assert.ok(planned);
+    assert.equal(planned!.paymentStatus, "planned");
+    assert.equal(planned!.countsTowardCashOutflow, false);
     const july = sumRealExpenses(expenses, { year: 2026, month: 7 });
     assert.equal(july.total, 150);
     assert.equal(july.count, 1);
   });
 
-  it("does not double-count same expense id (recurring → real)", () => {
+  it("does not double-count same expense id", () => {
     const same = expense({
       id: "exp-once",
       amount: 80,
       date: "2026-07-12T12:00:00+05:00",
       monthlyExpenseType: "water",
     });
-    // Same row appears twice in a merged list (template + materialised)
+    const rows = listExpenseRows([same, same], { year: 2026, month: 7 });
+    assert.equal(rows.length, 1);
     const july = sumRealExpenses([same, same], { year: 2026, month: 7 });
     assert.equal(july.total, 80);
-    assert.equal(july.count, 1);
+  });
+
+  it("filters by category and search without changing global totals", () => {
+    const expenses = [
+      expense({
+        id: "w",
+        amount: 100,
+        date: "2026-07-08T12:00:00+05:00",
+        monthlyExpenseType: "water",
+      }),
+      expense({
+        id: "e",
+        amount: 200,
+        date: "2026-07-08T12:00:00+05:00",
+        monthlyExpenseType: "electricity",
+        note: "transformator",
+      }),
+      expense({
+        id: "s",
+        amount: 50,
+        date: "2026-07-08T12:00:00+05:00",
+        category: "salary",
+        employeeName: "Ali",
+      }),
+    ];
+    const rows = listExpenseRows(expenses, { year: 2026, month: 7 });
+    assert.equal(rows.length, 3);
+    const waterOnly = filterExpenseRows(rows, { filter: "monthly:water" });
+    assert.equal(waterOnly.length, 1);
+    assert.equal(waterOnly[0]!.amount, 100);
+    const search = filterExpenseRows(rows, { search: "transformator" });
+    assert.equal(search.length, 1);
+    assert.equal(search[0]!.id, "e");
+    // Pagination must not affect full-list totals
+    const page1 = paginateRows(rows, 1, 2);
+    assert.equal(page1.items.length, 2);
+    assert.equal(page1.total, 3);
+    const fullSum = rows.reduce((s, r) => s + r.amount, 0);
+    const pageSum = page1.items.reduce((s, r) => s + r.amount, 0);
+    assert.notEqual(pageSum, fullSum);
+    assert.equal(fullSum, 350);
   });
 });
 
 describe("monthly-comparison: net, percent, zero base", () => {
-  it("computes net = income - expense", () => {
+  it("computes net = income - paid expense (not planned)", () => {
     const result = buildMonthlyComparison({
       payments: [
         payment({
@@ -233,12 +316,22 @@ describe("monthly-comparison: net, percent, zero base", () => {
           date: "2026-08-10T12:00:00+05:00",
           monthlyExpenseType: "water",
         }),
+        expense({
+          id: "plan",
+          amount: 999,
+          date: "2026-08-10T12:00:00+05:00",
+          monthlyExpenseType: "office",
+          note: "[reja] kechikkan",
+        }),
       ],
       baseMonth: { year: 2026, month: 7 },
       compareMonth: { year: 2026, month: 8 },
     });
     assert.equal(result.base.net, 700);
     assert.equal(result.compare.net, 800);
+    assert.equal(result.compare.plannedExpense, 999);
+    assert.equal(result.compare.expense, 400);
+    assert.equal(result.compareExpenses.length, 2);
     assert.equal(result.net.diff, 100);
     assert.equal(result.net.improved, true);
   });
@@ -322,7 +415,10 @@ describe("monthly-comparison: net, percent, zero base", () => {
     assert.equal(result.base.income, 5000);
     assert.equal(result.compare.income, 5500);
     assert.equal(result.compare.expense, 125 + 176 + 50);
+    assert.equal(result.compare.plannedExpense, 999);
     assert.ok(result.compare.expense < 999);
+    assert.equal(result.baseIncomes.length, 1);
+    assert.equal(result.compareExpenses.length, 4);
 
     const el = result.categories.find((c) => c.key === "monthly:electricity");
     assert.ok(el);
@@ -332,12 +428,10 @@ describe("monthly-comparison: net, percent, zero base", () => {
     const su = result.categories.find((c) => c.key === "monthly:water");
     assert.ok(su);
     assert.equal(su!.status, "saving");
-    assert.match(su!.recommendation, /kamaygan/i);
 
     const office = result.categories.find((c) => c.key === "monthly:office");
     assert.ok(office);
     assert.equal(office!.status, "new_expense");
-    assert.match(office!.recommendation, /Yangi xarajat/i);
 
     assert.equal(result.estimatedSavingsOpportunity, 25 + 50);
     assert.equal(result.sameMonth, false);

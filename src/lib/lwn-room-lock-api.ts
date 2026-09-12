@@ -22,7 +22,10 @@ export type CreateAccessGrantInput = {
   validFrom?: string;
   validTo?: string;
   notes?: string;
+  /** false = faqat reja; true (default) = qulfga o‘rnatishga urinish */
   autoSync?: boolean;
+  /** Maxsus PIN — faqat so‘rovda; javobda qaytmaydi */
+  customPin?: string;
 };
 
 export type AccessLogFilters = {

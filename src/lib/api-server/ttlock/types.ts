@@ -26,6 +26,12 @@ export const TTLOCK_ENDPOINTS = {
    */
   keyboardPwdDelete: "/v3/keyboardPwd/delete",
   /**
+   * Rasmiy EU Open API: POST /v3/keyboardPwd/add — maxsus (custom) PIN
+   * Gateway yoki Wi‑Fi qulf kerak (addType=2). Bluetooth uchun addType=1 + SDK.
+   * @see https://euopen.ttlock.com/doc/api/v3/keyboardPwd/add
+   */
+  keyboardPwdAdd: "/v3/keyboardPwd/add",
+  /**
    * Rasmiy EU Open API: POST /v3/key/send
    * @see https://euopen.ttlock.com/doc/api/v3/key/send
    */
@@ -112,6 +118,13 @@ export type TtlockLockListResponse = {
 
 export type TtlockKeyboardPwdGetResponse = {
   keyboardPwd?: string | number;
+  keyboardPwdId?: string | number;
+  errcode?: number;
+  errmsg?: string;
+};
+
+/** /v3/keyboardPwd/add — faqat keyboardPwdId (PIN qaytmaydi) */
+export type TtlockKeyboardPwdAddResponse = {
   keyboardPwdId?: string | number;
   errcode?: number;
   errmsg?: string;

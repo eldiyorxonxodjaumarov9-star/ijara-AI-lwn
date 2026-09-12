@@ -7,6 +7,7 @@ import { readTtlockEnvConfig, type TtlockEnvConfig } from "./config";
 import { mapTtlockBusinessCode, TtlockError } from "./errors";
 import {
   TTLOCK_ENDPOINTS,
+  type TtlockKeyboardPwdAddResponse,
   type TtlockKeyboardPwdDeleteResponse,
   type TtlockKeyboardPwdGetResponse,
   type TtlockKeyDeleteResponse,
@@ -296,6 +297,56 @@ export async function createKeyboardPwd(input: {
     );
   }
   return { keyboardPwd, keyboardPwdId };
+}
+
+/**
+ * Rasmiy: maxsus PIN o‘rnatish — POST /v3/keyboardPwd/add
+ * addType=2: gateway yoki Wi‑Fi qulf orqali (SDK/Bluetooth’siz).
+ * PIN hech qachon logga yozilmasin.
+ */
+export async function addCustomKeyboardPwd(input: {
+  accessToken: string;
+  lockId: string | number;
+  keyboardPwd: string;
+  startDateMs: number;
+  endDateMs: number;
+  /** 2 = gateway / Wi‑Fi (rasmiy) */
+  addType?: number;
+  keyboardPwdName?: string;
+  /** 3 = period (rasmiy default) */
+  keyboardPwdType?: number;
+}): Promise<{ keyboardPwdId: string }> {
+  const cfg = requireConfig();
+  const pin = String(input.keyboardPwd ?? "").trim();
+  // Pin faqat form body’da — xato xabarlariga qo‘shilmaydi
+  const json = await ttlockFetchJson<TtlockKeyboardPwdAddResponse>(
+    TTLOCK_ENDPOINTS.keyboardPwdAdd,
+    {
+      clientId: cfg.clientId,
+      accessToken: input.accessToken,
+      lockId: input.lockId,
+      keyboardPwd: pin,
+      keyboardPwdName: input.keyboardPwdName,
+      keyboardPwdType: input.keyboardPwdType ?? 3,
+      startDate: input.startDateMs,
+      endDate: input.endDateMs,
+      addType: input.addType ?? 2,
+      date: nowMs(),
+    }
+  );
+
+  if (typeof json.errcode === "number" && json.errcode !== 0) {
+    throw mapTtlockBusinessCode(json.errcode, json.errmsg);
+  }
+  const keyboardPwdId = String(json.keyboardPwdId ?? "").trim();
+  if (!keyboardPwdId) {
+    throw new TtlockError(
+      "TTLock maxsus parol javobi to'liq emas",
+      "TTLOCK_API_ERROR",
+      502
+    );
+  }
+  return { keyboardPwdId };
 }
 
 /** Rasmiy: passcode o‘chirish (gateway/WiFi: deleteType=2) */

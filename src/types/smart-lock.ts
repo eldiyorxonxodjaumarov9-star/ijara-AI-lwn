@@ -106,7 +106,12 @@ export type RoomAccessGrantRecord = {
   delivery?: AccessDeliveryPublic;
   /** Faqat create/sync javobida — list’da bo‘lmasligi kerak */
   oneTimePasscode?: string;
-  syncOutcome?: "planned_only" | "synced" | "failed_keep_plan";
+  syncOutcome?:
+    | "planned_only"
+    | "synced"
+    | "failed_keep_plan"
+    | "install_blocked"
+    | "cloud_accepted";
   userMessage?: string;
 };
 

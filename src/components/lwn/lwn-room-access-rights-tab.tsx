@@ -49,6 +49,12 @@ import {
   mapOnlineStatusLabel,
 } from "@/lib/ttlock-settings-view";
 import { mapGatewayStatusLabel } from "@/lib/ttlock-room-lock-view";
+import {
+  CUSTOM_PIN_GATEWAY_REQUIRED_MESSAGE,
+  CUSTOM_PIN_MAX_LEN,
+  CUSTOM_PIN_MIN_LEN,
+  validateCustomKeyboardPin,
+} from "@/lib/ttlock-custom-pin";
 
 function effectiveBadgeVariant(
   status: string | undefined
@@ -70,6 +76,24 @@ function effectiveBadgeVariant(
     default:
       return "outline";
   }
+}
+
+function toastForGrantResult(created: RoomAccessGrantRecord | null | void) {
+  const msg =
+    created && "userMessage" in created && created.userMessage
+      ? created.userMessage
+      : "Kirish huquqi saqlandi.";
+  const outcome =
+    created && "syncOutcome" in created ? created.syncOutcome : undefined;
+  if (outcome === "install_blocked" || outcome === "failed_keep_plan") {
+    toast.error(msg);
+    return;
+  }
+  if (outcome === "cloud_accepted") {
+    toast.message(msg);
+    return;
+  }
+  toast.success(msg);
 }
 
 export function LwnRoomAccessRightsTab({
@@ -99,11 +123,13 @@ export function LwnRoomAccessRightsTab({
   const [validFrom, setValidFrom] = useState("");
   const [validTo, setValidTo] = useState("");
   const [notes, setNotes] = useState("");
+  const [customPin, setCustomPin] = useState("");
   const [oneTimePin, setOneTimePin] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const linked = lockSettings?.linkedLock ?? null;
   const hasLock = Boolean(lockSettings?.ttlockCachedLockId && linked);
+  const hasGatewayOrWifi = Boolean(linked?.hasGateway);
 
   const selectedTenant = tenants.find((t) => t.tenantId === tenantId);
   const ekeyReceiverResolved =
@@ -115,7 +141,15 @@ export function LwnRoomAccessRightsTab({
   const ekeyReceiverMissing =
     permissionType === "app" && Boolean(tenantId) && !ekeyReceiverResolved;
 
-  const handleSavePlan = async () => {
+  const resetForm = () => {
+    setTenantId("");
+    setValidFrom("");
+    setValidTo("");
+    setNotes("");
+    setCustomPin("");
+  };
+
+  const handleSave = async (autoSync: boolean) => {
     if (!tenantId) {
       toast.info("Arendator tanlang");
       return;
@@ -124,6 +158,13 @@ export function LwnRoomAccessRightsTab({
       toast.info("Boshlanish va tugash vaqtini kiriting");
       return;
     }
+    if (permissionType === "pin") {
+      const pinCheck = validateCustomKeyboardPin(customPin);
+      if (!pinCheck.ok) {
+        toast.info(pinCheck.message);
+        return;
+      }
+    }
     try {
       const created = await onAddGrant({
         tenantId,
@@ -131,20 +172,14 @@ export function LwnRoomAccessRightsTab({
         validFrom,
         validTo,
         notes: notes.trim() || undefined,
-        autoSync: true,
+        autoSync,
+        customPin: permissionType === "pin" ? customPin.trim() : undefined,
       });
-      const msg =
-        created && "userMessage" in created && created.userMessage
-          ? created.userMessage
-          : "Kirish huquqi rejalashtirildi.";
-      toast.success(msg);
+      toastForGrantResult(created);
       if (created?.oneTimePasscode) {
         setOneTimePin(created.oneTimePasscode);
       }
-      setTenantId("");
-      setValidFrom("");
-      setValidTo("");
-      setNotes("");
+      resetForm();
     } catch {
       /* hook */
     }
@@ -155,10 +190,7 @@ export function LwnRoomAccessRightsTab({
     setBusyId(grantId);
     try {
       const updated = await onSyncGrant(grantId);
-      toast.success(
-        updated?.userMessage ??
-          "Kirish huquqi TTLock’ga muvaffaqiyatli yuborildi."
-      );
+      toastForGrantResult(updated);
       if (updated?.oneTimePasscode) {
         setOneTimePin(updated.oneTimePasscode);
       }
@@ -176,7 +208,7 @@ export function LwnRoomAccessRightsTab({
       await onCancelGrant(grantId);
       toast.success("Kirish huquqi bekor qilindi.");
     } catch {
-      /* hook */
+      /* hook — xato toast hookda */
     } finally {
       setBusyId(null);
     }
@@ -203,8 +235,9 @@ export function LwnRoomAccessRightsTab({
         role="note"
         className="rounded-xl border border-muted bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
       >
-        Reja PostgreSQL’da saqlanadi. Qulf biriktirilmagan bo‘lsa ham reja
-        yaratiladi, lekin qurilmaga yuborilmaydi.
+        Reja PostgreSQL’da saqlanadi. Maxsus PIN faqat shifrlangan holda
+        saqlanadi va umumiy javoblarda ko‘rsatilmaydi. Qulf biriktirilmagan
+        bo‘lsa ham reja yaratiladi, lekin qurilmaga yuborilmaydi.
       </div>
 
       {!apiAvailable && (
@@ -267,9 +300,18 @@ export function LwnRoomAccessRightsTab({
         </CardContent>
       </Card>
 
-      <Card>
+      {hasLock && !hasGatewayOrWifi && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
+        >
+          {CUSTOM_PIN_GATEWAY_REQUIRED_MESSAGE}
+        </div>
+      )}
+
+      <Card id="timed-passcode-form">
         <CardContent className="space-y-4 p-5">
-          <h3 className="font-medium">Yangi kirish huquqi rejasi</h3>
+          <h3 className="font-medium">Yangi kirish huquqi / vaqtli parol</h3>
           {tenants.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Ushbu xonaga tegishli shartnomali arendator yo&apos;q.
@@ -336,6 +378,29 @@ export function LwnRoomAccessRightsTab({
                     disabled={!apiAvailable}
                   />
                 </div>
+                {permissionType === "pin" && (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="custom-pin-input">
+                      PIN-kod ({CUSTOM_PIN_MIN_LEN}–{CUSTOM_PIN_MAX_LEN} raqam)
+                    </Label>
+                    <Input
+                      id="custom-pin-input"
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="new-password"
+                      maxLength={CUSTOM_PIN_MAX_LEN}
+                      value={customPin}
+                      onChange={(e) =>
+                        setCustomPin(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder={`${CUSTOM_PIN_MIN_LEN}–${CUSTOM_PIN_MAX_LEN} raqam`}
+                      disabled={!apiAvailable}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      PIN chat, URL yoki umumiy API javoblarida ko‘rsatilmaydi.
+                    </p>
+                  </div>
+                )}
                 {permissionType === "app" && (
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label>eKey receiver</Label>
@@ -366,17 +431,33 @@ export function LwnRoomAccessRightsTab({
                   />
                 </div>
               </div>
-              <Button
-                onClick={() => void handleSavePlan()}
-                disabled={!apiAvailable || saving}
-              >
-                {saving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Plus className="size-4" />
-                )}
-                Saqlash
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSave(false)}
+                  disabled={!apiAvailable || saving}
+                >
+                  {saving ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                  Faqat reja saqlash
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleSave(true)}
+                  disabled={!apiAvailable || saving}
+                >
+                  {saving ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                  Qulfga o‘rnatish
+                </Button>
+              </div>
             </>
           )}
         </CardContent>
@@ -386,7 +467,7 @@ export function LwnRoomAccessRightsTab({
         <EmptyState
           icon={UserCheck}
           title="Saqlangan kirish huquqlari yo'q"
-          description="Yuqorida arendator va muddat belgilab reja saqlang."
+          description="Yuqorida arendator, muddat va PIN belgilab saqlang."
         />
       ) : (
         <div className="space-y-4">
@@ -443,6 +524,9 @@ export function LwnRoomAccessRightsTab({
                         g.delivery?.externalAccessId && (
                           <p className="text-sm text-muted-foreground">
                             Parol: ••••••
+                            {g.effectiveStatus === "API_YUBORILGAN"
+                              ? " · qurilmada tasdiqlanmagan"
+                              : ""}
                           </p>
                         )}
                     </div>

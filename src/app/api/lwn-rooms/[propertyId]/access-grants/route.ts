@@ -59,8 +59,11 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       validToRaw: body.validTo,
       notes: body.notes == null ? null : String(body.notes),
       autoSync: body.autoSync !== false,
+      customPin:
+        body.customPin == null ? null : String(body.customPin),
     });
 
+    // PIN hech qachon javobda qaytmasin (oneTimePasscode faqat random /get uchun)
     return ok(result, 201);
   } catch (err) {
     return failFromErr(err);

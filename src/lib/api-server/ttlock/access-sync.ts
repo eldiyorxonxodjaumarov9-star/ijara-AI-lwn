@@ -8,6 +8,7 @@ import type { User } from "@prisma/client";
 
 import { prisma } from "@/lib/api-server/prisma";
 import {
+  addCustomKeyboardPwd,
   createKeyboardPwd,
   deleteEkey,
   deleteKeyboardPwd,
@@ -18,7 +19,10 @@ import {
   requireTtlockDb,
   type TtlockAccessCredentialRow,
 } from "@/lib/api-server/ttlock/db";
-import { encryptAccessCredential } from "@/lib/api-server/ttlock/persistence";
+import {
+  decryptAccessCredential,
+  encryptAccessCredential,
+} from "@/lib/api-server/ttlock/persistence";
 import { TtlockError } from "@/lib/api-server/ttlock/errors";
 import {
   assertTtlockOwnerRole,
@@ -28,6 +32,10 @@ import {
   ACCESS_EFFECTIVE_UI_LABELS,
   assertValidFromBeforeTo,
   classifyCredentialForSyncClaim,
+  CUSTOM_PIN_CLOUD_ACCEPTED_MESSAGE,
+  CUSTOM_PIN_GATEWAY_REQUIRED_MESSAGE,
+  CUSTOM_PIN_PLAN_ONLY_MESSAGE,
+  CUSTOM_PIN_REVOKE_GATEWAY_MESSAGE,
   derivePersistedSyncAfterSend,
   decideRemoteRevoke,
   EKEY_RECEIVER_PLAN_ONLY_MESSAGE,
@@ -39,11 +47,25 @@ import {
   permissionToCredentialType,
   resolveAccessEffectiveStatus,
   resolveEkeyReceiver,
+  validateCustomKeyboardPin,
   type AccessEffectiveUiStatus,
 } from "@/lib/api-server/ttlock/access-effective";
 import { isTtlockConfigured } from "@/lib/api-server/ttlock/config";
+import {
+  resolveRemoteTransportPath,
+  type RemotePathInput,
+} from "@/lib/api-server/ttlock/remote-capability";
+import { inferWifiRemoteCapable } from "@/lib/api-server/ttlock/types";
 
-export { ACCESS_EFFECTIVE_UI_LABELS, LOCK_MISSING_PLAN_HINT };
+export {
+  ACCESS_EFFECTIVE_UI_LABELS,
+  CUSTOM_PIN_CLOUD_ACCEPTED_MESSAGE,
+  CUSTOM_PIN_GATEWAY_REQUIRED_MESSAGE,
+  CUSTOM_PIN_PLAN_ONLY_MESSAGE,
+  CUSTOM_PIN_REVOKE_GATEWAY_MESSAGE,
+  LOCK_MISSING_PLAN_HINT,
+  validateCustomKeyboardPin,
+};
 export type { AccessEffectiveUiStatus };
 
 export type AccessDeliveryPublic = {
@@ -80,7 +102,12 @@ export type AccessGrantPublic = {
   effectiveLabel: string;
   delivery: AccessDeliveryPublic;
   oneTimePasscode?: string;
-  syncOutcome?: "planned_only" | "synced" | "failed_keep_plan";
+  syncOutcome?:
+    | "planned_only"
+    | "synced"
+    | "failed_keep_plan"
+    | "install_blocked"
+    | "cloud_accepted";
   userMessage?: string;
 };
 
@@ -104,9 +131,38 @@ async function loadRoomLock(propertyId: string) {
   if (!settings?.ttlockCachedLockId) return null;
   const lock = await prisma.ttlockCachedLock.findUnique({
     where: { id: settings.ttlockCachedLockId },
+    include: { gateway: true },
   });
   if (!lock) return null;
   return { settings, lock };
+}
+
+function lockRemoteTransport(lock: {
+  hasGateway: boolean;
+  gateway: { onlineStatus: string } | null;
+  capabilities: unknown;
+}): RemotePathInput {
+  const caps =
+    lock.capabilities && typeof lock.capabilities === "object"
+      ? (lock.capabilities as Record<string, unknown>)
+      : null;
+  return {
+    hasGateway: lock.hasGateway,
+    gatewayOnlineStatus:
+      (lock.gateway?.onlineStatus as "ONLINE" | "OFFLINE" | "UNKNOWN") ?? null,
+    wifiRemoteCapable: inferWifiRemoteCapable({ capabilities: caps }),
+    capabilities: caps,
+  };
+}
+
+function canRemoteInstallCustomPin(lock: {
+  hasGateway: boolean;
+  gateway: { onlineStatus: string } | null;
+  capabilities: unknown;
+}): { ok: true } | { ok: false; message: string } {
+  const path = resolveRemoteTransportPath(lockRemoteTransport(lock));
+  if (path.ok) return { ok: true };
+  return { ok: false, message: CUSTOM_PIN_GATEWAY_REQUIRED_MESSAGE };
 }
 
 export function mapGrantToPublic(
@@ -287,25 +343,40 @@ async function ensureCredentialShell(input: {
   connectionId: string;
   lockId: string;
   accessType: "PASSCODE" | "EKEY";
+  credentialEncrypted?: string | null;
 }) {
   const existing = await prisma.$queryRawUnsafe<{ id: string }[]>(
     `SELECT "id" FROM "ttlock_access_credentials" WHERE "roomAccessGrantId" = $1 LIMIT 1`,
     input.grantId
   );
-  if (existing[0]) return existing[0].id;
+  if (existing[0]) {
+    if (input.credentialEncrypted) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "ttlock_access_credentials"
+         SET "credentialEncrypted" = COALESCE("credentialEncrypted", $2),
+             "updatedAt" = $3
+         WHERE "id" = $1 AND "externalAccessId" IS NULL`,
+        existing[0].id,
+        input.credentialEncrypted,
+        new Date()
+      );
+    }
+    return existing[0].id;
+  }
 
   const id = randomUUID();
   const now = new Date();
   await prisma.$executeRawUnsafe(
     `INSERT INTO "ttlock_access_credentials" (
       "id", "roomAccessGrantId", "connectionId", "ttlockCachedLockId",
-      "accessType", "syncStatus", "createdAt", "updatedAt"
-    ) VALUES ($1,$2,$3,$4,$5::"TtlockAccessCredentialType",'PLANNED'::"TtlockAccessSyncStatus",$6,$7)`,
+      "accessType", "syncStatus", "credentialEncrypted", "createdAt", "updatedAt"
+    ) VALUES ($1,$2,$3,$4,$5::"TtlockAccessCredentialType",'PLANNED'::"TtlockAccessSyncStatus",$6,$7,$8)`,
     id,
     input.grantId,
     input.connectionId,
     input.lockId,
     input.accessType,
+    input.credentialEncrypted ?? null,
     now,
     now
   );
@@ -365,7 +436,10 @@ export async function createRoomAccessGrantPlan(input: {
   validFromRaw: unknown;
   validToRaw: unknown;
   notes?: string | null;
+  /** false = faqat reja; true = qulfga o‘rnatishga urinish */
   autoSync?: boolean;
+  /** Maxsus PIN — faqat serverda shifrlanadi, javobga qaytmaydi */
+  customPin?: string | null;
 }): Promise<AccessGrantPublic> {
   assertTtlockOwnerRole(input.user);
   await assertTenantOnRoom(input.propertyId, input.tenantId);
@@ -382,6 +456,15 @@ export async function createRoomAccessGrantPlan(input: {
   }
 
   const credType = permissionToCredentialType(input.permissionType);
+  let customPinValidated: string | null = null;
+  if (credType === "PASSCODE") {
+    const pinCheck = validateCustomKeyboardPin(input.customPin);
+    if (!pinCheck.ok) {
+      throw new TtlockError(pinCheck.message, "TTLOCK_PIN_INVALID", 400);
+    }
+    customPinValidated = pinCheck.pin;
+  }
+
   let ekeyReceiverMissing = false;
   if (credType === "EKEY") {
     const tenant = await prisma.tenant.findUnique({
@@ -435,13 +518,44 @@ export async function createRoomAccessGrantPlan(input: {
     });
   }
 
+  const connection = await findConnectionByOwner(input.user.id);
+  let encryptedPin: string | null = null;
+  if (customPinValidated && connection) {
+    encryptedPin = encryptAccessCredential(customPinValidated).credentialEncrypted;
+    await ensureCredentialShell({
+      grantId: row.id,
+      connectionId: connection.id,
+      lockId: roomLock.lock.id,
+      accessType: "PASSCODE",
+      credentialEncrypted: encryptedPin,
+    });
+  }
+
   if (input.autoSync === false) {
     return mapGrantToPublic(row, {
       lockName: roomLock.lock.name,
       lockExternalId: roomLock.lock.externalLockId,
       syncOutcome: "planned_only",
-      userMessage: "Kirish huquqi rejalashtirildi.",
+      userMessage: customPinValidated
+        ? CUSTOM_PIN_PLAN_ONLY_MESSAGE
+        : "Kirish huquqi rejalashtirildi.",
     });
+  }
+
+  // Maxsus PIN o‘rnatish: gateway/Wi‑Fi yo‘q bo‘lsa soxta muvaffaqiyat YO‘Q
+  if (customPinValidated) {
+    const transport = canRemoteInstallCustomPin(roomLock.lock);
+    if (!transport.ok) {
+      return mapGrantToPublic(
+        (await loadGrantBundle(input.propertyId, row.id)) ?? row,
+        {
+          lockName: roomLock.lock.name,
+          lockExternalId: roomLock.lock.externalLockId,
+          syncOutcome: "install_blocked",
+          userMessage: transport.message,
+        }
+      );
+    }
   }
 
   try {
@@ -575,32 +689,72 @@ export async function syncGrantToTtlock(input: {
     grant.validTo ?? new Date(Date.now() + 24 * 60 * 60 * 1000);
   let oneTimePasscode: string | undefined;
   let receiverMasked: string | null = null;
+  let usedCustomPin = false;
 
   try {
     const accessToken = await getValidAccessToken(connection, input.user.id);
 
     if (credType === "PASSCODE") {
-      const created = await createKeyboardPwd({
-        accessToken,
-        lockId: roomLock.lock.externalLockId,
-        startDateMs: validFrom.getTime(),
-        endDateMs: validTo.getTime(),
-        keyboardPwdType: 3,
-      });
-      oneTimePasscode = created.keyboardPwd;
-      const { credentialEncrypted } = encryptAccessCredential(
-        created.keyboardPwd
-      );
-      const syncStatus = derivePersistedSyncAfterSend({
-        validFrom: grant.validFrom,
-        validTo: grant.validTo,
-      });
-      await markCredentialSent({
-        credentialId: claimed.id,
-        externalAccessId: created.keyboardPwdId,
-        credentialEncrypted,
-        syncStatus,
-      });
+      const customEncrypted = claimed.credentialEncrypted?.trim() || null;
+      if (customEncrypted) {
+        usedCustomPin = true;
+        const transport = canRemoteInstallCustomPin(roomLock.lock);
+        if (!transport.ok) {
+          await markCredentialFailed(
+            claimed.id,
+            "TTLOCK_GATEWAY_REQUIRED",
+            transport.message
+          );
+          throw new TtlockError(
+            transport.message,
+            "TTLOCK_GATEWAY_REQUIRED",
+            400
+          );
+        }
+        const pin = decryptAccessCredential(customEncrypted);
+        const added = await addCustomKeyboardPwd({
+          accessToken,
+          lockId: roomLock.lock.externalLockId,
+          keyboardPwd: pin,
+          startDateMs: validFrom.getTime(),
+          endDateMs: validTo.getTime(),
+          addType: 2,
+          keyboardPwdType: 3,
+        });
+        const syncStatus = derivePersistedSyncAfterSend({
+          validFrom: grant.validFrom,
+          validTo: grant.validTo,
+          deviceUnverified: true,
+        });
+        await markCredentialSent({
+          credentialId: claimed.id,
+          externalAccessId: added.keyboardPwdId,
+          credentialEncrypted: customEncrypted,
+          syncStatus,
+        });
+      } else {
+        const created = await createKeyboardPwd({
+          accessToken,
+          lockId: roomLock.lock.externalLockId,
+          startDateMs: validFrom.getTime(),
+          endDateMs: validTo.getTime(),
+          keyboardPwdType: 3,
+        });
+        oneTimePasscode = created.keyboardPwd;
+        const { credentialEncrypted } = encryptAccessCredential(
+          created.keyboardPwd
+        );
+        const syncStatus = derivePersistedSyncAfterSend({
+          validFrom: grant.validFrom,
+          validTo: grant.validTo,
+        });
+        await markCredentialSent({
+          credentialId: claimed.id,
+          externalAccessId: created.keyboardPwdId,
+          credentialEncrypted,
+          syncStatus,
+        });
+      }
     } else {
       const receiver = resolveEkeyReceiver(grant.tenant ?? {});
       if (!receiver.ok) {
@@ -663,8 +817,10 @@ export async function syncGrantToTtlock(input: {
     lockExternalId: roomLock.lock.externalLockId,
     receiverMasked,
     oneTimePasscode,
-    syncOutcome: "synced",
-    userMessage: "Kirish huquqi TTLock’ga muvaffaqiyatli yuborildi.",
+    syncOutcome: usedCustomPin ? "cloud_accepted" : "synced",
+    userMessage: usedCustomPin
+      ? CUSTOM_PIN_CLOUD_ACCEPTED_MESSAGE
+      : "Kirish huquqi TTLock’ga muvaffaqiyatli yuborildi.",
   });
 }
 
@@ -752,12 +908,21 @@ export async function revokeAccessGrant(input: {
     const accessToken = await getValidAccessToken(connection, input.user.id);
     const lock = await prisma.ttlockCachedLock.findUnique({
       where: { id: cred!.ttlockCachedLockId },
+      include: { gateway: true },
     });
     if (!lock) {
       throw new TtlockError("Qulf topilmadi", "TTLOCK_LOCK_NOT_FOUND", 404);
     }
 
     if (revokeKind === "remote_passcode") {
+      const transport = canRemoteInstallCustomPin(lock);
+      if (!transport.ok) {
+        throw new TtlockError(
+          CUSTOM_PIN_REVOKE_GATEWAY_MESSAGE,
+          "TTLOCK_GATEWAY_REQUIRED",
+          400
+        );
+      }
       await deleteKeyboardPwd({
         accessToken,
         lockId: lock.externalLockId,

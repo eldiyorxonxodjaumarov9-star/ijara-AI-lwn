@@ -316,7 +316,7 @@ describe("TTLock phase7 access grants", () => {
     assert.match(hook, /stripOneTimePasscode/);
   });
 
-  it("req20+21+22: future SENT→API’ga yuborilgan; interval→Faol; tugagan→Tugagan", () => {
+  it("req20+21+22: future SENT→API’ga yuborilgan; ACTIVE interval→Faol; tugagan→Tugagan", () => {
     const from = new Date("2026-09-10T05:00:00Z");
     const to = new Date("2026-09-20T05:00:00Z");
     assert.equal(
@@ -337,6 +337,17 @@ describe("TTLock phase7 access grants", () => {
         validFrom: from,
         validTo: to,
         syncStatus: "SENT",
+        hasCredential: true,
+        now: new Date("2026-09-12T00:00:00Z"),
+      }),
+      "API_YUBORILGAN"
+    );
+    assert.equal(
+      resolveAccessEffectiveStatus({
+        grantStatus: "PLANNED",
+        validFrom: from,
+        validTo: to,
+        syncStatus: "ACTIVE",
         hasCredential: true,
         now: new Date("2026-09-12T00:00:00Z"),
       }),

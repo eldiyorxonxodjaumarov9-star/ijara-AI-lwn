@@ -216,7 +216,15 @@ export function LwnRoomManageView({ roomId }: { roomId: string }) {
                     "Qulfni yopish buyrug‘i muvaffaqiyatli yuborildi."
                 );
               }}
-              onCreateTimedPasscode={() => setTab("access-rights")}
+              onCreateTimedPasscode={() => {
+                setTab("access-rights");
+                queueMicrotask(() => {
+                  document
+                    .getElementById("timed-passcode-form")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  document.getElementById("custom-pin-input")?.focus();
+                });
+              }}
               onRevokeAccess={() => setRevokeOpen(true)}
               onSyncHistory={async () => {
                 try {

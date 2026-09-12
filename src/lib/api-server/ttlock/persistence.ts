@@ -3,7 +3,7 @@
  * Token/parol/eKey ochiq matn sifatida saqlanmasin.
  */
 
-import { encryptSecret } from "@/lib/api-server/ttlock/crypto";
+import { decryptSecret, encryptSecret } from "@/lib/api-server/ttlock/crypto";
 import { TtlockError } from "@/lib/api-server/ttlock/errors";
 
 export type TtlockDeviceOnlineStatus = "UNKNOWN" | "ONLINE" | "OFFLINE";
@@ -134,6 +134,14 @@ export function encryptAccessCredential(
   return { credentialEncrypted: encryptSecret(plaintext, keyMaterial) };
 }
 
+/** Shifrlangan credentialni ochish — faqat server sync ichida */
+export function decryptAccessCredential(
+  credentialEncrypted: string,
+  keyMaterial?: string
+): string {
+  return decryptSecret(credentialEncrypted, keyMaterial);
+}
+
 /** API/list javobidan maxfiy maydonlarni olib tashlash */
 const SECRET_KEYS = [
   "accessTokenEncrypted",
@@ -144,6 +152,8 @@ const SECRET_KEYS = [
   "refresh_token",
   "password",
   "client_secret",
+  "customPin",
+  "keyboardPwd",
 ] as const;
 
 export function stripSecretFields<T extends Record<string, unknown>>(

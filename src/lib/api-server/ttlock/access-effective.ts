@@ -5,6 +5,16 @@
 
 import type { TtlockAccessSyncStatus } from "@prisma/client";
 
+export {
+  CUSTOM_PIN_CLOUD_ACCEPTED_MESSAGE,
+  CUSTOM_PIN_GATEWAY_REQUIRED_MESSAGE,
+  CUSTOM_PIN_MAX_LEN,
+  CUSTOM_PIN_MIN_LEN,
+  CUSTOM_PIN_PLAN_ONLY_MESSAGE,
+  CUSTOM_PIN_REVOKE_GATEWAY_MESSAGE,
+  validateCustomKeyboardPin,
+} from "@/lib/ttlock-custom-pin";
+
 /** Toshkent UTC+5, DST yo‘q */
 export const TASHKENT_UTC_OFFSET_HOURS = 5;
 
@@ -142,24 +152,19 @@ export function resolveAccessEffectiveStatus(input: {
   if (isAccessExpired(input.validTo, now)) {
     return "TUGAGAN";
   }
-  if (
-    input.syncStatus === "ACTIVE" ||
-    (input.syncStatus === "SENT" &&
-      isWithinAccessWindow(input.validFrom, input.validTo, now))
-  ) {
-    if (
-      input.syncStatus === "SENT" &&
-      isWithinAccessWindow(input.validFrom, input.validTo, now)
-    ) {
+  // Faqat ACTIVE = qurilma/oyna bo‘yicha faol deb belgilangan.
+  // SENT → hech qachon FAOL (maxsus PIN qurilmada tasdiqlanmaguncha).
+  if (input.syncStatus === "ACTIVE") {
+    if (isWithinAccessWindow(input.validFrom, input.validTo, now)) {
       return "FAOL";
     }
-    if (input.syncStatus === "ACTIVE") return "FAOL";
-  }
-  if (input.syncStatus === "SENT" || input.syncStatus === "EXPIRED") {
-    if (input.syncStatus === "EXPIRED" || isAccessExpired(input.validTo, now)) {
-      return "TUGAGAN";
-    }
     return "API_YUBORILGAN";
+  }
+  if (input.syncStatus === "SENT") {
+    return "API_YUBORILGAN";
+  }
+  if (input.syncStatus === "EXPIRED") {
+    return "TUGAGAN";
   }
   if (!input.hasCredential || input.syncStatus === "PLANNED" || !input.syncStatus) {
     return "REJALASHTIRILGAN";
@@ -172,9 +177,15 @@ export function derivePersistedSyncAfterSend(input: {
   validFrom: Date | null;
   validTo: Date | null;
   now?: Date;
+  /**
+   * Maxsus PIN (add): qurilma tasdiqlanmaguncha ACTIVE qilinmasin —
+   * faqat SENT / EXPIRED.
+   */
+  deviceUnverified?: boolean;
 }): "SENT" | "ACTIVE" | "EXPIRED" {
   const now = input.now ?? new Date();
   if (isAccessExpired(input.validTo, now)) return "EXPIRED";
+  if (input.deviceUnverified) return "SENT";
   if (isWithinAccessWindow(input.validFrom, input.validTo, now)) return "ACTIVE";
   return "SENT";
 }

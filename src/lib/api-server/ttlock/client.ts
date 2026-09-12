@@ -14,6 +14,8 @@ import {
   type TtlockLockCommandResponse,
   type TtlockLockDetailResponse,
   type TtlockGatewayDetailResponse,
+  type TtlockGatewayListByLockResponse,
+  type TtlockGatewayListResponse,
   type TtlockLockListResponse,
   type TtlockLockRecordListResponse,
   type TtlockTokenResponse,
@@ -600,4 +602,68 @@ export async function fetchGatewayDetail(input: {
       date: nowMs(),
     }
   );
+}
+
+/** Rasmiy: hisobdagi gateway ro‘yxati — GET /v3/gateway/list */
+export async function fetchGatewayListPage(input: {
+  accessToken: string;
+  pageNo: number;
+  pageSize?: number;
+}): Promise<TtlockGatewayListResponse> {
+  const cfg = requireConfig();
+  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 100));
+  const json = await ttlockFetchGetJson<TtlockGatewayListResponse>(
+    TTLOCK_ENDPOINTS.gatewayList,
+    {
+      clientId: cfg.clientId,
+      accessToken: input.accessToken,
+      pageNo: input.pageNo,
+      pageSize,
+      date: nowMs(),
+    },
+    { timeoutMs: DEFAULT_TIMEOUT_MS }
+  );
+  if (typeof json.errcode === "number" && json.errcode !== 0) {
+    throw mapTtlockBusinessCode(json.errcode, json.errmsg);
+  }
+  return json;
+}
+
+export async function fetchAllGateways(accessToken: string) {
+  const all: NonNullable<TtlockGatewayListResponse["list"]> = [];
+  let pageNo = 1;
+  const pageSize = 100;
+  for (let i = 0; i < 50; i++) {
+    const page = await fetchGatewayListPage({ accessToken, pageNo, pageSize });
+    const list = page.list ?? [];
+    all.push(...list);
+    if (list.length < pageSize) break;
+    pageNo += 1;
+  }
+  return all;
+}
+
+/**
+ * Rasmiy: qulfga bog‘langan gateway’lar — GET /v3/gateway/listByLock
+ * (gateway server cache ~30 daqiqa)
+ */
+export async function fetchGatewaysByLock(input: {
+  accessToken: string;
+  lockId: string | number;
+}): Promise<TtlockGatewayListByLockResponse> {
+  const cfg = requireConfig();
+  const json = await ttlockFetchGetJson<TtlockGatewayListByLockResponse>(
+    TTLOCK_ENDPOINTS.gatewayListByLock,
+    {
+      clientId: cfg.clientId,
+      accessToken: input.accessToken,
+      lockId: input.lockId,
+      date: nowMs(),
+    },
+    { timeoutMs: DEFAULT_TIMEOUT_MS }
+  );
+  if (typeof json.errcode === "number" && json.errcode !== 0) {
+    throw mapTtlockBusinessCode(json.errcode, json.errmsg);
+  }
+  return json;
 }

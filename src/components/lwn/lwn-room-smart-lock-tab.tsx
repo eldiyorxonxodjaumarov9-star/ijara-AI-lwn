@@ -164,6 +164,14 @@ export function LwnRoomSmartLockTab({
                   />
                   <InfoRow label="Gateway" value={detail.gatewayLabel} />
                   <InfoRow
+                    label="API ulanish holati"
+                    value={
+                      <Badge variant="success" className="font-normal">
+                        Ulangan
+                      </Badge>
+                    }
+                  />
+                  <InfoRow
                     label="Izoh"
                     value={settings?.notes?.trim() || "—"}
                   />

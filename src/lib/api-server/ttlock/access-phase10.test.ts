@@ -19,6 +19,7 @@ import {
 } from "./config";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { isTtlockDbReady, resetTtlockDbReadyCache } from "./db";
+import { TTLOCK_DEBT_AUTO_LOCK_ENABLED } from "./service";
 import { TTLOCK_EMPTY_LOCKS_MESSAGE } from "@/lib/ttlock-settings-view";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -145,7 +146,10 @@ describe("TTLock phase10 release audit", () => {
     );
     const service = readFileSync(join(ttlockDir, "service.ts"), "utf8");
     assert.match(service, /softRemoveMissingLocks/);
+    assert.match(service, /fetchAllGateways/);
+    assert.match(service, /TTLOCK_EMPTY_LOCK_LIST/);
     assert.equal(service.includes('DELETE FROM "ttlock_cached_locks"'), false);
+    assert.equal(TTLOCK_DEBT_AUTO_LOCK_ENABLED, false);
   });
 
   it("p10-5: UI panel guards", () => {
@@ -160,8 +164,7 @@ describe("TTLock phase10 release audit", () => {
 
   it("p10-6: migrations + db ready probe", () => {
     const migDir = join(repoRoot, "server/prisma/migrations");
-    const files = readdirSync(migDir).filter((f) => f.includes("ttlock"));
-    assert.equal(files.length, 6);
+    const files = readdirSync(migDir);
     const ordered = [
       "20260831100000_lwn_room_lock_baseline",
       "20260831110000_ttlock_integration",
@@ -171,6 +174,10 @@ describe("TTLock phase10 release audit", () => {
       "20260831150000_ttlock_callback_phase9",
       "20260831160000_ttlock_callback_hardening",
     ];
+    assert.equal(
+      files.filter((f) => f.includes("ttlock") || f.includes("lwn_room_lock")).length,
+      ordered.length
+    );
     for (const name of ordered) {
       assert.ok(files.some((f) => f.startsWith(name)), name);
     }

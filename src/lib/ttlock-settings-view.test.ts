@@ -45,6 +45,7 @@ function baseStatus(
       lastErrorCode: null,
       lastErrorMessage: null,
       lockCount: 0,
+      gatewayCount: 0,
       ...connection,
     },
   };

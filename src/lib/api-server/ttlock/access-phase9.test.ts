@@ -431,6 +431,8 @@ describe("TTLock phase9 callback", () => {
     assert.equal(TTLOCK_ENDPOINTS.lockRecordList, "/v3/lockRecord/list");
     assert.equal(TTLOCK_ENDPOINTS.lockDetail, "/v3/lock/detail");
     assert.equal(TTLOCK_ENDPOINTS.gatewayDetail, "/v3/gateway/detail");
+    assert.equal(TTLOCK_ENDPOINTS.gatewayList, "/v3/gateway/list");
+    assert.equal(TTLOCK_ENDPOINTS.gatewayListByLock, "/v3/gateway/listByLock");
   });
 
   it("50 talab mapping jadvali", () => {

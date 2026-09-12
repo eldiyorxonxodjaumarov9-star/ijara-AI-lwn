@@ -25,6 +25,8 @@ export type TtlockPublicStatus = {
     lastErrorCode: string | null;
     lastErrorMessage: string | null;
     lockCount: number;
+    /** Faol gateway cache soni (hisob sync) */
+    gatewayCount: number;
   };
   callback?: {
     callbackUrl: string;
@@ -51,6 +53,8 @@ export type TtlockPublicLock = {
   online: boolean | null;
   /** Canonical online holat */
   onlineStatus: "UNKNOWN" | "ONLINE" | "OFFLINE";
+  gatewayName: string | null;
+  gatewayOnlineStatus: "UNKNOWN" | "ONLINE" | "OFFLINE" | null;
   isActive: boolean;
   lastSyncedAt: string | null;
 };

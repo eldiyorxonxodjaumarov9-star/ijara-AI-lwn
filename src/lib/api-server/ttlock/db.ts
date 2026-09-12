@@ -358,6 +358,35 @@ export async function countLocks(connectionId: string): Promise<number> {
   return Number(rows[0]?.count ?? 0);
 }
 
+export async function countGateways(connectionId: string): Promise<number> {
+  const rows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
+    `SELECT COUNT(*)::bigint AS count FROM "ttlock_gateways"
+     WHERE "connectionId" = $1 AND "isActive" = true`,
+    connectionId
+  );
+  return Number(rows[0]?.count ?? 0);
+}
+
+export type TtlockCachedLockWithGateway = TtlockCachedLockRow & {
+  gatewayName: string | null;
+  gatewayOnlineStatus: TtlockDeviceOnlineStatus | null;
+};
+
+export async function listLocksWithGateway(
+  connectionId: string
+): Promise<TtlockCachedLockWithGateway[]> {
+  return prisma.$queryRawUnsafe<TtlockCachedLockWithGateway[]>(
+    `SELECT l.*,
+            g."name" AS "gatewayName",
+            g."onlineStatus" AS "gatewayOnlineStatus"
+     FROM "ttlock_cached_locks" l
+     LEFT JOIN "ttlock_gateways" g ON g."id" = l."gatewayId"
+     WHERE l."connectionId" = $1
+     ORDER BY l."isActive" DESC, l."name" ASC`,
+    connectionId
+  );
+}
+
 export async function listLocks(
   connectionId: string
 ): Promise<TtlockCachedLockRow[]> {

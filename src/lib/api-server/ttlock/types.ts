@@ -60,6 +60,16 @@ export const TTLOCK_ENDPOINTS = {
    * @see https://euopen.ttlock.com/documentPages/htmlPages/cloud/gateway/detailEn.html
    */
   gatewayDetail: "/v3/gateway/detail",
+  /**
+   * Rasmiy EU Open API: GET /v3/gateway/list
+   * @see https://euopen.ttlock.com/doc/api/v3/gateway/list
+   */
+  gatewayList: "/v3/gateway/list",
+  /**
+   * Rasmiy EU Open API: GET /v3/gateway/listByLock
+   * @see https://euopen.ttlock.com/documentPages/htmlPages/cloud/gateway/listByLockEn.html
+   */
+  gatewayListByLock: "/v3/gateway/listByLock",
 } as const;
 
 export type TtlockTokenResponse = {
@@ -168,6 +178,40 @@ export type TtlockGatewayDetailResponse = {
   gatewayName?: string;
   isOnline?: number;
   lockNum?: number;
+  errcode?: number;
+  errmsg?: string;
+};
+
+export type TtlockGatewayListItem = {
+  gatewayId: number | string;
+  gatewayMac?: string;
+  gatewayName?: string;
+  gatewayVersion?: number;
+  networkName?: string;
+  lockNum?: number;
+  isOnline?: number;
+};
+
+export type TtlockGatewayListResponse = {
+  list?: TtlockGatewayListItem[];
+  pageNo?: number;
+  pageSize?: number;
+  pages?: number;
+  total?: number;
+  errcode?: number;
+  errmsg?: string;
+};
+
+export type TtlockGatewayByLockItem = {
+  gatewayId: number | string;
+  gatewayMac?: string;
+  gatewayName?: string;
+  rssi?: number;
+  rssiUpdateDate?: number;
+};
+
+export type TtlockGatewayListByLockResponse = {
+  list?: TtlockGatewayByLockItem[];
   errcode?: number;
   errmsg?: string;
 };

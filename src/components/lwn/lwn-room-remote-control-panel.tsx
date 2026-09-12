@@ -48,16 +48,21 @@ function ActionButton({
   onClick?: () => void;
 }) {
   return (
-    <Button
-      variant="outline"
-      className="w-full justify-start sm:w-auto"
-      disabled={disabled || loading}
-      title={disabled && reason ? reason : undefined}
-      onClick={onClick}
-    >
-      {loading ? <Loader2 className="size-4 animate-spin" /> : icon}
-      <span className="truncate">{label}</span>
-    </Button>
+    <div className="flex w-full flex-col gap-1 sm:w-auto">
+      <Button
+        variant="outline"
+        className="w-full justify-start sm:w-auto"
+        disabled={disabled || loading}
+        title={disabled && reason ? reason : undefined}
+        onClick={onClick}
+      >
+        {loading ? <Loader2 className="size-4 animate-spin" /> : icon}
+        <span className="truncate">{label}</span>
+      </Button>
+      {disabled && reason ? (
+        <p className="px-1 text-xs text-muted-foreground">{reason}</p>
+      ) : null}
+    </div>
   );
 }
 

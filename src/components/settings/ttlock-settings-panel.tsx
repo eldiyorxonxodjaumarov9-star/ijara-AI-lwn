@@ -381,6 +381,22 @@ export function TtlockSettingsPanel() {
                 <p className="text-muted-foreground">Topilgan qulflar</p>
                 <p className="font-medium">{conn?.lockCount ?? locks.length} ta</p>
               </div>
+              <div>
+                <p className="text-muted-foreground">Topilgan gateway</p>
+                <p className="font-medium">{conn?.gatewayCount ?? 0} ta</p>
+              </div>
+            </div>
+          )}
+
+          {phase === "connected" && (conn?.lockCount ?? 0) === 0 && (
+            <div
+              role="status"
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm"
+            >
+              Hisob ulangan, lekin cache’da qulf yo‘q. TTLock ilovasida qulf
+              qo‘shilganini tekshiring, so‘ng «Qulflarni sinxronlash»ni bosing.
+              Shundan keyin Xonalar → Xonani boshqarishda qulfni biriktirish
+              mumkin.
             </div>
           )}
 
@@ -509,7 +525,19 @@ export function TtlockSettingsPanel() {
                         <p>Batareya: {formatTtlockBattery(lock.battery)}</p>
                         <p>
                           Gateway:{" "}
-                          {lock.hasGateway ? "Mavjud" : "Yo‘q"}
+                          {lock.gatewayName
+                            ? `${lock.gatewayName} · ${
+                                lock.gatewayOnlineStatus === "ONLINE"
+                                  ? "onlayn"
+                                  : lock.gatewayOnlineStatus === "OFFLINE"
+                                    ? "oflayn"
+                                    : lock.hasGateway
+                                      ? "holat noma’lum"
+                                      : "yo‘q"
+                              }`
+                            : lock.hasGateway
+                              ? "Bog‘langan (nom noma’lum)"
+                              : "Yo‘q"}
                         </p>
                         <p>
                           Sinxron: {formatTtlockDateTime(lock.lastSyncedAt)}

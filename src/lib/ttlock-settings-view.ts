@@ -97,6 +97,8 @@ export function mapTtlockUiError(
       return "TTLock javobi tasdiqlanmadi. Qulf holatini tekshiring.";
     case "TTLOCK_NO_REVOCABLE_ACCESS":
       return "Bekor qilish uchun faol kirish huquqi topilmadi.";
+    case "TTLOCK_EMPTY_LOCK_LIST":
+      return "TTLock API bo‘sh qulf ro‘yxatini qaytardi; mavjud cache saqlandi. Qulfni ilovada tekshiring va qayta sinxronlang.";
     default:
       break;
   }
@@ -310,6 +312,7 @@ export function sanitizeTtlockStatus(
           ? null
           : String(connection.lastErrorMessage),
       lockCount: Number(connection.lockCount ?? 0) || 0,
+      gatewayCount: Number(connection.gatewayCount ?? 0) || 0,
     },
     ...(callbackRaw
       ? {
@@ -394,6 +397,13 @@ export function sanitizeTtlockLocks(raw: unknown): TtlockPublicLock[] {
             ? false
             : null,
       onlineStatus,
+      gatewayName: o.gatewayName == null ? null : String(o.gatewayName),
+      gatewayOnlineStatus:
+        o.gatewayOnlineStatus === "ONLINE" ||
+        o.gatewayOnlineStatus === "OFFLINE" ||
+        o.gatewayOnlineStatus === "UNKNOWN"
+          ? o.gatewayOnlineStatus
+          : null,
       isActive: o.isActive !== false,
       lastSyncedAt:
         o.lastSyncedAt == null ? null : String(o.lastSyncedAt),

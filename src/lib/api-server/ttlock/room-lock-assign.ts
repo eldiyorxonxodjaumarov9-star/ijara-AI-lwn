@@ -193,7 +193,7 @@ export async function listAssignableTtlockLocks(
        g."externalGatewayId" AS "gatewayExternalId",
        g."onlineStatus"::text AS "gatewayOnlineStatus",
        rls."propertyId" AS "assignedPropertyId",
-       p."name" AS "assignedPropertyName"
+       p."title" AS "assignedPropertyName"
      FROM "ttlock_cached_locks" l
      INNER JOIN "ttlock_connections" c ON c."id" = l."connectionId"
      LEFT JOIN "ttlock_gateways" g ON g."id" = l."gatewayId"
@@ -322,7 +322,7 @@ export async function assignTtlockLockToRoom(input: {
       }
 
       const other = await tx.$queryRawUnsafe<{ propertyId: string; name: string | null }[]>(
-        `SELECT rls."propertyId", p."name"
+        `SELECT rls."propertyId", p."title" AS "name"
          FROM "room_lock_settings" rls
          LEFT JOIN "properties" p ON p."id" = rls."propertyId"
          WHERE rls."ttlockCachedLockId" = $1 AND rls."propertyId" <> $2

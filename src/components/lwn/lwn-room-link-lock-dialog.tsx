@@ -120,7 +120,9 @@ function LwnRoomLinkLockForm({
   room: Property;
   initial: RoomLockSettingsRecord | null;
   saving: boolean;
-  onSave: (input: SaveLockSettingsInput) => Promise<void>;
+  onSave: (
+    input: SaveLockSettingsInput
+  ) => Promise<RoomLockSettingsRecord | void | null>;
   onAfterMutation?: () => Promise<void> | void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -248,11 +250,21 @@ function LwnRoomLinkLockForm({
         const isReplace =
           Boolean(previousLockId) && previousLockId !== selectedLockId;
         const isSame = previousLockId === selectedLockId;
-        await onSave({
+        const saved = await onSave({
           providerName: TTLOCK_PROVIDER_LABEL,
           ttlockCachedLockId: selectedLockId,
           notes: notes.trim() || null,
         });
+        const boundId =
+          saved && typeof saved === "object"
+            ? saved.ttlockCachedLockId
+            : null;
+        if (!boundId || boundId !== selectedLockId) {
+          toast.error(
+            "Qulf biriktirilmadi. Ro‘yxatni yangilab qayta urinib ko‘ring."
+          );
+          return;
+        }
         if (isReplace) {
           toast.success("Xonaga biriktirilgan qulf yangilandi.");
         } else if (isSame && previousLockId) {
@@ -281,8 +293,14 @@ function LwnRoomLinkLockForm({
       toast.success("Qulf sozlamalari saqlandi");
       await onAfterMutation?.();
       onOpenChange(false);
-    } catch {
-      /* tanlov saqlanadi */
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? mapTtlockUiError(err.code, err.message)
+          : err instanceof Error
+            ? err.message
+            : "Qulf sozlamalarini saqlab bo‘lmadi"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -291,16 +309,26 @@ function LwnRoomLinkLockForm({
   const handleUnlink = async () => {
     setSubmitting(true);
     try {
-      await onSave({
+      const saved = await onSave({
         providerName: TTLOCK_PROVIDER_LABEL,
         ttlockCachedLockId: null,
         notes: notes.trim() || null,
       });
+      if (saved && typeof saved === "object" && saved.ttlockCachedLockId) {
+        toast.error("Qulf ajratilmadi. Qayta urinib ko‘ring.");
+        return;
+      }
       toast.success("Qulf xonadan muvaffaqiyatli ajratildi.");
       await onAfterMutation?.();
       onOpenChange(false);
-    } catch {
-      /* keep */
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? mapTtlockUiError(err.code, err.message)
+          : err instanceof Error
+            ? err.message
+            : "Qulfni ajratib bo‘lmadi"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -612,7 +640,9 @@ export function LwnRoomLinkLockDialog({
   room: Property;
   initial: RoomLockSettingsRecord | null;
   saving: boolean;
-  onSave: (input: SaveLockSettingsInput) => Promise<void>;
+  onSave: (
+    input: SaveLockSettingsInput
+  ) => Promise<RoomLockSettingsRecord | void | null>;
   onAfterMutation?: () => Promise<void> | void;
 }) {
   const formKey = `${initial?.id ?? "new"}:${initial?.updatedAt ?? "0"}:${open ? "1" : "0"}`;

@@ -99,6 +99,10 @@ export function mapTtlockUiError(
       return "Bekor qilish uchun faol kirish huquqi topilmadi.";
     case "TTLOCK_EMPTY_LOCK_LIST":
       return "TTLock API bo‘sh qulf ro‘yxatini qaytardi; mavjud cache saqlandi. Qulfni ilovada tekshiring va qayta sinxronlang.";
+    case "TTLOCK_LOCK_REQUIRED":
+      return "TTLock qulfini tanlang yoki qo‘lda provayderni kiriting.";
+    case "TTLOCK_ASSIGN_INCOMPLETE":
+      return "Qulf biriktirilmadi. Qayta urinib ko‘ring.";
     default:
       break;
   }

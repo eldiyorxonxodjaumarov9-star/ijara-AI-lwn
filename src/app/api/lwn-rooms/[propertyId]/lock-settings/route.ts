@@ -93,17 +93,34 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
         : String(body.ttlockCachedLockId).trim() || null;
 
     // Client lockName / battery / online e’tiborga olinmaydi
-    if (isTtlock && ttlockRaw) {
-      await assignTtlockLockToRoom({
-        user: auth.user,
-        propertyId,
-        ttlockCachedLockId: ttlockRaw,
-        notes,
-      });
-      return ok(await loadMappedSettings(propertyId, auth.user));
-    }
+    if (isTtlock) {
+      if (ttlockRaw) {
+        await assignTtlockLockToRoom({
+          user: auth.user,
+          propertyId,
+          ttlockCachedLockId: ttlockRaw,
+          notes,
+        });
+        const mapped = await loadMappedSettings(propertyId, auth.user);
+        if (!mapped?.ttlockCachedLockId) {
+          return fail(
+            "Qulf biriktirilmadi. Qayta urinib ko‘ring.",
+            500,
+            "TTLOCK_ASSIGN_INCOMPLETE"
+          );
+        }
+        return ok(mapped);
+      }
 
-    if (isTtlock && hasTtlockField && !ttlockRaw) {
+      // Faqat aniq unassign (ttlockCachedLockId: null) — aks holda notes-only “soxta” TTLock saqlashni rad etamiz
+      if (!hasTtlockField) {
+        return fail(
+          "TTLock qulfini tanlang yoki qo‘lda provayderni kiriting.",
+          400,
+          "TTLOCK_LOCK_REQUIRED"
+        );
+      }
+
       await unassignTtlockLockFromRoom({
         user: auth.user,
         propertyId,

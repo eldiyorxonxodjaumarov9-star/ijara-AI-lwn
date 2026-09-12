@@ -413,6 +413,14 @@ describe("TTLock phase6 room lock assign", () => {
     assert.equal(/CREATE TABLE|ALTER TABLE/i.test(routeSrc()), false);
   });
 
+  it("properties.title ishlatiladi (name emas) — assignable list SQL", () => {
+    const src = assignSrc();
+    assert.match(src, /p\."title" AS "assignedPropertyName"/);
+    assert.match(src, /p\."title" AS "name"/);
+    assert.equal(/p\."name" AS "assignedPropertyName"/.test(src), false);
+    assert.equal(/SELECT rls\."propertyId", p\."name"\s/.test(src), false);
+  });
+
   it(
     "parallel concurrency haqiqiy DB testi — SKIP (muhit yo‘q)",
     { skip: "Haqiqiy Neon/Postgres concurrency muhiti yo‘q — PASS deb yozilmaydi" },

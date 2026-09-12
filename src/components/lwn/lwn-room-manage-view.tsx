@@ -196,7 +196,7 @@ export function LwnRoomManageView({ roomId }: { roomId: string }) {
               remoteStatusLoading={remoteStatusLoading}
               remoteBusy={remoteBusy}
               onSaveSettings={async (input) => {
-                await saveSettings(input);
+                return await saveSettings(input);
               }}
               onAfterLockMutation={async () => {
                 await reload();

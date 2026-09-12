@@ -66,7 +66,9 @@ export function LwnRoomSmartLockTab({
   remoteStatus: RemoteControlStatusRecord | null;
   remoteStatusLoading: boolean;
   remoteBusy: boolean;
-  onSaveSettings: (input: SaveLockSettingsInput) => Promise<void>;
+  onSaveSettings: (
+    input: SaveLockSettingsInput
+  ) => Promise<RoomLockSettingsRecord | void | null>;
   onAfterLockMutation?: () => Promise<void> | void;
   onRefreshRemoteStatus: () => Promise<void>;
   onRemoteUnlock: () => Promise<void>;

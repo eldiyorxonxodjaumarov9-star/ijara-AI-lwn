@@ -44,7 +44,7 @@ export function LandingDashboardSection() {
                   <div className="size-3 rounded-full bg-red-500/80" />
                   <div className="size-3 rounded-full bg-yellow-500/80" />
                   <div className="size-3 rounded-full bg-green-500/80" />
-                  <span className="ml-2 text-xs text-slate-500">Arenda AI Dashboard</span>
+                  <span className="ml-2 text-xs text-slate-500">Ijara AI Dashboard</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {["Mulklar", "Arendatorlar", "To'lovlar", "Hisobotlar"].map(

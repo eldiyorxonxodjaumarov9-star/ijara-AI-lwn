@@ -11,7 +11,7 @@ import type {
   Role,
 } from "@/types";
 
-export const APP_NAME = "ArendaAi";
+export const APP_NAME = "Ijara AI";
 
 /** Live Work Network binosi */
 export const LWN_BUILDING = "LWN";

@@ -21,7 +21,7 @@ export function LandingHero() {
           </div>
 
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Arenda AI — O&apos;zbekistondagi ijara va ko&apos;chmas mulk bozori
+            Ijara AI — O&apos;zbekistondagi ijara va ko&apos;chmas mulk bozori
             uchun{" "}
             <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-300 bg-clip-text text-transparent">
               aqlli AI platforma

@@ -143,7 +143,7 @@ export function AiSearchPortal() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Badge variant="secondary">{item.propertyType}</Badge>
                         <Badge variant="outline" className="border-white/20 text-slate-400">
-                          {item.source === "landlord" ? "Ijara egasi" : "Arenda AI"}
+                          {item.source === "landlord" ? "Ijara egasi" : "Ijara AI"}
                         </Badge>
                       </div>
                     </article>

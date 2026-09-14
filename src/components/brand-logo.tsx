@@ -15,7 +15,7 @@ export function BrandLogo({
       </div>
       {showText && (
         <span className="text-lg font-bold tracking-tight">
-          Arenda<span className="text-primary">Ai</span>
+          Ijara<span className="text-primary"> AI</span>
         </span>
       )}
     </div>

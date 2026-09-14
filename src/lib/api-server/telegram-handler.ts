@@ -315,7 +315,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
   if (text.startsWith("/help") || text.startsWith("/yordam")) {
     await sendTelegramMessage(
       chatId,
-      "<b>ArendaAi bot</b>\n\n" +
+      "<b>Ijara AI bot</b>\n\n" +
         "/start — menyu\n\n" +
         "<b>Xodim:</b> telefon orqali bog‘lanish + vazifalar.\n" +
         "<b>Arendator:</b> telefon orqali tasdiqlash.\n" +

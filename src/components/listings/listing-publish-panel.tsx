@@ -180,7 +180,7 @@ export function ListingPublishPanel({
       images: form.images.length ? form.images : undefined,
       status: form.status,
       landlordEmail: email,
-      landlordName: landlordName.trim() || "ArendaAi",
+      landlordName: landlordName.trim() || "Ijara AI",
     });
 
     if (!result.ok) {
@@ -201,7 +201,7 @@ export function ListingPublishPanel({
         images: result.listing.images,
         status: result.listing.status,
         landlordEmail: email,
-        landlordName: landlordName.trim() || "ArendaAi",
+        landlordName: landlordName.trim() || "Ijara AI",
         legacyLocalId: result.listing.id,
         scheduledAt: form.scheduleAt
           ? new Date(form.scheduleAt).toISOString()

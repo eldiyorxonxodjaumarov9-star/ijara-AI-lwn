@@ -37,7 +37,7 @@ export function buildPaymentReminderMessage(
   const greeting = slot ? `${SLOT_GREETING[slot]} ` : "";
   return (
     `${greeting}Assalomu alaykum, ${d.tenantName}! ${place} qarzdorlik mavjud. ` +
-    `Iltimos, admin bilan bog'laning. Qarzdorlikni o'z vaqtida to'lang va keyingi oylarda ham o'z vaqtida to'lab boring. — ArendaAi`
+    `Iltimos, admin bilan bog'laning. Qarzdorlikni o'z vaqtida to'lang va keyingi oylarda ham o'z vaqtida to'lab boring. — Ijara AI`
   );
 }
 

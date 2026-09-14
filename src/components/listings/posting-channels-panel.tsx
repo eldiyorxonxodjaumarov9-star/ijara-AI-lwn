@@ -204,7 +204,7 @@ export function PostingChannelsPanel({ hideInstagram = false }: { hideInstagram?
 
             {ch.platform === "ARENDA_INTERNAL" && (
               <p className="text-sm text-muted-foreground">
-                Ichki Arenda AI bazasi — e&apos;lon ijara qidiruvda avtomatik ko&apos;rinadi.
+                Ichki Ijara AI bazasi — e&apos;lon ijara qidiruvda avtomatik ko&apos;rinadi.
               </p>
             )}
 

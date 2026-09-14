@@ -30,10 +30,10 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
           onClick={closeMenu}
         >
           <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-blue-500/30">
-            <span className="text-sm font-bold">A</span>
+            <span className="text-sm font-bold">I</span>
           </div>
           <span className="text-lg font-bold tracking-tight text-white">
-            Arenda<span className="text-cyan-400"> AI</span>
+            Ijara<span className="text-cyan-400"> AI</span>
           </span>
         </Link>
 

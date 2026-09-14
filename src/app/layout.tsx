@@ -15,24 +15,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://ijaraai.uz"),
   title: {
-    default: "ArendaAi — Ko'chmas mulk ijarasi boshqaruvi",
-    template: "%s | ArendaAi",
+    default: "Ijara AI — Ko'chmas mulk ijarasi boshqaruvi",
+    template: "%s | Ijara AI",
   },
   description:
-    "ArendaAi — ko'chmas mulk ijarasini boshqarish uchun zamonaviy SaaS platforma: mulklar, arendatorlar, shartnomalar, to'lovlar va hisobotlar.",
+    "Ijara AI — ko'chmas mulk ijarasini boshqarish uchun zamonaviy SaaS platforma: mulklar, arendatorlar, shartnomalar, to'lovlar va hisobotlar.",
   keywords: [
-    "arenda",
-    "ArendaAi",
+    "ijara",
+    "Ijara AI",
     "ko'chmas mulk",
     "ijara boshqaruvi",
     "property management",
   ],
-  authors: [{ name: "ArendaAi" }],
+  authors: [{ name: "Ijara AI" }],
   openGraph: {
-    title: "ArendaAi",
+    title: "Ijara AI",
     description: "Ko'chmas mulk ijarasi boshqaruv platformasi",
     type: "website",
+    url: "https://ijaraai.uz",
   },
 };
 

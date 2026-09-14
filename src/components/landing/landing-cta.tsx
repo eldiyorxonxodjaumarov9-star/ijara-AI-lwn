@@ -9,7 +9,7 @@ export function LandingCta() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.15),transparent_50%)]" />
           <div className="relative">
             <h2 className="text-3xl font-bold text-white sm:text-4xl">
-              Arenda AI bilan ijara jarayonini aqlli boshqaring
+              Ijara AI bilan ijara jarayonini aqlli boshqaring
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-blue-100">
               Ijara qidiring yoki e&apos;lon joylang — barchasi bir platformada.

@@ -15,7 +15,7 @@ export function generateAiPostBase(listing: ListingPostInput) {
   if (listing.description?.trim()) {
     lines.push("", listing.description.trim());
   }
-  lines.push("", "Batafsil ma'lumot uchun Arenda AI orqali bog'laning.");
+  lines.push("", "Batafsil ma'lumot uchun Ijara AI orqali bog'laning.");
   return lines.join("\n");
 }
 
@@ -32,7 +32,7 @@ export function generateTelegramPost(listing: ListingPostInput) {
   if (listing.description?.trim()) {
     lines.push("", escapeHtml(listing.description.trim()));
   }
-  lines.push("", "📲 Batafsil: Arenda AI orqali bog'laning");
+  lines.push("", "📲 Batafsil: Ijara AI orqali bog'laning");
   return lines.join("\n");
 }
 
@@ -56,7 +56,7 @@ export function generateFormalPost(listing: ListingPostInput, platform: string) 
     "",
     generateAiPostBase(listing),
     "",
-    "Aloqa: Arenda AI platformasi orqali",
+    "Aloqa: Ijara AI platformasi orqali",
   ].join("\n");
 }
 
@@ -124,7 +124,7 @@ export function getGeneratedText(listing: ListingPostInput, platform: PostingPla
     case "INSTAGRAM":
       return generateInstagramPost(listing);
     case "ARENDA_INTERNAL":
-      return generateFormalPost(listing, "Arenda AI");
+      return generateFormalPost(listing, "Ijara AI");
     default:
       return generateFormalPost(
         listing,

@@ -152,7 +152,7 @@ export function notifyTenantPaymentLocal(
   const notification: AppNotification = {
     id: crypto.randomUUID(),
     title: "To'lov qabul qilindi",
-    message: `Assalomu alaykum, ${tenantName}! ${propertyName} bo'yicha ${new Intl.NumberFormat("uz-UZ").format(Math.round(amount))} UZS to'lovingiz qabul qilindi. Rahmat! — ArendaAi`,
+    message: `Assalomu alaykum, ${tenantName}! ${propertyName} bo'yicha ${new Intl.NumberFormat("uz-UZ").format(Math.round(amount))} UZS to'lovingiz qabul qilindi. Rahmat! — Ijara AI`,
     type: "success",
     read: false,
     createdAt: new Date().toISOString(),

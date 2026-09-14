@@ -122,7 +122,7 @@ export function publicAppOrigin(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
     process.env.APP_URL?.replace(/\/$/, "") ||
-    "https://www.arendaai.uz"
+    "https://ijaraai.uz"
   );
 }
 

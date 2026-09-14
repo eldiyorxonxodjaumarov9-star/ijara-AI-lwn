@@ -22,7 +22,7 @@ export function generateTelegramDistributionCaption(
   const baseUrl =
     listingUrl ??
     process.env.NEXT_PUBLIC_APP_URL?.trim() ??
-    "https://www.arendaai.uz";
+    "https://ijaraai.uz";
   const link = `${baseUrl.replace(/\/$/, "")}/ijara-qidiruv`;
 
   const regionLabel = listing.region?.trim() || listing.district;
@@ -47,7 +47,7 @@ export function generateTelegramDistributionCaption(
   const tags = [
     "#ijara",
     "#toshkent",
-    "#arendaai",
+    "#ijaraai",
     "#uzbekistan",
     `#${slugTag(regionLabel)}`,
     `#${slugTag(listing.propertyType)}`,
@@ -55,7 +55,7 @@ export function generateTelegramDistributionCaption(
 
   lines.push(
     "",
-    `🔗 <a href="${link}">Batafsil Arenda AI</a>`,
+    `🔗 <a href="${link}">Batafsil Ijara AI</a>`,
     "",
     tags
   );

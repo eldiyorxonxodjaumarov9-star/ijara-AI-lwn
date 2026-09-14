@@ -171,7 +171,7 @@ export async function sendTestChannelMessage(
   channelName: string
 ) {
   const text = [
-    "✅ <b>Arenda AI — test xabari</b>",
+    "✅ <b>Ijara AI — test xabari</b>",
     "",
     `Kanal: ${channelName}`,
     `Vaqt: ${new Date().toLocaleString("uz-UZ", { timeZone: "Asia/Tashkent" })}`,

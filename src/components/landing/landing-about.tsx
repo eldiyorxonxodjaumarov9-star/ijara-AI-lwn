@@ -27,7 +27,7 @@ export function LandingAbout() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">
-            Arenda AI nima qiladi?
+            Ijara AI nima qiladi?
           </h2>
           <p className="mt-4 text-lg text-slate-400">
             Biz ijara jarayonini sun&apos;iy intellekt yordamida soddalashtiramiz —

@@ -95,7 +95,7 @@ export type ListingWithJobs = {
 };
 
 export const PLATFORM_LABELS: Record<PostingPlatform, string> = {
-  ARENDA_INTERNAL: "Arenda AI",
+  ARENDA_INTERNAL: "Ijara AI",
   TELEGRAM: "Telegram",
   INSTAGRAM: "Instagram",
   OLX: "OLX.uz",

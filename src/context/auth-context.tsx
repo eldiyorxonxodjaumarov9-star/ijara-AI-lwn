@@ -111,7 +111,7 @@ const DEFAULT_DEMO_USER: AppUser & { password: string } = {
   password: "123456",
   displayName: "Demo Administrator",
   role: "admin",
-  company: "ArendaAi",
+  company: "Ijara AI",
   language: "uz",
   createdAt: new Date().toISOString(),
 };

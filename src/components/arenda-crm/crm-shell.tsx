@@ -125,7 +125,7 @@ export function CrmSidebar({
           <div className="rounded-xl bg-gradient-to-br from-[#2563EB]/20 to-[#38BDF8]/10 p-3 ring-1 ring-[#38BDF8]/20">
             <div className="flex items-center gap-2 text-[#38BDF8]">
               <Sparkles className="size-4" />
-              <span className="text-xs font-semibold">Arenda AI</span>
+              <span className="text-xs font-semibold">Ijara AI</span>
             </div>
             <p className="mt-1 text-xs text-slate-400">
               AI broker, narx va reklama generatori tayyor

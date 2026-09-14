@@ -54,8 +54,8 @@ export function getPlatformContact(): { email: string; name: string } {
     null
   );
   return {
-    email: session?.email?.trim() || "platform@arendaai.uz",
-    name: session?.displayName?.trim() || "Arenda AI",
+    email: session?.email?.trim() || "platform@ijaraai.uz",
+    name: session?.displayName?.trim() || "Ijara AI",
   };
 }
 

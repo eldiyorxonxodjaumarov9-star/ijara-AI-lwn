@@ -3,7 +3,7 @@
  */
 
 export const TTLOCK_CALLBACK_DEFAULT_URL =
-  "https://www.arendaai.uz/api/integrations/ttlock/callback";
+  "https://ijaraai.uz/api/integrations/ttlock/callback";
 
 export const TTLOCK_CALLBACK_MAX_BODY_BYTES = 256 * 1024;
 

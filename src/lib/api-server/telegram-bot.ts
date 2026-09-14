@@ -100,7 +100,7 @@ export async function sendRoleMenu(chatId: string | number) {
   return sendTelegramMessage(
     chatId,
     "Assalomu alaykum! 👋\n\n" +
-      "<b>ArendaAi</b> botiga xush kelibsiz.\n\n" +
+      "<b>Ijara AI</b> botiga xush kelibsiz.\n\n" +
       "Kim sifatida kirmoqchisiz?",
     {
       reply_markup: {

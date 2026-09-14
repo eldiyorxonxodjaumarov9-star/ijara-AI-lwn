@@ -24,7 +24,7 @@ export async function runPlatformAdapter(
       status: "POSTED",
       externalPostId: listing.legacyLocalId ?? "internal",
       postUrl: "/ijara-qidiruv",
-      channelName: "Arenda AI",
+      channelName: "Ijara AI",
       generatedText,
     };
   }

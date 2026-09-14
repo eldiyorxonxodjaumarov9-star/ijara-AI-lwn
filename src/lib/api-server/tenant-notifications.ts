@@ -30,7 +30,7 @@ export function buildPaymentReceivedMessage(
   propertyName: string,
   amount: number
 ) {
-  return `Assalomu alaykum, ${tenantName}! ${propertyName} bo'yicha ${formatUzs(amount)} to'lovingiz qabul qilindi. Rahmat! — ArendaAi`;
+  return `Assalomu alaykum, ${tenantName}! ${propertyName} bo'yicha ${formatUzs(amount)} to'lovingiz qabul qilindi. Rahmat! — Ijara AI`;
 }
 
 export async function notifyTenantPaymentReceived(payment: {

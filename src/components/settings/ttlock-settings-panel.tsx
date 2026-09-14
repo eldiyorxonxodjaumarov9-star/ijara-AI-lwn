@@ -504,7 +504,7 @@ export function TtlockSettingsPanel() {
                   <ol className="list-decimal space-y-1 pl-4">
                     <li>TTLock mobil ilovasini oching.</li>
                     <li>Qulfni Bluetooth orqali hisobga qo‘shing.</li>
-                    <li>Arenda AI’ga qaytib, sinxronlashtiring.</li>
+                    <li>Ijara AI’ga qaytib, sinxronlashtiring.</li>
                   </ol>
                 </div>
               ) : (

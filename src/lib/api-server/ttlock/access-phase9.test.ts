@@ -254,7 +254,7 @@ describe("TTLock phase9 callback", () => {
     assert.match(ui, /Asia\/Tashkent/);
     assert.equal(
       TTLOCK_CALLBACK_DEFAULT_URL,
-      "https://www.arendaai.uz/api/integrations/ttlock/callback"
+      "https://ijaraai.uz/api/integrations/ttlock/callback"
     );
     assert.match(phase9Sql, /eventFingerprint/);
     const statusUi = readFileSync(

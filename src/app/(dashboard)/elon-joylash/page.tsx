@@ -16,7 +16,7 @@ import { useAuth } from "@/context/auth-context";
 export default function ElonJoylashPage() {
   const { user } = useAuth();
   const email = user?.email ?? "";
-  const name = user?.displayName ?? user?.company ?? "ArendaAi";
+  const name = user?.displayName ?? user?.company ?? "Ijara AI";
   const [tab, setTab] = useState("listings");
 
   return (

@@ -285,7 +285,7 @@ export function buildAdminSummaryMessage(rows: AdminTenantRow[]) {
   const totalDebt = debtors.reduce((s, r) => s + r.debtAmount, 0);
 
   const lines = [
-    "📊 <b>ArendaAi — Admin hisobot</b>",
+    "📊 <b>Ijara AI — Admin hisobot</b>",
     `🕐 ${formatTashkentClock()}`,
     "",
     `👥 Faol arendatorlar: <b>${rows.length}</b> ta`,

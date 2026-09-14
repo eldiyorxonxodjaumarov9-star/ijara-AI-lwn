@@ -169,7 +169,7 @@ export default function ContractFormPage({
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/40 px-4 py-8">
       <div className="mx-auto max-w-lg space-y-4">
         <div>
-          <p className="text-sm text-muted-foreground">Arenda AI</p>
+          <p className="text-sm text-muted-foreground">Ijara AI</p>
           <h1 className="text-2xl font-semibold tracking-tight">
             Shartnoma ma’lumotlari
           </h1>

@@ -46,7 +46,7 @@ export const translations = {
     "nav.crm.reports": "Hisobotlar",
     "nav.crm.settings": "CRM sozlamalari",
     "nav.crm.access": "Kirish huquqi",
-    "sidebar.pro": "ArendaAi Pro",
+    "sidebar.pro": "Ijara AI Pro",
     "sidebar.proDesc": "Barcha modullar faollashtirilgan.",
 
     // Umumiy
@@ -244,7 +244,7 @@ export const translations = {
     "nav.crm.reports": "Отчёты",
     "nav.crm.settings": "Настройки CRM",
     "nav.crm.access": "Доступ",
-    "sidebar.pro": "ArendaAi Pro",
+    "sidebar.pro": "Ijara AI Pro",
     "sidebar.proDesc": "Все модули активированы.",
 
     "common.search": "Поиск...",
@@ -436,7 +436,7 @@ export const translations = {
     "nav.crm.reports": "Reports",
     "nav.crm.settings": "CRM settings",
     "nav.crm.access": "Access control",
-    "sidebar.pro": "ArendaAi Pro",
+    "sidebar.pro": "Ijara AI Pro",
     "sidebar.proDesc": "All modules activated.",
 
     "common.search": "Search...",
@@ -626,7 +626,7 @@ export const translations = {
     "nav.crm.reports": "Есептер",
     "nav.crm.settings": "CRM баптаулары",
     "nav.crm.access": "Кіру рұқсаты",
-    "sidebar.pro": "ArendaAi Pro",
+    "sidebar.pro": "Ijara AI Pro",
     "sidebar.proDesc": "Барлық модульдер қосылған.",
 
     "common.search": "Іздеу...",

@@ -123,6 +123,21 @@ describe("contract-draft validation", () => {
       true
     );
   });
+
+  it("lessor form sections cover every required field exactly once", async () => {
+    const {
+      LESSOR_REQUIRED_FIELDS,
+      LESSOR_FORM_SECTIONS,
+      LESSOR_FIELD_LABELS,
+      LESSOR_FIELD_PLACEHOLDERS,
+    } = await import("./validation");
+    const listed = LESSOR_FORM_SECTIONS.flatMap((s) => [...s.fields]);
+    assert.deepEqual([...listed].sort(), [...LESSOR_REQUIRED_FIELDS].sort());
+    for (const k of LESSOR_REQUIRED_FIELDS) {
+      assert.ok(LESSOR_FIELD_LABELS[k]);
+      assert.ok(LESSOR_FIELD_PLACEHOLDERS[k]);
+    }
+  });
 });
 
 const SHARED_PLACEHOLDERS = [

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Download,
   Eye,
@@ -32,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiFetch, isApiConfigured } from "@/lib/api/client";
+import { ApiError, apiFetch, isApiConfigured } from "@/lib/api/client";
 import { computeMonthlyAmount, computeTotalAmount } from "@/lib/contract-money";
 
 type EligibleTenant = {
@@ -91,6 +92,7 @@ export default function ContractDraftsPage() {
   const [paymentDueDay, setPaymentDueDay] = useState(5);
   const [depositAmount, setDepositAmount] = useState(1_000_000);
   const [phone, setPhone] = useState("");
+  const [lessorMissing, setLessorMissing] = useState<string[]>([]);
 
   const monthly = useMemo(
     () => computeMonthlyAmount(areaSqm, ratePerSqm),
@@ -160,9 +162,19 @@ export default function ContractDraftsPage() {
       });
       toast.success(res.userMessage);
       setOpen(false);
+      setLessorMissing([]);
       await reload();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Yuborib bo‘lmadi");
+      if (err instanceof ApiError && err.code === "LESSOR_INCOMPLETE") {
+        const msg = err.message;
+        const parts = msg.includes(":")
+          ? msg.split(":").slice(1).join(":").split(",").map((s) => s.trim()).filter(Boolean)
+          : [];
+        setLessorMissing(parts);
+        toast.error(msg);
+      } else {
+        toast.error(err instanceof Error ? err.message : "Yuborib bo‘lmadi");
+      }
     } finally {
       setSaving(false);
     }
@@ -222,6 +234,34 @@ export default function ContractDraftsPage() {
         title="Shartnoma tuzish"
         description="Shartnomasi yo‘q mijozlarga so‘rov yuboring. Mijoz bot orqali formani to‘ldiradi."
       />
+
+      <Card
+        className={
+          lessorMissing.length > 0
+            ? "border-amber-500/40 bg-amber-500/5"
+            : undefined
+        }
+      >
+        <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1 text-sm">
+            <p className="font-medium">
+              {lessorMissing.length > 0
+                ? "Shartnoma rekvizitlari to‘liq emas"
+                : "Shartnomada ijaraga beruvchi rekvizitlari"}
+            </p>
+            <p className="text-muted-foreground">
+              {lessorMissing.length > 0
+                ? `Yetishmayotgan: ${lessorMissing.join(", ")}`
+                : "Sozlamalar → Kompaniya → Shartnoma rekvizitlarida qo‘lda saqlangan ma’lumotlar yangi shartnomalarga avtomatik olinadi."}
+            </p>
+          </div>
+          <Button asChild variant="secondary" className="shrink-0">
+            <Link href="/settings?tab=company&section=lessor">
+              Shartnoma rekvizitlarini to‘ldirish
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

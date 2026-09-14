@@ -114,15 +114,60 @@ export const LESSOR_REQUIRED_FIELDS = [
 export type LessorField = (typeof LESSOR_REQUIRED_FIELDS)[number];
 
 export const LESSOR_FIELD_LABELS: Record<LessorField, string> = {
-  lessorFullName: "Ijaraga beruvchi F.I.Sh.",
-  lessorPassport: "Pasport",
+  lessorFullName: "F.I.Sh. yoki tashkilot nomi",
+  lessorPassport: "Pasport / ID ma’lumotlari",
   lessorJshshir: "JSHSHIR",
   lessorAddress: "Manzil",
   lessorCity: "Shahar",
-  lessorBankStir: "Bank STIR",
-  lessorBankMfo: "Bank MFO",
+  lessorBankStir: "STIR",
+  lessorBankMfo: "MFO",
   lessorBankName: "Bank nomi",
   lessorAccount: "Hisob raqami",
   lessorCardNumber: "Karta raqami",
-  lessorPhone: "Telefon",
+  lessorPhone: "Telefon raqami",
 };
+
+export const LESSOR_FIELD_PLACEHOLDERS: Record<LessorField, string> = {
+  lessorFullName: "Masalan: Familiya Ism Sharif yoki MChJ nomi",
+  lessorPassport: "Masalan: AA1234567",
+  lessorJshshir: "14 ta raqam",
+  lessorAddress: "Viloyat, tuman, ko‘cha, uy",
+  lessorCity: "Masalan: Тошкент шаҳри",
+  lessorBankStir: "9 ta raqam",
+  lessorBankMfo: "5 ta raqam",
+  lessorBankName: "Bank to‘liq nomi",
+  lessorAccount: "Hisob raqami (20 raqam)",
+  lessorCardNumber: "16 ta raqam",
+  lessorPhone: "+998 XX XXX XX XX",
+};
+
+/** Form bo‘limlari — barcha LESSOR_REQUIRED_FIELDS shu yerda bo‘lishi shart */
+export const LESSOR_FORM_SECTIONS: {
+  id: string;
+  title: string;
+  fields: readonly LessorField[];
+}[] = [
+  {
+    id: "identity",
+    title: "Ijaraga beruvchi ma’lumotlari",
+    fields: [
+      "lessorFullName",
+      "lessorPassport",
+      "lessorJshshir",
+      "lessorAddress",
+      "lessorCity",
+      "lessorPhone",
+    ],
+  },
+  {
+    id: "bank",
+    title: "Bank va to‘lov rekvizitlari",
+    fields: [
+      "lessorBankStir",
+      "lessorBankName",
+      "lessorBankMfo",
+      "lessorAccount",
+      "lessorCardNumber",
+    ],
+  },
+];

@@ -34,7 +34,7 @@ import { useCollection } from "@/hooks/use-collection";
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
 import type { AppNotification } from "@/types";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 export function Header() {
   const router = useRouter();
@@ -59,7 +59,9 @@ export function Header() {
           </Button>
         </DialogTrigger>
         <DialogContent className="left-0 top-0 h-full max-w-64 translate-x-0 translate-y-0 rounded-none border-r p-0 sm:rounded-none">
-          <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          <Suspense fallback={null}>
+            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          </Suspense>
         </DialogContent>
       </Dialog>
 

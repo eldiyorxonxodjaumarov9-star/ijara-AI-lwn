@@ -132,9 +132,17 @@ export async function apiFetch<T = unknown>(
   const json = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
+    const code =
+      json &&
+      typeof json === "object" &&
+      "error" in json &&
+      (json as { error?: { code?: string } }).error?.code
+        ? String((json as { error: { code: string } }).error.code)
+        : undefined;
     throw new ApiError(
       buildMessage(json, "So'rovda xatolik yuz berdi"),
       response.status,
+      code
     );
   }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 import { cn } from "@/lib/utils";
 import { navigation } from "@/config/navigation";
@@ -10,8 +11,30 @@ import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useLiveDebtCount } from "@/hooks/use-live-debt-count";
 
+function isNavActive(
+  href: string,
+  pathname: string,
+  searchParams: URLSearchParams
+) {
+  const [path, query = ""] = href.split("?");
+  if (!path) return false;
+  if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
+  if (!query) {
+    if (path === "/settings" && searchParams.get("section") === "lessor") {
+      return false;
+    }
+    return pathname === path || pathname.startsWith(`${path}/`);
+  }
+  const required = new URLSearchParams(query);
+  for (const [k, v] of required.entries()) {
+    if (searchParams.get(k) !== v) return false;
+  }
+  return true;
+}
+
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { t } = useLanguage();
   const liveDebtCount = useLiveDebtCount();
@@ -38,9 +61,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               </p>
               <ul className="space-y-1">
                 {items.map((item) => {
-                  const active =
-                    pathname === item.href ||
-                    pathname.startsWith(item.href + "/");
+                  const active = isNavActive(item.href, pathname, searchParams);
                   return (
                     <li key={item.href}>
                       <Link
@@ -84,7 +105,9 @@ export function DesktopSidebar() {
   return (
     <aside className="hidden w-64 shrink-0 border-r lg:block">
       <div className="fixed inset-y-0 left-0 w-64 border-r">
-        <SidebarContent />
+        <Suspense fallback={null}>
+          <SidebarContent />
+        </Suspense>
       </div>
     </aside>
   );

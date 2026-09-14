@@ -103,6 +103,18 @@ function SettingsPageContent() {
     void checkCloudSyncAvailable().then(setCloudAvailable);
   }, [demoMode]);
 
+  useEffect(() => {
+    if (activeTab !== "company") return;
+    const section = searchParams.get("section");
+    if (section !== "lessor") return;
+    const t = window.setTimeout(() => {
+      document
+        .getElementById("shartnoma-rekvizitlari")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [activeTab, searchParams]);
+
   const onTabChange = (value: string) => {
     setActiveTab(value);
     router.replace(`${pathname}?tab=${encodeURIComponent(value)}`, {
@@ -300,11 +312,6 @@ function SettingsPageContent() {
               </div>
               <Button onClick={() => void saveCompany()}>{t("common.save")}</Button>
               <div className="border-t pt-5">
-                <h3 className="mb-1 font-medium">Shartnoma rekvizitlari</h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Ijaraga beruvchi pasport, JSHSHIR va bank ma’lumotlari
-                  (Raximova Dilnoza kabi namuna hardcode qilinmaydi).
-                </p>
                 <LessorProfilePanel />
               </div>
             </CardContent>

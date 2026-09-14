@@ -170,6 +170,8 @@ model User {
   taskStatusEvents     WorkTaskStatusEvent[]  @relation("TaskStatusActor")
   ttlockConnections    TtlockConnection[]
   ttlockRemoteCommands TtlockRemoteCommand[]
+  contractRequestsCreated ContractRequest[]   @relation("ContractRequestCreatedBy")
+  contractStatusEvents    ContractStatusEvent[] @relation("ContractStatusActor")
 
   @@index([role])
   @@map("users")
@@ -186,6 +188,18 @@ model Company {
   locale    String   @default("uz")
   timezone  String   @default("Asia/Tashkent")
   taxRate   Float    @default(0.04)
+  /** Shartnoma lessor (ijaraga beruvchi) rekvizitlari — PII, public emas */
+  lessorFullName   String?
+  lessorPassport   String?
+  lessorJshshir    String?
+  lessorAddress    String?
+  lessorCity       String?  @default("Тошкент шаҳри")
+  lessorBankStir   String?
+  lessorBankMfo    String?
+  lessorBankName   String?
+  lessorAccount    String?
+  lessorCardNumber String?
+  lessorPhone      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -214,6 +228,7 @@ model Property {
   roomAccessGrants     RoomAccessGrant[]
   roomAccessLogEvents  RoomAccessLogEvent[]
   ttlockRemoteCommands TtlockRemoteCommand[]
+  contractRequests     ContractRequest[]
 
   @@index([status])
   @@index([region])
@@ -248,6 +263,7 @@ model Tenant {
   archives         TenantArchive[]
   telegramBotUsers TelegramBotUser[]
   roomAccessGrants RoomAccessGrant[]
+  contractRequests ContractRequest[]
 
   @@map("tenants")
 }
@@ -1229,4 +1245,147 @@ model TtlockCallbackInbox {
   @@index([status, nextRetryAt])
   @@index([status, processingLeaseUntil])
   @@map("ttlock_callback_inbox")
+}
+
+// ===================== Shartnoma tuzish MVP (ContractRequest) =====================
+
+enum ContractDraftStatus {
+  DRAFT
+  AWAITING_CLIENT
+  CLIENT_FORM_OPENED
+  GENERATING
+  CREATED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum ContractPartyCategory {
+  INDIVIDUAL
+  LEGAL_ENTITY
+}
+
+enum ContractPartySubtype {
+  NONE
+  SELF_EMPLOYED
+  YTT
+  MCHJ
+}
+
+enum ContractTemplateKind {
+  INDIVIDUAL
+  LEGAL_ENTITY
+}
+
+enum ContractDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model ContractRequest {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  propertyId         String
+  createdByUserId    String
+  partyCategory      ContractPartyCategory
+  partySubtype       ContractPartySubtype   @default(NONE)
+  templateKind       ContractTemplateKind
+  templateVersion    String                 @default("v1")
+  status             ContractDraftStatus    @default(DRAFT)
+  phoneNormalized    String
+  phoneDisplay       String?
+  contractNumber     String?                @unique
+  contractDate       DateTime?
+  startDate          DateTime
+  endDate            DateTime
+  serviceName        String
+  areaSqm            Int
+  ratePerSqm         Int
+  monthCount         Int
+  monthlyAmount      Int
+  totalAmount        Int
+  paymentDueDay      Int
+  depositAmount      Int
+  adminSnapshot      Json
+  clientSnapshot     Json?
+  lessorSnapshot     Json
+  tokenHash          String
+  tokenExpiresAt     DateTime
+  telegramChatId     String?
+  telegramUserId     String?
+  failReasonSafe     String?
+  leaseContractId    String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property  Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("ContractRequestCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  statusEvents ContractStatusEvent[]
+  document     ContractGeneratedDocument?
+  deliveries   ContractDeliveryEvent[]
+
+  @@index([tenantId, status])
+  @@index([propertyId])
+  @@index([phoneNormalized, status])
+  @@index([status, createdAt])
+  @@index([tokenHash])
+  @@map("contract_requests")
+}
+
+model ContractStatusEvent {
+  id          String              @id @default(uuid())
+  requestId   String
+  fromStatus  ContractDraftStatus?
+  toStatus    ContractDraftStatus
+  actorUserId String?
+  actorKind   String              @default("SYSTEM")
+  reason      String?
+  createdAt   DateTime            @default(now())
+
+  request ContractRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?          @relation("ContractStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+  @@map("contract_status_events")
+}
+
+model ContractGeneratedDocument {
+  id              String   @id @default(uuid())
+  requestId       String   @unique
+  storageUrl      String
+  storageKey      String?
+  mimeType        String   @default("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+  originalName    String
+  byteSize        Int
+  contentSha256   String
+  templateKind    ContractTemplateKind
+  templateVersion String
+  generatedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  request ContractRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("contract_generated_documents")
+}
+
+model ContractDeliveryEvent {
+  id             String                 @id @default(uuid())
+  requestId      String
+  channel        String                 @default("TELEGRAM")
+  status         ContractDeliveryStatus @default(PENDING)
+  telegramChatId String?
+  attempts       Int                    @default(0)
+  nextRetryAt    DateTime?
+  lastErrorSafe  String?
+  sentAt         DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  request ContractRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@index([requestId])
+  @@map("contract_delivery_events")
 }

@@ -40,6 +40,7 @@ import { PostingChannelsPanel } from "@/components/listings/posting-channels-pan
 import { InstagramSettingsPanel } from "@/components/listings/instagram-settings-panel";
 import { TelegramDistributionPanel } from "@/components/listings/telegram-distribution-panel";
 import { TtlockSettingsPanel } from "@/components/settings/ttlock-settings-panel";
+import { LessorProfilePanel } from "@/components/settings/lessor-profile-panel";
 
 export default function SettingsPage() {
   return (
@@ -298,6 +299,14 @@ function SettingsPageContent() {
                 />
               </div>
               <Button onClick={() => void saveCompany()}>{t("common.save")}</Button>
+              <div className="border-t pt-5">
+                <h3 className="mb-1 font-medium">Shartnoma rekvizitlari</h3>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Ijaraga beruvchi pasport, JSHSHIR va bank ma’lumotlari
+                  (Raximova Dilnoza kabi namuna hardcode qilinmaydi).
+                </p>
+                <LessorProfilePanel />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

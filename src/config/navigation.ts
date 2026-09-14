@@ -56,6 +56,12 @@ export const navigation: NavSection[] = [
         roles: ["admin", "manager"],
       },
       { titleKey: "nav.contracts", href: "/contracts", icon: FileText },
+      {
+        titleKey: "nav.contractDrafts",
+        href: "/contract-drafts",
+        icon: FileText,
+        roles: ["admin", "manager"],
+      },
     ],
   },
   {

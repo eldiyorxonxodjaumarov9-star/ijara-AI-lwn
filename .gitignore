@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 .data/
+scripts/.tmp-docx-extract/
 
 # debug
 npm-debug.log*

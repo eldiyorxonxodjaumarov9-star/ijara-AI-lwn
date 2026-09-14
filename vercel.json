@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/ttlock-callback-retry",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/contract-delivery-retry",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

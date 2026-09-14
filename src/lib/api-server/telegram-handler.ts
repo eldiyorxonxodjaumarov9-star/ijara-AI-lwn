@@ -52,6 +52,10 @@ import {
   tryClaimTelegramUpdate,
 } from "@/lib/api-server/tasks/telegram-tasks";
 import { reviewTaskReport } from "@/lib/api-server/tasks/task-service";
+import {
+  handleContractContactFlow,
+  handleContractDraftCallback,
+} from "@/lib/api-server/contract-draft/bot";
 
 async function unlinkTelegramChat(chatId: string) {
   await prisma.tenant.updateMany({
@@ -288,6 +292,10 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
       await handleAdminReviewCallback(chatId, data);
       return;
     }
+    if (data.startsWith("cdr:")) {
+      await handleContractDraftCallback(chatId, data);
+      return;
+    }
     return;
   }
 
@@ -411,6 +419,16 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
       await handleEmployeeContactLink(chatId, message);
       return;
     }
+    const handledContract = await handleContractContactFlow({
+      chatId,
+      fromId: message.from?.id ?? null,
+      contact: {
+        phone_number: message.contact.phone_number,
+        user_id: message.contact.user_id,
+      },
+    });
+    if (handledContract) return;
+
     await upsertTelegramSession(chatId, { mode: "tenant" });
     const result = await processPhoneForBot(chatId, message.contact.phone_number);
     await sendTelegramMessage(chatId, result.message, {
@@ -420,6 +438,13 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
   }
 
   if (looksLikePhone(text)) {
+    const handledContract = await handleContractContactFlow({
+      chatId,
+      fromId: message.from?.id ?? null,
+      contact: { phone_number: text, user_id: message.from?.id },
+    });
+    if (handledContract) return;
+
     await upsertTelegramSession(chatId, { mode: "tenant" });
     const result = await processPhoneForBot(chatId, text);
     await sendTelegramMessage(chatId, result.message, {

@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-14",
+  "timezone": "Asia/Tashkent",
+  "payments": {
+    "dueTodayCount": 3,
+    "overdueCount": 2,
+    "totalDebt": 8500000,
+    "items": []
+  },
+  "occupancy": {
+    "occupied": 24,
+    "vacant": 2,
+    "total": 26
+  },
+  "comparison": {
+    "currentMonth": "2026-09",
+    "compareToMonth": "2026-08",
+    "income": {
+      "current": 75000000,
+      "previous": 70000000,
+      "difference": 5000000,
+      "percent": 7.14
+    },
+    "expenses": {
+      "current": 20000000,
+      "previous": 18000000,
+      "difference": 2000000,
+      "percent": 11.11
+    }
+  },
+  "expenseHighlights": [
+    {
+      "type": "ELECTRICITY",
+      "label": "Elektr",
+      "current": 4960000,
+      "previous": 4200000,
+      "difference": 760000,
+      "percent": 18.1
+    }
+  ]
+}

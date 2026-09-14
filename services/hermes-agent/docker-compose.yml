@@ -1,0 +1,21 @@
+services:
+  hermes-arenda:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HERMES_HOME: /var/lib/hermes
+      HERMES_DRY_RUN: "true"
+    volumes:
+      - hermes_data:/var/lib/hermes
+      - ./skills:/opt/hermes-arenda/skills:ro
+    # Outbound only to Arenda AI API — no DB mount
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  hermes_data:

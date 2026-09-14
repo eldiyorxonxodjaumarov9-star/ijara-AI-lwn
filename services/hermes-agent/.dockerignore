@@ -1,0 +1,6 @@
+.node
+.git
+.env
+.hermes
+**/__pycache__
+*.pyc

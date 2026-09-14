@@ -38,9 +38,10 @@ yarn-error.log*
 .env*
 !.env.example
 !services/hermes-agent/.env.example
-auth
-auth-wal
-auth-shm
+!**/api/**/auth/**
+/auth
+/auth-wal
+/auth-shm
 
 # vercel
 .vercel

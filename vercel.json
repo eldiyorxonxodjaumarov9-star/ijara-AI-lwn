@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/contract-delivery-retry",
-      "schedule": "*/15 * * * *"
+      "schedule": "45 3 * * *"
     }
   ]
 }

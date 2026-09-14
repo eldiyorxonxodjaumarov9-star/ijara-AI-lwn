@@ -45,10 +45,10 @@ export async function sendContactRequest(chatId: string | number) {
   return sendTelegramMessage(
     chatId,
     "Assalomu alaykum! 👋\n\n" +
-      "Shartnoma yoki arendator ma’lumotlari uchun telefon raqamingizni yuboring.\n" +
-      "Faqat <b>o‘zingizning</b> kontaktingizni yuboring.\n\n" +
-      "📱 Tugmani bosing yoki raqamni yozing:\n" +
-      "<code>+998901234567</code>",
+      "Shartnoma so‘rovi uchun «📱 Telefon raqamimni yuborish» tugmasini bosing.\n" +
+      "Faqat <b>o‘zingizning</b> Telegram kontaktingizni yuboring " +
+      "(yozma raqam shartnoma so‘rovini ochmaydi).\n\n" +
+      "Oddiy arendator kirishi uchun raqamni yozishingiz ham mumkin.",
     {
       reply_markup: {
         keyboard: [

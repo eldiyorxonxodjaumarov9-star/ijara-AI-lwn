@@ -82,19 +82,6 @@ export async function createAndSendContractRequest(
     );
   }
 
-  const existingActive = await prisma.contractRequest.findFirst({
-    where: {
-      tenantId: tenant.id,
-      status: { in: ACTIVE_REQUEST_STATUSES },
-    },
-  });
-  if (existingActive) {
-    throw Object.assign(
-      new Error("Bu mijoz uchun faol shartnoma so‘rovi allaqachon mavjud"),
-      { status: 409 }
-    );
-  }
-
   const startDate = parseDateOnly(parsed.startDate);
   const endDate = parseDateOnly(parsed.endDate);
   const contractDate = parseDateOnly(parsed.contractDate);
@@ -104,6 +91,24 @@ export async function createAndSendContractRequest(
       { status: 400 }
     );
   }
+
+  const contractNumber = parsed.contractNumber?.trim() || null;
+  if (contractNumber) {
+    const taken = await prisma.contractRequest.findUnique({
+      where: { contractNumber },
+      select: { id: true },
+    });
+    if (taken) {
+      throw Object.assign(
+        new Error("Bu shartnoma raqami allaqachon band"),
+        { status: 409 }
+      );
+    }
+  }
+
+  const contractCity =
+    parsed.contractCity?.trim() || lessor.profile.lessorCity || "Тошкент шаҳри";
+  const adminNotes = parsed.adminNotes?.trim() || "";
 
   const { rawToken, tokenHash } = createContractToken();
   const id = randomUUID();
@@ -117,7 +122,10 @@ export async function createAndSendContractRequest(
     totalAmount,
     paymentDueDay: parsed.paymentDueDay,
     depositAmount: parsed.depositAmount,
+    contractNumber,
     contractDate: formatDateUz(contractDate),
+    contractCity,
+    adminNotes: adminNotes || null,
     startDate: formatDateUz(startDate),
     endDate: formatDateUz(endDate),
     propertyTitle: property.title,
@@ -125,41 +133,64 @@ export async function createAndSendContractRequest(
     partyUiType: parsed.partyUiType,
   };
 
-  const row = await prisma.contractRequest.create({
-    data: {
-      id,
-      tenantId: tenant.id,
-      propertyId: property.id,
-      createdByUserId: user.id,
-      partyCategory: mapping.partyCategory,
-      partySubtype: mapping.partySubtype,
-      templateKind: mapping.templateKind,
-      templateVersion: TEMPLATE_VERSION,
-      status: "AWAITING_CLIENT",
-      phoneNormalized: phone.normalized,
-      phoneDisplay: phone.display,
-      contractDate,
-      startDate,
-      endDate,
-      serviceName: parsed.serviceName,
-      areaSqm: parsed.areaSqm,
-      ratePerSqm: parsed.ratePerSqm,
-      monthCount: parsed.monthCount,
-      monthlyAmount,
-      totalAmount,
-      paymentDueDay: parsed.paymentDueDay,
-      depositAmount: parsed.depositAmount,
-      adminSnapshot,
-      lessorSnapshot: lessor.profile,
-      tokenHash,
-      tokenExpiresAt: contractTokenExpiresAt(),
-      telegramChatId: tenant.telegramChatId,
-    },
-    include: {
-      tenant: { select: { id: true, fullName: true, phone: true } },
-      property: { select: { id: true, title: true, address: true } },
-      document: { select: { id: true, originalName: true, generatedAt: true } },
-    },
+  const row = await prisma.$transaction(async (tx) => {
+    const existingActive = await tx.contractRequest.findFirst({
+      where: {
+        tenantId: tenant.id,
+        status: { in: ACTIVE_REQUEST_STATUSES },
+      },
+      select: { id: true },
+    });
+    if (existingActive) {
+      throw Object.assign(
+        new Error("Bu mijoz uchun faol shartnoma so‘rovi allaqachon mavjud"),
+        { status: 409 }
+      );
+    }
+
+    return tx.contractRequest.create({
+      data: {
+        id,
+        tenantId: tenant.id,
+        propertyId: property.id,
+        createdByUserId: user.id,
+        partyCategory: mapping.partyCategory,
+        partySubtype: mapping.partySubtype,
+        templateKind: mapping.templateKind,
+        templateVersion: TEMPLATE_VERSION,
+        status: "AWAITING_CLIENT",
+        phoneNormalized: phone.normalized,
+        phoneDisplay: phone.display,
+        contractNumber,
+        contractDate,
+        startDate,
+        endDate,
+        serviceName: parsed.serviceName,
+        areaSqm: parsed.areaSqm,
+        ratePerSqm: parsed.ratePerSqm,
+        monthCount: parsed.monthCount,
+        monthlyAmount,
+        totalAmount,
+        paymentDueDay: parsed.paymentDueDay,
+        depositAmount: parsed.depositAmount,
+        adminSnapshot,
+        lessorSnapshot: lessor.profile,
+        tokenHash,
+        tokenExpiresAt: contractTokenExpiresAt(),
+        // Telegram hali bog‘lanmagan bo‘lsa soxta chatId saqlamaymiz
+        telegramChatId: tenant.telegramChatId || null,
+      },
+      include: {
+        tenant: { select: { id: true, fullName: true, phone: true } },
+        property: { select: { id: true, title: true, address: true } },
+        document: { select: { id: true, originalName: true, generatedAt: true } },
+        deliveries: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { status: true },
+        },
+      },
+    });
   });
 
   await recordStatusEvent({
@@ -193,11 +224,14 @@ export async function createAndSendContractRequest(
     }
   }
 
+  const awaitClientMessage =
+    "So‘rov tayyor. Mijoz @ArendaaAI_bot’da /start bosib, o‘z telefon raqamini yuborgach forma havolasini oladi.";
+
   return {
     request: toPublicRequestView(row),
     botNotified,
     userMessage: botNotified
-      ? "So‘rov yuborildi. Mijozga bot orqali forma havolasi yuborildi."
-      : "So‘rov yaratildi. Mijoz botga ulanmagan — /start va telefon orqali bog‘lanishi kutilmoqda.",
+      ? `So‘rov tayyor. Forma havolasi botga yuborildi. Agar ochilmasa: ${awaitClientMessage}`
+      : awaitClientMessage,
   };
 }

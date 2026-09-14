@@ -117,5 +117,19 @@ describe("contract-draft automated e2e fixtures", () => {
     assert.match(page, /Botga qayta yuborish/);
     assert.match(page, /retry-delivery/);
     assert.match(page, /force:\s*true/);
+    assert.match(page, /Mijozga yuborish/);
+    assert.match(page, /Rekvizitlarni tahrirlash/);
+    assert.match(page, /Shartnomasi yo‘q mijozlar/);
+    assert.match(page, /Shartnoma so‘rovlari/);
+  });
+
+  it("create response tells client to use @ArendaaAI_bot /start", () => {
+    const src = readFileSync(
+      join(process.cwd(), "src/lib/api-server/contract-draft/create.ts"),
+      "utf8"
+    );
+    assert.match(src, /@ArendaaAI_bot/);
+    assert.match(src, /AWAITING_CLIENT/);
+    assert.equal(src.includes("renderContractDocx"), false);
   });
 });

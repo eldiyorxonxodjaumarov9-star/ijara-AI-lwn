@@ -14,6 +14,13 @@ export function assertContractStaff(user: User) {
   }
 }
 
+const LEASE_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Amaldagi",
+  PENDING: "Kutilmoqda",
+  EXPIRED: "Muddati tugagan",
+  TERMINATED: "Tugatilgan",
+};
+
 export async function listEligibleTenants() {
   const activeStatuses = ACTIVE_REQUEST_STATUSES;
   const tenants = await prisma.tenant.findMany({
@@ -43,9 +50,34 @@ export async function listEligibleTenants() {
       phone: true,
       clientNumber: true,
       telegramChatId: true,
+      contracts: {
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+        select: {
+          status: true,
+          property: { select: { id: true, title: true, address: true, area: true } },
+        },
+      },
     },
   });
-  return tenants;
+  return tenants.map((t) => {
+    const last = t.contracts[0] ?? null;
+    return {
+      id: t.id,
+      fullName: t.fullName,
+      phone: t.phone,
+      clientNumber: t.clientNumber,
+      telegramChatId: t.telegramChatId,
+      propertyId: last?.property.id ?? null,
+      propertyAddress: last?.property.address ?? null,
+      propertyTitle: last?.property.title ?? null,
+      propertyArea: last?.property.area ?? null,
+      leaseStatus: last?.status ?? null,
+      leaseStatusLabel: last
+        ? LEASE_STATUS_LABEL[last.status] ?? last.status
+        : "Shartnoma yo‘q",
+    };
+  });
 }
 
 export async function listContractRequests(limit = 50) {
@@ -56,6 +88,11 @@ export async function listContractRequests(limit = 50) {
       tenant: { select: { id: true, fullName: true, phone: true } },
       property: { select: { id: true, title: true, address: true } },
       document: { select: { id: true, originalName: true, generatedAt: true } },
+      deliveries: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { status: true },
+      },
     },
   });
 }
@@ -98,6 +135,10 @@ export function toPublicRequestView(
     rawToken?: never;
   }
 ) {
+  const deliveryStatus =
+    "deliveries" in row && Array.isArray(row.deliveries) && row.deliveries[0]
+      ? row.deliveries[0].status
+      : null;
   return {
     id: row.id,
     status: row.status,
@@ -117,6 +158,8 @@ export function toPublicRequestView(
     paymentDueDay: row.paymentDueDay,
     depositAmount: row.depositAmount,
     failReasonSafe: row.failReasonSafe,
+    telegramChatId: row.telegramChatId,
+    deliveryStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     tenant: row.tenant,

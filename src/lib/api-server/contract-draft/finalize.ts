@@ -151,6 +151,8 @@ export async function finalizeContractFromClientForm(input: {
   try {
     const contractNumber = row.contractNumber ?? (await nextContractNumber());
     const lessor = row.lessorSnapshot as unknown as LessorProfile;
+    const adminSnap = (row.adminSnapshot ?? {}) as Record<string, unknown>;
+    const adminCity = String(adminSnap.contractCity ?? "").trim();
     const money = moneyFieldsFromAmounts(
       row.monthlyAmount,
       row.totalAmount,
@@ -161,7 +163,7 @@ export async function finalizeContractFromClientForm(input: {
       templateKind: row.templateKind,
       contractNumber,
       contractDate: formatDateUz(row.contractDate ?? row.createdAt),
-      contractCity: lessor.lessorCity || "Тошкент шаҳри",
+      contractCity: adminCity || lessor.lessorCity || "Тошкент шаҳри",
       lessor,
       propertyAddress: row.property.address,
       roomName: row.property.title,

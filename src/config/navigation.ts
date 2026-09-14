@@ -55,6 +55,12 @@ export const navigation: NavSection[] = [
         icon: Bot,
         roles: ["admin", "manager"],
       },
+      {
+        titleKey: "nav.aiEmployees",
+        href: "/ai-employees",
+        icon: Bot,
+        roles: ["admin"],
+      },
       { titleKey: "nav.contracts", href: "/contracts", icon: FileText },
       { titleKey: "nav.contractDrafts", href: "/contract-drafts", icon: FileText, roles: ["admin", "manager"] },
       {

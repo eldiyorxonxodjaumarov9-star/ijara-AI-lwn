@@ -37,6 +37,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!services/hermes-agent/.env.example
 auth
 auth-wal
 auth-shm
@@ -50,4 +51,10 @@ next-env.d.ts
 
 .vercel
 
-.env*
+# Hermes Agent runtime (credentials, venv, cache — never commit)
+services/hermes-agent/.hermes/
+services/hermes-agent/.env
+!**/.env.example
+**/.hermes/
+hermes-agent/venv/
+**/hermes-agent/venv/

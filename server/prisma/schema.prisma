@@ -1389,3 +1389,113 @@ model ContractDeliveryEvent {
   @@index([requestId])
   @@map("contract_delivery_events")
 }
+
+// ===================== AI Employees / Hermes Agent Gateway =====================
+
+enum AgentType {
+  MANAGER
+  PAYMENT
+  ANALYST
+  SYSTEM
+}
+
+enum AgentTriggerType {
+  SCHEDULE
+  EVENT
+  MANUAL
+  TEST
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
+enum AgentActionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REJECTED
+  DUPLICATE
+}
+
+enum AgentRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model AgentRun {
+  id             String           @id @default(uuid())
+  agentType      AgentType
+  triggerType    AgentTriggerType
+  triggerRef     String?
+  status         AgentRunStatus   @default(PENDING)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  traceId        String?
+  modelProvider  String?
+  model          String?
+  modelVersion   String?
+  inputTokens    Int?
+  outputTokens   Int?
+  estimatedCost  Decimal?         @db.Decimal(18, 8)
+  metadata       Json?
+  errorCode      String?
+  errorSummary   String?
+  idempotencyKey String?          @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  actions AgentActionAudit[]
+
+  @@index([status, createdAt])
+  @@index([agentType, createdAt])
+  @@index([traceId])
+  @@map("agent_runs")
+}
+
+model AgentActionAudit {
+  id             String            @id @default(uuid())
+  runId          String?
+  agentType      AgentType
+  action         String
+  riskLevel      AgentRiskLevel    @default(LOW)
+  requiredScope  String?
+  targetType     String?
+  targetId       String?
+  inputSummary   String?
+  outputSummary  String?
+  status         AgentActionStatus @default(PENDING)
+  errorCode      String?
+  idempotencyKey String?           @unique
+  durationMs     Int?
+  createdAt      DateTime          @default(now())
+
+  run AgentRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([runId, createdAt])
+  @@index([action, createdAt])
+  @@map("agent_action_audits")
+}
+
+model AgentSettings {
+  id                     String   @id @default("default")
+  masterEnabled          Boolean  @default(false)
+  managerEnabled         Boolean  @default(true)
+  paymentEnabled         Boolean  @default(true)
+  analystEnabled         Boolean  @default(true)
+  telegramReportsEnabled Boolean  @default(false)
+  dryRunDefault          Boolean  @default(true)
+  dailyReportHour        Int      @default(8)
+  timezone               String   @default("Asia/Tashkent")
+  updatedBy              String?
+  updatedAt              DateTime @updatedAt
+  createdAt              DateTime @default(now())
+
+  @@map("agent_settings")
+}

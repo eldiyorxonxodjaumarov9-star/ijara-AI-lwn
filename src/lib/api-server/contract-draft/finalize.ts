@@ -50,16 +50,24 @@ function tenantTypeLabel(row: ContractRequest): string {
   return "Жисмоний шахс";
 }
 
+const CLAIMABLE = ["AWAITING_CLIENT", "CLIENT_FORM_OPENED", "FAILED"] as const;
+
 export async function finalizeContractFromClientForm(input: {
   request: ContractRequest & {
     property: { title: string; address: string };
     tenant: { fullName: string };
   };
   clientBody: unknown;
+  idempotencyKey?: string | null;
 }) {
   const row = input.request;
   if (row.status === "CREATED" && row.clientSnapshot) {
     return { alreadyCreated: true as const, requestId: row.id };
+  }
+  if (row.status === "GENERATING") {
+    throw Object.assign(new Error("Shartnoma yaratilmoqda, biroz kuting"), {
+      status: 409,
+    });
   }
   if (row.status !== "AWAITING_CLIENT" && row.status !== "CLIENT_FORM_OPENED" && row.status !== "FAILED") {
     throw Object.assign(new Error("Bu so‘rov uchun forma yuborib bo‘lmaydi"), {
@@ -93,15 +101,45 @@ export async function finalizeContractFromClientForm(input: {
     clientSnapshot = { ...data, phoneNormalized: phone.normalized, phoneDisplay: phone.display };
   }
 
+  if (input.idempotencyKey) {
+    clientSnapshot = {
+      ...clientSnapshot,
+      _submitIdempotencyKey: input.idempotencyKey.slice(0, 128),
+    };
+  }
+
   assertTransition(row.status, "GENERATING");
-  await prisma.contractRequest.update({
-    where: { id: row.id },
+
+  const claimed = await prisma.contractRequest.updateMany({
+    where: {
+      id: row.id,
+      status: { in: [...CLAIMABLE] },
+    },
     data: {
       status: "GENERATING",
       clientSnapshot: clientSnapshot as Prisma.InputJsonValue,
       failReasonSafe: null,
     },
   });
+
+  if (claimed.count === 0) {
+    const again = await prisma.contractRequest.findUnique({
+      where: { id: row.id },
+      select: { status: true, clientSnapshot: true, contractNumber: true },
+    });
+    if (again?.status === "CREATED") {
+      return { alreadyCreated: true as const, requestId: row.id };
+    }
+    if (again?.status === "GENERATING") {
+      throw Object.assign(new Error("Shartnoma yaratilmoqda, biroz kuting"), {
+        status: 409,
+      });
+    }
+    throw Object.assign(new Error("Bu so‘rov uchun forma yuborib bo‘lmaydi"), {
+      status: 409,
+    });
+  }
+
   await recordStatusEvent({
     requestId: row.id,
     fromStatus: row.status,
@@ -170,7 +208,18 @@ export async function finalizeContractFromClientForm(input: {
       fileName,
     });
 
-    await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx) => {
+      const done = await tx.contractRequest.updateMany({
+        where: { id: row.id, status: "GENERATING" },
+        data: {
+          status: "CREATED",
+          contractNumber,
+          failReasonSafe: null,
+        },
+      });
+      if (done.count === 0) {
+        return { raced: true as const };
+      }
       await tx.contractGeneratedDocument.upsert({
         where: { requestId: row.id },
         create: {
@@ -193,25 +242,30 @@ export async function finalizeContractFromClientForm(input: {
           generatedAt: new Date(),
         },
       });
-      await tx.contractRequest.update({
-        where: { id: row.id },
-        data: {
-          status: "CREATED",
-          contractNumber,
-          failReasonSafe: null,
-        },
-      });
-      await tx.contractDeliveryEvent.create({
-        data: {
-          id: randomUUID(),
+      const existingDelivery = await tx.contractDeliveryEvent.findFirst({
+        where: {
           requestId: row.id,
-          channel: "TELEGRAM",
-          status: "PENDING",
-          telegramChatId: row.telegramChatId,
-          nextRetryAt: new Date(),
+          status: { in: ["PENDING", "SENT"] },
         },
       });
+      if (!existingDelivery) {
+        await tx.contractDeliveryEvent.create({
+          data: {
+            id: randomUUID(),
+            requestId: row.id,
+            channel: "TELEGRAM",
+            status: "PENDING",
+            telegramChatId: row.telegramChatId,
+            nextRetryAt: new Date(),
+          },
+        });
+      }
+      return { raced: false as const };
     });
+
+    if (created.raced) {
+      return { alreadyCreated: true as const, requestId: row.id };
+    }
 
     await recordStatusEvent({
       requestId: row.id,
@@ -221,15 +275,15 @@ export async function finalizeContractFromClientForm(input: {
       reason: "DOCX yaratildi",
     });
 
-    void amountWithSomWords; // keep import used for tests/re-export path
+    void amountWithSomWords;
     return { alreadyCreated: false as const, requestId: row.id, contractNumber };
   } catch (err) {
     const safe =
       err instanceof Error && !/passport|jshshir|token|8600|stir/i.test(err.message)
         ? err.message.slice(0, 200)
         : "Shartnoma yaratishda xatolik";
-    await prisma.contractRequest.update({
-      where: { id: row.id },
+    await prisma.contractRequest.updateMany({
+      where: { id: row.id, status: "GENERATING" },
       data: { status: "FAILED", failReasonSafe: safe },
     });
     await recordStatusEvent({

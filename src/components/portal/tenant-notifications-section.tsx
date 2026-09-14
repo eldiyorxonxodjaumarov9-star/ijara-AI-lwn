@@ -50,7 +50,7 @@ export function TenantNotificationsSection() {
     } finally {
       setLoading(false);
     }
-  }, [user?.tenantId]);
+  }, [user]);
 
   useEffect(() => {
     void load();

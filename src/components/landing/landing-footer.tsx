@@ -8,12 +8,12 @@ export function LandingFooter() {
           &copy; {new Date().getFullYear()} Arenda AI. Barcha huquqlar himoyalangan.
         </p>
         <div className="flex items-center gap-6 text-sm text-slate-500">
-          <a href="/#bosh" className="transition-colors hover:text-white">
+          <Link href="/#bosh" className="transition-colors hover:text-white">
             Bosh sahifa
-          </a>
-          <a href="/#funksiyalar" className="transition-colors hover:text-white">
+          </Link>
+          <Link href="/#funksiyalar" className="transition-colors hover:text-white">
             Funksiyalar
-          </a>
+          </Link>
           <Link href="/ijara-qidiruv" className="transition-colors hover:text-white">
             Ijara qidiruv
           </Link>

@@ -88,17 +88,19 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   }
 
   if (row.status === "AWAITING_CLIENT") {
-    await prisma.contractRequest.update({
-      where: { id: row.id },
+    const opened = await prisma.contractRequest.updateMany({
+      where: { id: row.id, status: "AWAITING_CLIENT" },
       data: { status: "CLIENT_FORM_OPENED" },
     });
-    await recordStatusEvent({
-      requestId: row.id,
-      fromStatus: "AWAITING_CLIENT",
-      toStatus: "CLIENT_FORM_OPENED",
-      actorKind: "CLIENT",
-    });
-    row.status = "CLIENT_FORM_OPENED";
+    if (opened.count > 0) {
+      await recordStatusEvent({
+        requestId: row.id,
+        fromStatus: "AWAITING_CLIENT",
+        toStatus: "CLIENT_FORM_OPENED",
+        actorKind: "CLIENT",
+      });
+      row.status = "CLIENT_FORM_OPENED";
+    }
   }
 
   return ok(publicFormView(row));
@@ -125,12 +127,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   try {
     const body = await req.json();
-    void idem;
     const result = await finalizeContractFromClientForm({
       request: row,
       clientBody: body,
+      idempotencyKey: idem || null,
     });
-    await processPendingContractDeliveries(3);
+    await processPendingContractDeliveries(3, { inlineRetries: 2 });
     return ok({
       ...result,
       status: "CREATED",

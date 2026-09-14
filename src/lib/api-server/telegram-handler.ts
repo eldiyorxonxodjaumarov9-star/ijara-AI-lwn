@@ -83,7 +83,6 @@ async function enterOwnerPanel(chatId: string) {
 
 async function handleStart(chatId: string, from?: TelegramUserFrom | null) {
   await recordBotStart(chatId, from);
-  await unlinkTelegramChat(chatId);
 
   if (await enterOwnerPanel(chatId)) {
     return;
@@ -95,6 +94,7 @@ async function handleStart(chatId: string, from?: TelegramUserFrom | null) {
     return;
   }
 
+  // Do not clear tenant.telegramChatId on every /start — that breaks reminders.
   await resetTelegramSession(chatId);
   await upsertTelegramSession(chatId, { mode: "tenant" });
   await sendStartContactPrompt(chatId);
@@ -439,12 +439,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
   }
 
   if (looksLikePhone(text)) {
-    const handledContract = await handleContractContactFlow({
+    // Typed phone must not claim contract drafts (impersonation risk).
+    const typedTriedContract = await handleContractContactFlow({
       chatId,
       fromId: message.from?.id ?? null,
-      contact: { phone_number: text, user_id: message.from?.id },
+      contact: { phone_number: text },
+      typedPhone: true,
     });
-    if (handledContract) return;
+    if (typedTriedContract) return;
 
     await upsertTelegramSession(chatId, { mode: "tenant" });
     const result = await processPhoneForBot(chatId, text);

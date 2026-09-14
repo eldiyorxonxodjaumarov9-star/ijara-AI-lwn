@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
-import { randomUUID } from "crypto";
 
 import { requireUser } from "@/lib/api-server/auth";
-import { processPendingContractDeliveries } from "@/lib/api-server/contract-draft/bot";
+import {
+  enqueueContractDeliveryResend,
+  processPendingContractDeliveries,
+} from "@/lib/api-server/contract-draft/bot";
 import { finalizeContractFromClientForm } from "@/lib/api-server/contract-draft/finalize";
 import {
   assertContractStaff,
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         status: 200,
         headers: {
           "Content-Type": contentType,
-          "Content-Disposition": `attachment; filename="${doc.originalName}"`,
+          "Content-Disposition": `attachment; filename="${doc.originalName.replace(/[^\w.\-]+/g, "_")}"`,
           "Cache-Control": "private, no-store",
         },
       });
@@ -54,10 +56,25 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         document: {
           select: { id: true, originalName: true, generatedAt: true },
         },
+        deliveries: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            status: true,
+            attempts: true,
+            lastErrorSafe: true,
+            sentAt: true,
+            nextRetryAt: true,
+          },
+        },
       },
     });
     if (!row) return fail("So‘rov topilmadi", 404);
-    return ok(toPublicRequestView(row));
+    return ok({
+      ...toPublicRequestView(row),
+      deliveries: row.deliveries,
+    });
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500;
     return fail(err instanceof Error ? err.message : "Xato", status);
@@ -71,7 +88,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   try {
     assertContractStaff(auth.user);
     const { id } = await ctx.params;
-    const body = (await req.json().catch(() => ({}))) as { action?: string };
+    const body = (await req.json().catch(() => ({}))) as {
+      action?: string;
+      force?: boolean;
+    };
     const action = String(body.action ?? "");
     const row = await prisma.contractRequest.findUnique({ where: { id } });
     if (!row) return fail("So‘rov topilmadi", 404);
@@ -137,22 +157,19 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         request: full,
         clientBody: row.clientSnapshot,
       });
-      await processPendingContractDeliveries(5);
+      await processPendingContractDeliveries(5, { inlineRetries: 2 });
       return ok(result);
     }
 
     if (action === "retry-delivery") {
-      await prisma.contractDeliveryEvent.create({
-        data: {
-          id: randomUUID(),
-          requestId: id,
-          status: "PENDING",
-          telegramChatId: row.telegramChatId,
-          nextRetryAt: new Date(),
-        },
+      const queued = await enqueueContractDeliveryResend({
+        requestId: id,
+        force: Boolean(body.force),
       });
-      await processPendingContractDeliveries(5);
-      return ok({ userMessage: "Yuborish qayta urinildi" });
+      if (queued.queued) {
+        await processPendingContractDeliveries(5, { inlineRetries: 2 });
+      }
+      return ok({ userMessage: queued.message, queued: queued.queued });
     }
 
     return fail("Noma’lum amal", 400);

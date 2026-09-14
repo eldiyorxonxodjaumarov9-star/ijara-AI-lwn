@@ -168,12 +168,20 @@ export default function ContractDraftsPage() {
     }
   };
 
-  const runAction = async (id: string, action: string) => {
+  const runAction = async (
+    id: string,
+    action: string,
+    extra?: { force?: boolean }
+  ) => {
     try {
-      const res = await apiFetch<{ userMessage?: string; formPath?: string }>(
-        `/contract-drafts/${id}`,
-        { method: "POST", body: { action } }
-      );
+      const res = await apiFetch<{
+        userMessage?: string;
+        formPath?: string;
+        queued?: boolean;
+      }>(`/contract-drafts/${id}`, {
+        method: "POST",
+        body: { action, ...extra },
+      });
       if (res.formPath) {
         toast.message(`Havola: ${res.formPath}`);
       } else {
@@ -288,9 +296,23 @@ export default function ContractDraftsPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => void download(r.id)}
+                        aria-label="Hujjatni yuklab ko‘rish"
                       >
                         <Eye className="size-4" /> Ko‘rish
                       </Button>
+                      {r.status === "CREATED" && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            void runAction(r.id, "retry-delivery", {
+                              force: true,
+                            })
+                          }
+                        >
+                          <Send className="size-4" /> Botga qayta yuborish
+                        </Button>
+                      )}
                     </>
                   )}
                   {r.status === "FAILED" && (

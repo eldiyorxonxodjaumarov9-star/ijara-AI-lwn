@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,6 +39,7 @@ export default function ContractFormPage({
   const [preview, setPreview] = useState(false);
   const [done, setDone] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const idempotencyKeyRef = useRef("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,11 +82,17 @@ export default function ContractFormPage({
   const submit = async () => {
     setSubmitting(true);
     try {
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `idem-${Math.random().toString(36).slice(2)}`;
+      }
       const res = await fetch(`/api/public/contract-form/${token}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": idempotencyKeyRef.current,
         },
         body: JSON.stringify(fields),
       });

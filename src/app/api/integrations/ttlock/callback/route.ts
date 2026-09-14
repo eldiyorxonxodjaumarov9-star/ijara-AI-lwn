@@ -63,7 +63,7 @@ function scheduleInboxProcessing(inboxId: string, rawBody: string) {
  * 3. darhol raw `success`
  * 4. after() → claim + verify-by-fetch + upsert
  */
-export async function handleTtlockCallbackReceive(
+async function handleTtlockCallbackReceive(
   rawBody: string
 ): Promise<Response> {
   if (!isDatabaseConfigured()) {

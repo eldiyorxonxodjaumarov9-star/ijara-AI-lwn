@@ -269,6 +269,30 @@ describe("contract-draft docx", () => {
     assert.equal(findUnresolvedPlaceholders(indXml).length, 0);
     assert.match(indXml, /1 824 000/);
     assert.match(indXml, /7 296 000/);
+    assert.equal(indXml.includes("{{#showSelfEmployedBlock}}"), false);
+    assert.equal(indXml.includes("Test YTT Bank"), false);
+    assert.equal(indXml.includes("309999999"), false);
+
+    const selfEmp = renderContractDocx({
+      ...base,
+      templateKind: "INDIVIDUAL",
+      tenantType: "ЯТТ",
+      tenantFullName: "Test YTT Tenant",
+      passportOrId: "AA2222222",
+      tenantJshshir: "22222222222222",
+      tenantAddress: "YTT manzil",
+      tenantPhone: "+998903333333",
+      showSelfEmployedBlock: "1",
+      tenantStir: "309999999",
+      tenantBankName: "Test YTT Bank",
+      tenantMfo: "01111",
+      tenantAccountNumber: "20208000999999999999",
+    });
+    const selfXml =
+      new PizZip(selfEmp.buffer).file("word/document.xml")?.asText() ?? "";
+    assert.match(selfXml, /СТИР: 309999999/);
+    assert.match(selfXml, /Test YTT Bank/);
+    assert.equal(findUnresolvedPlaceholders(selfXml).length, 0);
 
     const leg = renderContractDocx({
       ...base,

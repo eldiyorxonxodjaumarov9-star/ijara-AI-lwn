@@ -25,6 +25,8 @@
 *.pem
 .data/
 scripts/.tmp-docx-extract/
+scripts/.tmp*
+scripts/.tmp-*/
 
 # debug
 npm-debug.log*

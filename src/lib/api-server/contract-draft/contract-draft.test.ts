@@ -4,8 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import {
   amountToUzCyrillicWords,
@@ -34,8 +33,7 @@ import {
   individualClientSchema,
   legalClientSchema,
 } from "./validation";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import PizZip from "pizzip";
 
 describe("contract-draft money", () => {
   it("computes monthly and total without float", () => {
@@ -127,25 +125,105 @@ describe("contract-draft validation", () => {
   });
 });
 
+const SHARED_PLACEHOLDERS = [
+  "contractNumber",
+  "contractDate",
+  "contractCity",
+  "lessorFullName",
+  "lessorPassport",
+  "lessorAddress",
+  "lessorJshshir",
+  "lessorBankStir",
+  "lessorBankMfo",
+  "lessorBankName",
+  "lessorAccount",
+  "lessorCardNumber",
+  "lessorPhone",
+  "propertyAddress",
+  "roomName",
+  "area",
+  "serviceName",
+  "ratePerSqm",
+  "monthCount",
+  "monthlyPayment",
+  "totalAmount",
+  "totalAmountWords",
+  "paymentDueDay",
+  "deposit",
+  "depositWords",
+  "startDate",
+  "endDate",
+  "tenantType",
+] as const;
+
+const INDIVIDUAL_PLACEHOLDERS = [
+  ...SHARED_PLACEHOLDERS,
+  "tenantFullName",
+  "passportOrId",
+  "tenantJshshir",
+  "tenantAddress",
+  "tenantPhone",
+] as const;
+
+const LEGAL_PLACEHOLDERS = [
+  ...SHARED_PLACEHOLDERS,
+  "companyFullName",
+  "legalForm",
+  "directorFullName",
+  "authorityBasis",
+  "legalAddress",
+  "stir",
+  "bankName",
+  "mfo",
+  "accountNumber",
+  "phone",
+] as const;
+
+const REF_PII_RE =
+  /RAXIMOVA|DILNOZA|KOMILJON|Рахимова|Дилноза|АА0286455|AA0286455|42501920211418|207\s*275\s*139|8600\s*4904\s*5715\s*2163|86004904|2312\s*0000\s*0000\s*0115\s*8004|\+998\s*99\s*791\s*07\s*91|Kapitalbank|4277340|Barhayot/i;
+
+function templateXml(name: string): string {
+  const buf = readFileSync(
+    join(process.cwd(), "server/contract-templates/v1", name)
+  );
+  const zip = new PizZip(buf);
+  return zip.file("word/document.xml")?.asText() ?? "";
+}
+
 describe("contract-draft docx", () => {
   it("detects unresolved placeholders", () => {
     assert.deepEqual(findUnresolvedPlaceholders("Hello {{name}}"), ["name"]);
   });
 
-  it("renders individual and legal templates", () => {
+  it("loads individual and legal templates", () => {
     const tplRoot = join(process.cwd(), "server/contract-templates/v1");
     assert.equal(existsSync(join(tplRoot, "individual.docx")), true);
     assert.equal(existsSync(join(tplRoot, "legal.docx")), true);
+    assert.ok(templateXml("individual.docx").length > 1000);
+    assert.ok(templateXml("legal.docx").length > 1000);
+  });
 
+  it("contains all required placeholders", () => {
+    const ind = templateXml("individual.docx");
+    for (const key of INDIVIDUAL_PLACEHOLDERS) {
+      assert.ok(ind.includes(`{{${key}}}`), `individual missing {{${key}}}`);
+    }
+    const leg = templateXml("legal.docx");
+    for (const key of LEGAL_PLACEHOLDERS) {
+      assert.ok(leg.includes(`{{${key}}}`), `legal missing {{${key}}}`);
+    }
+  });
+
+  it("renders individual and legal templates", () => {
     const lessor = {
-      lessorFullName: "TEST LESSOR",
+      lessorFullName: "TEST LESSOR UZOQ ISM",
       lessorPassport: "AA0000000",
       lessorJshshir: "00000000000000",
-      lessorAddress: "Test manzil",
+      lessorAddress: "Test manzil uzoq manzil qatori",
       lessorCity: "Тошкент шаҳри",
       lessorBankStir: "000000000",
       lessorBankMfo: "00000",
-      lessorBankName: "Test Bank",
+      lessorBankName: "Test Bank Namuna Filiali",
       lessorAccount: "00000000000000000000",
       lessorCardNumber: "0000000000000000",
       lessorPhone: "+998900000000",
@@ -156,8 +234,8 @@ describe("contract-draft docx", () => {
       contractDate: "01.09.2026",
       contractCity: "Тошкент шаҳри",
       lessor,
-      propertyAddress: "Test manzil 1",
-      roomName: "305",
+      propertyAddress: "Test manzil 1, uzoq manzil",
+      roomName: "305-A",
       area: "20",
       serviceName: "Ofis ijarasi",
       ratePerSqm: "91 200",
@@ -176,35 +254,44 @@ describe("contract-draft docx", () => {
     const ind = renderContractDocx({
       ...base,
       templateKind: "INDIVIDUAL",
-      tenantFullName: "Test Tenant",
+      tenantFullName: "Test Tenant Uzoq Familiya",
       passportOrId: "AA1111111",
       tenantJshshir: "11111111111111",
-      tenantAddress: "Tenant manzil",
+      tenantAddress: "Tenant manzil uzoq",
       tenantPhone: "+998901111111",
     });
     assert.ok(ind.buffer.byteLength > 1000);
     assert.equal(ind.sha256.length, 64);
-    assert.equal(ind.buffer.toString("utf8").includes("RAXIMOVA"), false);
+    assert.equal(REF_PII_RE.test(ind.buffer.toString("utf8")), false);
+    // Re-open generated OOXML
+    const indZip = new PizZip(ind.buffer);
+    const indXml = indZip.file("word/document.xml")?.asText() ?? "";
+    assert.equal(findUnresolvedPlaceholders(indXml).length, 0);
+    assert.match(indXml, /1 824 000/);
+    assert.match(indXml, /7 296 000/);
 
     const leg = renderContractDocx({
       ...base,
       templateKind: "LEGAL_ENTITY",
       tenantType: "МЧЖ",
-      companyFullName: "Test Company",
+      companyFullName: "Test Company Uzoq Nomli Tashkilot",
       legalForm: "MChJ",
-      directorFullName: "Director",
+      directorFullName: "Director Uzoq Ism",
       authorityBasis: "ustav",
-      legalAddress: "Legal manzil",
+      legalAddress: "Legal manzil uzoq",
       stir: "123456789",
       bankName: "Bank",
-      mfo: "01158",
+      mfo: "00444",
       accountNumber: "1234567890",
       phone: "+998902222222",
     });
     assert.ok(leg.buffer.byteLength > 1000);
-    // OOXML zip signature
     assert.equal(leg.buffer[0], 0x50);
     assert.equal(leg.buffer[1], 0x4b);
+    const legZip = new PizZip(leg.buffer);
+    const legXml = legZip.file("word/document.xml")?.asText() ?? "";
+    assert.equal(findUnresolvedPlaceholders(legXml).length, 0);
+    assert.equal(REF_PII_RE.test(leg.buffer.toString("utf8")), false);
   });
 
   it("templates contain no reference PII", () => {
@@ -212,8 +299,8 @@ describe("contract-draft docx", () => {
       const buf = readFileSync(
         join(process.cwd(), "server/contract-templates/v1", name)
       );
-      const text = buf.toString("utf8");
-      assert.equal(/RAXIMOVA|42501920211418|86004904/i.test(text), false);
+      assert.equal(REF_PII_RE.test(buf.toString("utf8")), false);
+      assert.equal(REF_PII_RE.test(templateXml(name)), false);
     }
   });
 });

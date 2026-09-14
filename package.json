@@ -8,6 +8,8 @@
     "vercel-build": "prisma generate --schema=server/prisma/schema.prisma && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npx --yes tsx --test \"src/**/*.test.ts\"",
     "postinstall": "prisma generate --schema=server/prisma/schema.prisma",
     "db:push": "node scripts/prisma-env.mjs db push --schema=server/prisma/schema.prisma",
     "db:seed": "npm run prisma:seed --prefix server"

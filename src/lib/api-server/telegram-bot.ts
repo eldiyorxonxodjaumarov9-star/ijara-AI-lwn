@@ -45,16 +45,34 @@ export async function sendContactRequest(chatId: string | number) {
   return sendTelegramMessage(
     chatId,
     "Assalomu alaykum! 👋\n\n" +
-      "<b>Arendator</b> sifatida davom etmoqdasiz.\n\n" +
-      "Telefon raqamingizni yuboring — bazada bormi tekshiramiz.\n" +
-      "Topilsa, xona, shartnoma va to'lov ma'lumotlari chiqadi.\n\n" +
-      "📱 Tugma orqali yuboring yoki raqamni yozing:\n" +
+      "Shartnoma yoki arendator ma’lumotlari uchun telefon raqamingizni yuboring.\n" +
+      "Faqat <b>o‘zingizning</b> kontaktingizni yuboring.\n\n" +
+      "📱 Tugmani bosing yoki raqamni yozing:\n" +
       "<code>+998901234567</code>",
     {
       reply_markup: {
-        keyboard: [[{ text: "📱 Telefon raqamni yuborish", request_contact: true }]],
+        keyboard: [
+          [{ text: "📱 Telefon raqamimni yuborish", request_contact: true }],
+        ],
         resize_keyboard: true,
         one_time_keyboard: true,
+      },
+    }
+  );
+}
+
+/** /start for unbound users: contact-first + owner/employee inline links */
+export async function sendStartContactPrompt(chatId: string | number) {
+  await sendContactRequest(chatId);
+  return sendTelegramMessage(
+    chatId,
+    "Agar <b>Arenda egasi</b> yoki <b>Xodim</b> bo‘lsangiz, quyidan tanlang:",
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🏢 Arenda egasi", callback_data: "role_owner" }],
+          [{ text: "👷 Xodim", callback_data: "role_employee" }],
+        ],
       },
     }
   );
@@ -68,7 +86,9 @@ export async function sendEmployeeContactRequest(chatId: string | number) {
       "Faqat Telegramdagi o‘zingizning kontakt orqali yuboring.",
     {
       reply_markup: {
-        keyboard: [[{ text: "📱 Telefon raqamni yuborish", request_contact: true }]],
+        keyboard: [
+          [{ text: "📱 Telefon raqamimni yuborish", request_contact: true }],
+        ],
         resize_keyboard: true,
         one_time_keyboard: true,
       },

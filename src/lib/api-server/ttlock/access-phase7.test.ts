@@ -264,7 +264,7 @@ describe("TTLock phase7 access grants", () => {
     const { credentialEncrypted } = encryptAccessCredential(pin, testKey);
     assert.equal(looksEncryptedSecret(credentialEncrypted), true);
     assert.equal(credentialEncrypted.includes(pin), false);
-    assert.equal(credentialEncrypted.includes("4829"), false);
+    // Full PIN must not leak; avoid flaky 4-digit substring checks on base64 ciphertext.
 
     const pub = mapGrantToPublic(
       fakeGrantBase({

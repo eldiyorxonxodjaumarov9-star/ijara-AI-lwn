@@ -27,6 +27,7 @@ import {
   sendEmployeeContactRequest,
   sendOwnerLoginPrompt,
   sendRoleMenu,
+  sendStartContactPrompt,
   sendTelegramMessage,
   type TelegramUpdate,
 } from "@/lib/api-server/telegram-bot";
@@ -95,8 +96,8 @@ async function handleStart(chatId: string, from?: TelegramUserFrom | null) {
   }
 
   await resetTelegramSession(chatId);
-  await upsertTelegramSession(chatId, { mode: "menu" });
-  await sendRoleMenu(chatId);
+  await upsertTelegramSession(chatId, { mode: "tenant" });
+  await sendStartContactPrompt(chatId);
 }
 
 async function handleOwnerLogin(chatId: string, text: string) {

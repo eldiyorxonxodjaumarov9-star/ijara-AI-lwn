@@ -59,20 +59,23 @@ describe("getContractDisplayPaymentDueDate", () => {
   });
 
   it("returns next scheduled date when no debt", () => {
-    const now = new Date("2026-08-10T12:00:00.000Z");
-    const payments: Payment[] = [
-      {
-        id: "pay1",
+    // Fixed Tashkent-day: 10 Aug 2026 — payment day 15, so Aug not overdue yet.
+    // Clear Jan–Jul so debt is zero and schedule returns next due (15.08.2026).
+    const now = new Date("2026-08-10T07:00:00.000Z"); // 12:00 Tashkent (UTC+5)
+    const payments: Payment[] = [];
+    for (let month = 1; month <= 7; month++) {
+      payments.push({
+        id: `pay-${month}`,
         contractId: "c1",
         tenantId: "t1",
         amount: 1_000_000,
-        date: "2026-08-01",
+        date: `2026-${String(month).padStart(2, "0")}-15`,
         periodYear: 2026,
-        periodMonth: 8,
+        periodMonth: month,
         method: "cash",
-        createdAt: "2026-08-01T00:00:00.000Z",
-      },
-    ];
+        createdAt: `2026-${String(month).padStart(2, "0")}-15T00:00:00.000Z`,
+      });
+    }
     const result = getContractDisplayPaymentDueDate(
       contract,
       payments,

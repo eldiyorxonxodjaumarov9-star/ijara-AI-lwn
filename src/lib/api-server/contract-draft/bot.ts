@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/api-server/prisma";
 import {
   contractFormUrl,
-  recordStatusEvent,
 } from "@/lib/api-server/contract-draft/queries";
 import {
   createContractToken,
@@ -21,6 +20,13 @@ type PendingRow = {
   tokenHash: string;
   property: { title: string; address: string };
 };
+
+function pendingLabel(p: PendingRow): string {
+  const room = p.property.title.trim() || "Xona";
+  const obj = p.property.address.trim();
+  const label = obj ? `${obj} — ${room}` : room;
+  return label.slice(0, 64);
+}
 
 /** Issue a fresh raw token for bot link (rotates hash). */
 export async function rotateFormToken(requestId: string): Promise<string> {
@@ -128,12 +134,12 @@ export async function handleContractContactFlow(input: {
 
   await sendTelegramMessage(
     input.chatId,
-    "Bir nechta shartnoma so‘rovi topildi. Xonani tanlang:",
+    "Bir nechta shartnoma so‘rovi topildi. Obyekt va xonani tanlang:",
     {
       reply_markup: {
         inline_keyboard: pending.map((p) => [
           {
-            text: p.property.title.slice(0, 60),
+            text: pendingLabel(p),
             callback_data: `cdr:${p.id}`,
           },
         ]),

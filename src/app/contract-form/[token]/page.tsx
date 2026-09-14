@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 type FormView = {
   status: string;
   partyCategory: string;
+  partySubtype?: string;
   serviceName: string;
   areaSqm: number;
   ratePerSqm: number;
@@ -67,10 +68,15 @@ export default function ContractFormPage({
   }, [token]);
 
   useEffect(() => {
-    void load();
+    const t = setTimeout(() => {
+      void load();
+    }, 0);
+    return () => clearTimeout(t);
   }, [load]);
 
   const isLegal = view?.partyCategory === "LEGAL_ENTITY";
+  const isSelfEmployed =
+    view?.partySubtype === "SELF_EMPLOYED" || view?.partySubtype === "YTT";
 
   const submit = async () => {
     setSubmitting(true);
@@ -126,6 +132,15 @@ export default function ContractFormPage({
     ["jshshir", "JSHSHIR (14 raqam)"],
     ["address", "Manzil"],
     ["phone", "Telefon"],
+    ...(isSelfEmployed
+      ? ([
+          ["registrationInfo", "Ro‘yxatdan o‘tish ma’lumoti"],
+          ["stir", "STIR (9 raqam)"],
+          ["bankName", "Bank nomi"],
+          ["mfo", "MFO (5 raqam)"],
+          ["accountNumber", "Hisob raqami"],
+        ] as const)
+      : []),
   ] as const;
 
   const legalFields = [

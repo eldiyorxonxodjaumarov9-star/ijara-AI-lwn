@@ -49,6 +49,13 @@ export type RenderContractInput = {
   mfo?: string;
   accountNumber?: string;
   phone?: string;
+  /** When true, optional YTT/self-employed bank lines render */
+  showSelfEmployedBlock?: string;
+  tenantStir?: string;
+  tenantBankName?: string;
+  tenantMfo?: string;
+  tenantAccountNumber?: string;
+  registrationInfo?: string;
 };
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
@@ -75,7 +82,7 @@ export function findUnresolvedPlaceholders(xmlOrText: string): string[] {
   return [...found];
 }
 
-export function buildDocxData(input: RenderContractInput): Record<string, string> {
+export function buildDocxData(input: RenderContractInput): Record<string, string | boolean> {
   return {
     contractNumber: input.contractNumber,
     contractDate: input.contractDate,
@@ -120,6 +127,12 @@ export function buildDocxData(input: RenderContractInput): Record<string, string
     mfo: input.mfo ?? "",
     accountNumber: input.accountNumber ?? "",
     phone: input.phone ?? input.tenantPhone ?? "",
+    showSelfEmployedBlock: Boolean(input.showSelfEmployedBlock),
+    tenantStir: input.tenantStir ?? "",
+    tenantBankName: input.tenantBankName ?? "",
+    tenantMfo: input.tenantMfo ?? "",
+    tenantAccountNumber: input.tenantAccountNumber ?? "",
+    registrationInfo: input.registrationInfo ?? "",
   };
 }
 

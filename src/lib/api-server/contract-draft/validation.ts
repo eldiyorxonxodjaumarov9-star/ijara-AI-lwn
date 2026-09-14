@@ -61,6 +61,18 @@ export const individualClientSchema = z.object({
   address: z.string().trim().min(5).max(500),
   phone: z.string().min(9).max(32),
   registrationInfo: z.string().trim().max(300).optional(),
+  stir: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^\d{9}$/.test(v), "STIR 9 raqam bo‘lishi kerak")
+    .optional(),
+  bankName: z.string().trim().max(200).optional(),
+  mfo: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^\d{5}$/.test(v), "MFO 5 raqam bo‘lishi kerak")
+    .optional(),
+  accountNumber: z.string().trim().max(34).optional(),
 });
 
 export const legalClientSchema = z.object({

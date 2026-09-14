@@ -141,6 +141,15 @@ export async function finalizeContractFromClientForm(input: {
       tenantJshshir: String(clientSnapshot.jshshir ?? ""),
       tenantAddress: String(clientSnapshot.address ?? ""),
       tenantPhone: String(clientSnapshot.phoneDisplay ?? clientSnapshot.phone ?? ""),
+      showSelfEmployedBlock:
+        row.partySubtype === "SELF_EMPLOYED" || row.partySubtype === "YTT"
+          ? "1"
+          : "",
+      tenantStir: String(clientSnapshot.stir ?? ""),
+      tenantBankName: String(clientSnapshot.bankName ?? ""),
+      tenantMfo: String(clientSnapshot.mfo ?? ""),
+      tenantAccountNumber: String(clientSnapshot.accountNumber ?? ""),
+      registrationInfo: String(clientSnapshot.registrationInfo ?? ""),
       companyFullName: String(clientSnapshot.companyFullName ?? ""),
       legalForm: String(clientSnapshot.legalForm ?? ""),
       directorFullName: String(clientSnapshot.directorFullName ?? ""),

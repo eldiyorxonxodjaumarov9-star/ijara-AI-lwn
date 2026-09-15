@@ -243,6 +243,21 @@ describe("telegram template validation", () => {
     });
     assert.equal(parsed.success, false);
   });
+
+  it("rejects an LLM-supplied financial snapshot", () => {
+    const parsed = telegramNotifySchema.safeParse({
+      type: "DAILY_MANAGER_REPORT",
+      reportDate: "2026-09-14",
+      idempotencyKey: "daily-manager-report:2026-09-14",
+      report: {
+        dueTodayCount: 3,
+        overdueCount: 2,
+        totalDebt: 8500000,
+      },
+      snapshot: { payments: { totalDebt: 1 } },
+    });
+    assert.equal(parsed.success, false);
+  });
 });
 
 describe("rate limit", () => {

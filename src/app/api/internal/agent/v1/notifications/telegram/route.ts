@@ -5,6 +5,7 @@ import {
   deliverDailyManagerTelegram,
   telegramNotifySchema,
 } from "@/lib/api-server/agent-gateway/telegram-notify";
+import { buildDailySnapshot } from "@/lib/api-server/agent-gateway/daily-snapshot";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 
@@ -49,6 +50,15 @@ export async function POST(req: NextRequest) {
     return fail("Validation xatosi", 400, "VALIDATION_ERROR");
   }
 
-  const result = await deliverDailyManagerTelegram(parsed.data);
+  const snapshot = await buildDailySnapshot();
+  if (snapshot.date !== parsed.data.reportDate) {
+    return fail(
+      "Hisobot sanasi server sanasiga mos emas",
+      409,
+      "REPORT_DATE_MISMATCH"
+    );
+  }
+
+  const result = await deliverDailyManagerTelegram(parsed.data, snapshot);
   return ok(result);
 }

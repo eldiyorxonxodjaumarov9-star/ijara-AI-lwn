@@ -116,25 +116,27 @@ export async function POST(req: NextRequest) {
   });
 
   const recommendations = buildDefaultRecommendations(snapshot);
-  const delivery = await deliverDailyManagerTelegram({
-    type: "DAILY_MANAGER_REPORT",
-    reportDate: snapshot.date,
-    runId: run.id,
-    idempotencyKey:
-      parsed.data.mode === "daily"
-        ? idempotencyKey
-        : `${idempotencyKey}:tg`,
-    dryRun,
-    recommendations,
-    report: {
-      dueTodayCount: snapshot.payments.dueTodayCount,
-      overdueCount: snapshot.payments.overdueCount,
-      totalDebt: snapshot.payments.totalDebt,
-      vacantRooms: snapshot.occupancy.vacant,
+  const delivery = await deliverDailyManagerTelegram(
+    {
+      type: "DAILY_MANAGER_REPORT",
+      reportDate: snapshot.date,
+      runId: run.id,
+      idempotencyKey:
+        parsed.data.mode === "daily"
+          ? idempotencyKey
+          : `${idempotencyKey}:tg`,
+      dryRun,
       recommendations,
+      report: {
+        dueTodayCount: snapshot.payments.dueTodayCount,
+        overdueCount: snapshot.payments.overdueCount,
+        totalDebt: snapshot.payments.totalDebt,
+        vacantRooms: snapshot.occupancy.vacant,
+        recommendations,
+      },
     },
-    snapshot,
-  });
+    snapshot
+  );
 
   await writeAgentActionAudit({
     runId: run.id,

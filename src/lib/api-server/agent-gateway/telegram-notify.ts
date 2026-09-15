@@ -21,9 +21,7 @@ export const telegramNotifySchema = z.object({
     vacantRooms: z.number().int().nonnegative().optional(),
     recommendations: z.array(z.string().max(300)).max(10).optional(),
   }),
-  /** Structured snapshot preferred; Hermes may send summary-only report above */
-  snapshot: z.unknown().optional(),
-});
+}).strict();
 
 export type TelegramNotifyInput = z.infer<typeof telegramNotifySchema>;
 
@@ -34,7 +32,10 @@ export type TelegramNotifyInput = z.infer<typeof telegramNotifySchema>;
  * - recipient from linked admin devices only
  * - idempotent by key
  */
-export async function deliverDailyManagerTelegram(input: TelegramNotifyInput) {
+export async function deliverDailyManagerTelegram(
+  input: TelegramNotifyInput,
+  trustedSnapshot?: DailySnapshot
+) {
   const settings = await getOrCreateAgentSettings();
   const dryRun =
     input.dryRun ??
@@ -53,7 +54,9 @@ export async function deliverDailyManagerTelegram(input: TelegramNotifyInput) {
     };
   }
 
-  const snapshot = input.snapshot as DailySnapshot | undefined;
+  // Exact figures are rebuilt inside Arenda AI. Hermes is never a source of
+  // truth for payment, occupancy, or expense numbers.
+  const snapshot = trustedSnapshot;
   const text = snapshot
     ? formatDailyManagerReportUz(
         snapshot,

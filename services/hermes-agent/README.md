@@ -56,13 +56,40 @@ Custom Arenda skills live under `skills/` and should be linked/copied into
 Configure via official Hermes cron/scheduled jobs after `hermes doctor` passes.
 See `config/schedule.md`.
 
-## Docker
+## Docker / 24×7 runtime
 
 ```bash
 docker compose -f docker-compose.yml up -d --build
 ```
 
-Requires a persistent host (VPS). Do **not** run Hermes as a Vercel serverless daemon.
+The image extends the official `nousresearch/hermes-agent` image. Its one-shot
+bootstrap installs the five Arenda skills, disables all CLI toolsets, and
+converts `08:00 Asia/Tashkent` to `03:00 UTC`. The gateway owns the scheduler.
+
+First authenticate the persistent Docker volume, then start the gateway:
+
+```bash
+docker compose run --rm --entrypoint hermes bootstrap setup --portal
+docker compose up -d --build
+docker compose exec hermes-arenda hermes cron status
+docker compose exec hermes-arenda hermes cron doctor
+```
+
+Run a production-data preview without Telegram delivery:
+
+```bash
+docker compose exec hermes-arenda \
+  python /opt/data/scripts/arenda_runner.py --dry-run
+```
+
+Only after the preview is verified should `HERMES_DRY_RUN=false` and Telegram
+reports be enabled. Requires a persistent host (VPS). Do **not** run Hermes as
+a Vercel serverless daemon.
+
+The runner obtains separate scoped tokens for Manager, Payment, and Analyst.
+Payment/Analyst model prompts receive aggregates without tenant names. The
+Telegram financial snapshot is rebuilt inside Arenda AI, so Hermes cannot
+override amounts.
 
 ## Smoke tests
 

@@ -1,21 +1,40 @@
 services:
-  hermes-arenda:
+  bootstrap:
     build: .
-    restart: unless-stopped
     env_file:
       - .env
     environment:
-      HERMES_HOME: /var/lib/hermes
-      HERMES_DRY_RUN: "true"
+      HERMES_HOME: /opt/data
+      TZ: UTC
+    entrypoint: ["python", "/opt/hermes-arenda/scripts/bootstrap_runtime.py"]
     volumes:
-      - hermes_data:/var/lib/hermes
-      - ./skills:/opt/hermes-arenda/skills:ro
-    # Outbound only to Arenda AI API — no DB mount
-    read_only: true
-    tmpfs:
-      - /tmp
+      - hermes_data:/opt/data
     security_opt:
       - no-new-privileges:true
+
+  hermes-arenda:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      HERMES_HOME: /opt/data
+      TZ: UTC
+    command: ["gateway", "run"]
+    volumes:
+      - hermes_data:/opt/data
+    # No host Docker socket, DB mount, Telegram token, or TTLock secret.
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "/opt/hermes-arenda/scripts/healthcheck.py"]
+      interval: 60s
+      timeout: 15s
+      start_period: 45s
+      retries: 3
 
 volumes:
   hermes_data:

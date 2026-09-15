@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     const result = await prisma.$transaction(
       async (tx) => {
         await tx.$queryRawUnsafe(
-          "SELECT pg_advisory_xact_lock(hashtext('arenda-agent-employees-v1'))"
+          "SELECT pg_advisory_xact_lock(hashtext('arenda-agent-employees-v1'))::text AS locked"
         );
         const before = await readState(tx);
         const values = Object.values(before);

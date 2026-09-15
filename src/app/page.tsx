@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing/landing-page";
 
 export const metadata: Metadata = {
-  title: "Ijara AI — O'zbekistondagi ijara va ko'chmas mulk bozori uchun aqlli AI platforma",
+  title: "Arenda AI — AI-powered Property Management Platform",
   description:
-    "Uy, ofis, do'kon, ombor, yer maydoni va boshqa ko'chmas mulklarni tez topish, joylashtirish va boshqarish uchun zamonaviy AI yechim.",
+    "Ijara biznesini bitta platformadan boshqaring: mulklar, to‘lovlar, qarzdorlik, xodimlar, vazifalar, TTLock kirish nazorati va AI tahlil.",
   openGraph: {
-    title: "Ijara AI",
+    title: "Arenda AI — Property Management Platform",
     description:
-      "O'zbekistondagi ijara va ko'chmas mulk bozori uchun aqlli AI platforma",
+      "To‘lovlar, arendatorlar, xarajatlar, xodimlar, vazifalar, aqlli qulflar va AI tahlil — bitta tizimda.",
     type: "website",
   },
 };

@@ -1,0 +1,118 @@
+.landing-page {
+  --landing-navy: #071429;
+  --landing-navy-mid: #0b1f3b;
+  --landing-blue: #1d4ed8;
+  --landing-electric: #2563eb;
+  --landing-ice: #f4f7fb;
+  color-scheme: light;
+}
+
+.landing-page ::selection {
+  background: rgb(37 99 235 / 0.18);
+}
+
+.landing-grid-fade {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
+}
+
+.landing-navy-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite;
+}
+
+.landing-float-slow {
+  animation: landing-float 9s ease-in-out infinite;
+  animation-delay: -2.4s;
+}
+
+.landing-glow {
+  animation: landing-glow 6s ease-in-out infinite;
+}
+
+.landing-scan {
+  animation: landing-scan 3.6s ease-in-out infinite;
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes landing-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes landing-scan {
+  0% {
+    transform: translateY(-10%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .landing-float,
+  .landing-float-slow,
+  .landing-glow,
+  .landing-scan {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-page .landing-float,
+  .landing-page .landing-float-slow,
+  .landing-page .landing-glow,
+  .landing-page .landing-scan {
+    animation: none !important;
+  }
+
+  .landing-page .landing-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

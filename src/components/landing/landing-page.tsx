@@ -1,24 +1,38 @@
+import "@/components/landing/landing.css";
+
 import { LandingAbout } from "@/components/landing/landing-about";
+import { LandingAnalytics } from "@/components/landing/landing-analytics";
 import { LandingAudience } from "@/components/landing/landing-audience";
-import { LandingCallCenter } from "@/components/landing/landing-call-center";
 import { LandingCta } from "@/components/landing/landing-cta";
-import { LandingDashboardSection } from "@/components/landing/landing-dashboard-section";
-import { LandingFeatures } from "@/components/landing/landing-features";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHero } from "@/components/landing/landing-hero";
+import { LandingHow } from "@/components/landing/landing-how";
+import { LandingHumanAi } from "@/components/landing/landing-human-ai";
+import { LandingInspection } from "@/components/landing/landing-inspection";
 import { LandingNavbar } from "@/components/landing/landing-navbar";
+import { LandingOs } from "@/components/landing/landing-os";
+import { LandingProblems } from "@/components/landing/landing-problems";
+import { LandingSmartLock } from "@/components/landing/landing-smart-lock";
+import { LandingTelegram } from "@/components/landing/landing-telegram";
+import { LandingTrust } from "@/components/landing/landing-trust";
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#060d18] text-white selection:bg-cyan-500/30">
+    <div className="landing-page min-h-screen bg-white text-slate-900">
       <LandingNavbar />
       <main>
         <LandingHero />
-        <LandingAbout />
-        <LandingFeatures />
+        <LandingTrust />
+        <LandingProblems />
+        <LandingOs />
+        <LandingAnalytics />
+        <LandingInspection />
+        <LandingSmartLock />
+        <LandingTelegram />
         <LandingAudience />
-        <LandingDashboardSection />
-        <LandingCallCenter />
+        <LandingHow />
+        <LandingAbout />
+        <LandingHumanAi />
         <LandingCta />
       </main>
       <LandingFooter />

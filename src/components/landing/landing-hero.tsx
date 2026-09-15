@@ -1,69 +1,51 @@
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+
+import { HeroProductVisual } from "@/components/landing/landing-mockups";
+import { LandingContainer } from "@/components/landing/landing-shell";
 
 export function LandingHero() {
   return (
-    <section
-      id="bosh"
-      className="relative overflow-hidden pt-28 pb-20 sm:pt-36 sm:pb-28"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 left-1/2 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-blue-600/20 blur-[120px]" />
-        <div className="absolute top-20 right-0 h-[300px] w-[400px] rounded-full bg-cyan-500/10 blur-[100px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.15),transparent_50%)]" />
-      </div>
+    <section className="relative overflow-x-clip bg-[#071429] pt-24 pb-14 text-white sm:pt-28 sm:pb-16 lg:pt-32 lg:pb-20">
+      <div className="pointer-events-none absolute inset-0 landing-navy-grid opacity-70" />
+      <div className="pointer-events-none absolute -top-24 left-1/3 h-[380px] w-[380px] rounded-full bg-blue-600/20 blur-[120px]" />
+      <div className="pointer-events-none absolute right-0 bottom-0 h-[240px] w-[240px] rounded-full bg-blue-400/10 blur-[90px]" />
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-sm text-cyan-300 backdrop-blur-sm">
-            <Sparkles className="size-4" />
-            O&apos;zbekiston ijara bozori uchun AI platforma
+      <LandingContainer className="relative">
+        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-8 xl:gap-14">
+          <div className="max-w-xl">
+            <p className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium tracking-wide text-blue-200">
+              AI-powered Property Management Platform
+            </p>
+            <h1 className="mt-5 text-balance text-[1.85rem] font-semibold leading-[1.15] tracking-tight sm:text-4xl sm:leading-[1.12] lg:text-[2.75rem] xl:text-[3.1rem] xl:leading-[1.08]">
+              Ijara biznesini bitta aqlli platformadan boshqaring.
+            </h1>
+            <p className="mt-4 max-w-md text-pretty text-[15px] leading-relaxed text-slate-300 sm:mt-5 sm:text-base">
+              To‘lovlar, xarajatlar, arendatorlar, vazifalar, Smart Lock va AI
+              tahlil — barchasi bitta tizimda.
+            </p>
+            <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center">
+              <Link
+                href="/login"
+                className="inline-flex h-12 min-w-[11.5rem] items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-[#071429] transition-colors hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              >
+                Platformani ko‘rish
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+              <Link
+                href="#imkoniyatlar"
+                className="inline-flex h-12 min-w-[11.5rem] items-center justify-center rounded-xl border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              >
+                Imkoniyatlarni ko‘rish
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Ijara AI — O&apos;zbekistondagi ijara va ko&apos;chmas mulk bozori
-            uchun{" "}
-            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-300 bg-clip-text text-transparent">
-              aqlli AI platforma
-            </span>
-          </h1>
-
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-400 sm:text-xl">
-            Uy, ofis, do&apos;kon, ombor, yer maydoni va boshqa ko&apos;chmas
-            mulklarni tez topish, joylashtirish va boshqarish uchun zamonaviy AI
-            yechim.
-          </p>
-
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="#funksiyalar"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/10"
-            >
-              Funksiyalarni ko&apos;rish
-            </Link>
-            <Link
-              href="/ijara-qidiruv"
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-blue-500/30 transition-all hover:from-blue-500 hover:to-cyan-400"
-            >
-              Ijara qidiruv
-              <ArrowRight className="size-4" />
-            </Link>
+          <div className="min-w-0">
+            <HeroProductVisual />
           </div>
         </div>
-
-        <div className="mx-auto mt-16 max-w-3xl rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl sm:p-8">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan-400">
-            AI Qidiruv misoli
-          </p>
-          <p className="text-lg text-slate-200 sm:text-xl">
-            &ldquo;Chilonzorda 2 xonali kvartira kerak, budjet 5 million&rdquo;
-          </p>
-          <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-            <span className="size-2 animate-pulse rounded-full bg-cyan-400" />
-            AI hudud, narx va talablarni tahlil qilmoqda...
-          </div>
-        </div>
-      </div>
+      </LandingContainer>
     </section>
   );
 }

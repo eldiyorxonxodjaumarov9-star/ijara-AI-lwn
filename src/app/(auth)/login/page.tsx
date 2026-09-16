@@ -15,12 +15,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth-context";
+import { ApiError } from "@/lib/api/client";
 import {
   loginSchema,
   tenantLoginSchema,
   type LoginInput,
   type TenantLoginInput,
 } from "@/lib/validations";
+
+function loginErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === "INVALID_RESPONSE" || error.code === "INVALID_JSON") {
+      return "Serverdan noto‘g‘ri javob olindi.";
+    }
+    if (error.code === "NETWORK" || error.status === 0) {
+      return "Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring.";
+    }
+    if (error.status === 401 || error.status === 403) {
+      return "Email yoki parol noto‘g‘ri.";
+    }
+    if (error.status >= 500) {
+      return "Kirish vaqtida server xatosi yuz berdi.";
+    }
+    return error.message || "Kirishda xatolik yuz berdi";
+  }
+  if (error instanceof Error && error.message) {
+    if (/unexpected token|<!doctype|is not valid json/i.test(error.message)) {
+      return "Serverdan noto‘g‘ri javob olindi.";
+    }
+    return error.message;
+  }
+  return "Kirishda xatolik yuz berdi";
+}
 
 function LoginPageContent() {
   const router = useRouter();
@@ -47,9 +73,7 @@ function LoginPageContent() {
       toast.success("Xush kelibsiz!");
       router.push("/dashboard");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Kirishda xatolik yuz berdi"
-      );
+      toast.error(loginErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
@@ -62,9 +86,7 @@ function LoginPageContent() {
       toast.success("Xush kelibsiz!");
       router.push("/portal");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Kirishda xatolik yuz berdi"
-      );
+      toast.error(loginErrorMessage(error));
     } finally {
       setSubmitting(false);
     }

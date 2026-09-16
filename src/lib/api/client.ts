@@ -1,13 +1,36 @@
 "use client";
 
 /**
- * NestJS backend bilan ishlash uchun API mijozi.
+ * NestJS/embedded API mijozi.
  * - NEXT_PUBLIC_API_URL o'rnatilganda "API rejim" yoqiladi.
  * - Access/refresh tokenlar localStorage da saqlanadi.
  * - 401 holatida access token avtomatik yangilanadi (refresh).
  */
 
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+function resolveApiBaseUrl(
+  raw: string | undefined = process.env.NEXT_PUBLIC_API_URL
+): string | undefined {
+  const trimmed = raw?.trim().replace(/\/$/, "");
+  if (!trimmed) return undefined;
+
+  // Absolute origin without /api → append /api (avoids /auth/login HTML 404).
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      const path = url.pathname.replace(/\/$/, "");
+      if (!path || path === "/") {
+        return `${url.origin}/api`;
+      }
+      return `${url.origin}${path}`;
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return trimmed;
+}
+
+const RAW_API_URL = resolveApiBaseUrl();
 
 export const API_URL = RAW_API_URL;
 export const isApiConfigured = Boolean(RAW_API_URL);
@@ -54,9 +77,76 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
 
 let refreshing: Promise<boolean> | null = null;
 
+function buildMessage(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === "object" && "message" in payload) {
+    const m = (payload as { message: unknown }).message;
+    if (Array.isArray(m)) return m.join(", ");
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return fallback;
+}
+
+function userFacingMessage(status: number, fallback: string): string {
+  if (fallback && fallback.trim() && !/unexpected token|<!doctype/i.test(fallback)) {
+    return fallback;
+  }
+  if (status === 401 || status === 403) {
+    return "Email yoki parol noto‘g‘ri.";
+  }
+  if (status >= 500) {
+    return "Kirish vaqtida server xatosi yuz berdi.";
+  }
+  if (status === 0) {
+    return "Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring.";
+  }
+  return "So‘rovda xatolik yuz berdi.";
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const text = await response.text();
+  if (!text) return null;
+
+  const looksJson =
+    contentType.includes("application/json") ||
+    contentType.includes("+json") ||
+    /^[\s]*[{[]/.test(text);
+
+  if (!looksJson || contentType.includes("text/html")) {
+    console.error("[apiFetch] Non-JSON response", {
+      url: response.url,
+      status: response.status,
+      contentType,
+      preview: text.slice(0, 160),
+    });
+    throw new ApiError(
+      "Serverdan noto‘g‘ri javob olindi.",
+      response.status || 0,
+      "INVALID_RESPONSE"
+    );
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (err) {
+    console.error("[apiFetch] JSON parse failed", {
+      url: response.url,
+      status: response.status,
+      contentType,
+      preview: text.slice(0, 160),
+      err,
+    });
+    throw new ApiError(
+      "Serverdan noto‘g‘ri javob olindi.",
+      response.status || 0,
+      "INVALID_JSON"
+    );
+  }
+}
+
 async function tryRefresh(): Promise<boolean> {
   const refresh = tokenStore.refresh;
-  if (!refresh) return false;
+  if (!refresh || !API_URL) return false;
   if (!refreshing) {
     refreshing = (async () => {
       try {
@@ -66,10 +156,14 @@ async function tryRefresh(): Promise<boolean> {
           body: JSON.stringify({ refreshToken: refresh }),
         });
         if (!res.ok) return false;
-        const json = await res.json();
-        const data = json?.data ?? json;
-        if (data?.accessToken) {
-          tokenStore.set(data.accessToken, data.refreshToken);
+        const json = (await parseResponseBody(res)) as {
+          data?: { accessToken?: string; refreshToken?: string };
+          accessToken?: string;
+          refreshToken?: string;
+        } | null;
+        const data = json && typeof json === "object" ? (json.data ?? json) : null;
+        if (data && typeof data === "object" && "accessToken" in data && data.accessToken) {
+          tokenStore.set(String(data.accessToken), data.refreshToken);
           return true;
         }
         return false;
@@ -83,19 +177,14 @@ async function tryRefresh(): Promise<boolean> {
   return refreshing;
 }
 
-function buildMessage(payload: unknown, fallback: string): string {
-  if (payload && typeof payload === "object" && "message" in payload) {
-    const m = (payload as { message: unknown }).message;
-    if (Array.isArray(m)) return m.join(", ");
-    if (typeof m === "string") return m;
-  }
-  return fallback;
-}
-
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  if (!API_URL) {
+    throw new ApiError("API sozlanmagan", 0, "API_NOT_CONFIGURED");
+  }
+
   const { auth = true, isForm = false, body, headers, ...rest } = options;
 
   const doRequest = async (): Promise<Response> => {
@@ -117,7 +206,17 @@ export async function apiFetch<T = unknown>(
     });
   };
 
-  let response = await doRequest();
+  let response: Response;
+  try {
+    response = await doRequest();
+  } catch (err) {
+    console.error("[apiFetch] network error", { path, err });
+    throw new ApiError(
+      "Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring.",
+      0,
+      "NETWORK"
+    );
+  }
 
   if (response.status === 401 && auth && tokenStore.refresh) {
     const ok = await tryRefresh();
@@ -128,8 +227,7 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  const text = await response.text();
-  const json = text ? JSON.parse(text) : null;
+  const json = await parseResponseBody(response);
 
   if (!response.ok) {
     const code =
@@ -139,15 +237,18 @@ export async function apiFetch<T = unknown>(
       (json as { error?: { code?: string } }).error?.code
         ? String((json as { error: { code: string } }).error.code)
         : undefined;
+    const rawMessage = buildMessage(json, "So'rovda xatolik yuz berdi");
     throw new ApiError(
-      buildMessage(json, "So'rovda xatolik yuz berdi"),
+      userFacingMessage(response.status, rawMessage),
       response.status,
       code
     );
   }
 
   // Backend muvaffaqiyatli javoblarni { success, data } ko'rinishida o'raydi
-  return (json?.data ?? json) as T;
+  return ((json && typeof json === "object" && "data" in json
+    ? (json as { data: T }).data
+    : json) ?? null) as T;
 }
 
 /** Authenticated binary download (e.g. private task attachments proxy). */
@@ -155,6 +256,10 @@ export async function apiFetchBlob(
   path: string,
   options: Omit<RequestOptions, "body" | "isForm"> = {}
 ): Promise<Blob> {
+  if (!API_URL) {
+    throw new ApiError("API sozlanmagan", 0, "API_NOT_CONFIGURED");
+  }
+
   const { auth = true, headers, ...rest } = options;
 
   const doRequest = async (): Promise<Response> => {
@@ -170,7 +275,17 @@ export async function apiFetchBlob(
     });
   };
 
-  let response = await doRequest();
+  let response: Response;
+  try {
+    response = await doRequest();
+  } catch {
+    throw new ApiError(
+      "Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring.",
+      0,
+      "NETWORK"
+    );
+  }
+
   if (response.status === 401 && auth && tokenStore.refresh) {
     const okRefresh = await tryRefresh();
     if (okRefresh) response = await doRequest();
@@ -180,7 +295,7 @@ export async function apiFetchBlob(
   if (!response.ok) {
     let message = "Faylni yuklab bo‘lmadi";
     try {
-      const json = await response.json();
+      const json = await parseResponseBody(response);
       message = buildMessage(json, message);
     } catch {
       /* ignore */
@@ -200,3 +315,6 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+/** Test/helper export */
+export const __test = { resolveApiBaseUrl };

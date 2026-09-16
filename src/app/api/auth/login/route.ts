@@ -15,7 +15,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = (await req.json()) as { email?: string; password?: string };
+    let body: { email?: string; password?: string };
+    try {
+      body = (await req.json()) as { email?: string; password?: string };
+    } catch {
+      return fail("Email va parol kerak", 400);
+    }
+
     const email = body.email?.trim().toLowerCase();
     const password = body.password ?? "";
     if (!email || !password) {
@@ -24,12 +30,12 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.isActive) {
-      return fail("Email yoki parol noto'g'ri", 401);
+      return fail("Email yoki parol noto‘g‘ri", 401);
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      return fail("Email yoki parol noto'g'ri", 401);
+      return fail("Email yoki parol noto‘g‘ri", 401);
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };
@@ -41,7 +47,8 @@ export async function POST(req: NextRequest) {
     });
 
     return ok({ user: sanitizeUser(user), ...tokens });
-  } catch {
-    return fail("Kirish xatosi", 500);
+  } catch (err) {
+    console.error("[auth/login] unexpected error", err);
+    return fail("Kirish vaqtida server xatosi yuz berdi.", 500);
   }
 }

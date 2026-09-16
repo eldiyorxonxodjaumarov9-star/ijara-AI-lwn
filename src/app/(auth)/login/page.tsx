@@ -22,6 +22,7 @@ import {
   type LoginInput,
   type TenantLoginInput,
 } from "@/lib/validations";
+import { cn } from "@/lib/utils";
 
 function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -37,16 +38,20 @@ function loginErrorMessage(error: unknown): string {
     if (error.status >= 500) {
       return "Kirish vaqtida server xatosi yuz berdi.";
     }
-    return error.message || "Kirishda xatolik yuz berdi";
+    return "Kirishda xatolik yuz berdi";
   }
   if (error instanceof Error && error.message) {
     if (/unexpected token|<!doctype|is not valid json/i.test(error.message)) {
       return "Serverdan noto‘g‘ri javob olindi.";
     }
-    return error.message;
+    return "Kirishda xatolik yuz berdi";
   }
   return "Kirishda xatolik yuz berdi";
 }
+
+const fieldClass =
+  "border-white/10 bg-white/5 pl-9 text-slate-100 placeholder:text-slate-500 focus-visible:ring-sky-500/40";
+const labelClass = "text-slate-300";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -93,26 +98,29 @@ function LoginPageContent() {
   };
 
   return (
-    <div>
+    <div className="text-slate-100">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Tizimga kirish</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight text-white">
+          Tizimga kirish
+        </h1>
+        <p className="mt-1 text-sm text-slate-400">
           Hisobingizga kiring va ishni davom ettiring
         </p>
       </div>
 
       {user && (
-        <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
-          <p className="font-medium">
+        <div className="mb-5 rounded-xl border border-sky-400/20 bg-sky-500/10 p-4 text-sm">
+          <p className="font-medium text-sky-100">
             Siz allaqachon tizimdasiz: {user.displayName}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-slate-400">
             Boshqa hisob bilan kirish uchun avval chiqing.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
+              className="bg-sky-500 text-white hover:bg-sky-400"
               onClick={() =>
                 router.push(user.role === "tenant" ? "/portal" : "/dashboard")
               }
@@ -123,6 +131,7 @@ function LoginPageContent() {
               type="button"
               size="sm"
               variant="outline"
+              className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
               disabled={loggingOut}
               onClick={async () => {
                 setLoggingOut(true);
@@ -143,16 +152,25 @@ function LoginPageContent() {
       )}
 
       <Tabs defaultValue={defaultTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="owner">Arenda egasi</TabsTrigger>
-          <TabsTrigger value="tenant">Ijarachi</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 border border-white/10 bg-white/5 p-1">
+          <TabsTrigger
+            value="owner"
+            className="data-[state=active]:bg-sky-500/20 data-[state=active]:text-sky-100"
+          >
+            Arenda egasi
+          </TabsTrigger>
+          <TabsTrigger
+            value="tenant"
+            className="data-[state=active]:bg-sky-500/20 data-[state=active]:text-sky-100"
+          >
+            Ijarachi
+          </TabsTrigger>
         </TabsList>
 
-        {/* ===== Arenda egasi ===== */}
-        <TabsContent value="owner">
+        <TabsContent value="owner" className="mt-5">
           {demoMode && (
-            <div className="mb-5 rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">
+            <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-400">
+              <p className="font-medium text-slate-200">
                 Demo kirish ma&apos;lumotlari:
               </p>
               <p>Email: admin@arendahub.uz</p>
@@ -165,19 +183,22 @@ function LoginPageContent() {
             className="space-y-4"
           >
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className={labelClass}>
+                Email
+              </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="email"
                   type="email"
                   placeholder="siz@example.com"
-                  className="pl-9"
+                  className={fieldClass}
+                  autoComplete="email"
                   {...ownerForm.register("email")}
                 />
               </div>
               {ownerForm.formState.errors.email && (
-                <p className="text-xs text-destructive">
+                <p className="text-xs text-rose-300">
                   {ownerForm.formState.errors.email.message}
                 </p>
               )}
@@ -185,51 +206,57 @@ function LoginPageContent() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Parol</Label>
+                <Label htmlFor="password" className={labelClass}>
+                  Parol
+                </Label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-sky-300 hover:text-sky-200 hover:underline"
                 >
                   Parolni unutdingizmi?
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••"
-                  className="pl-9"
+                  className={fieldClass}
+                  autoComplete="current-password"
                   {...ownerForm.register("password")}
                 />
               </div>
               {ownerForm.formState.errors.password && (
-                <p className="text-xs text-destructive">
+                <p className="text-xs text-rose-300">
                   {ownerForm.formState.errors.password.message}
                 </p>
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button
+              type="submit"
+              className="w-full bg-sky-500 text-white hover:bg-sky-400"
+              disabled={submitting}
+            >
               {submitting && <Loader2 className="size-4 animate-spin" />}
               Kirish
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="mt-6 text-center text-sm text-slate-400">
             Hisobingiz yo&apos;qmi?{" "}
             <Link
               href="/register"
-              className="font-medium text-primary hover:underline"
+              className="font-medium text-sky-300 hover:text-sky-200 hover:underline"
             >
               Ro&apos;yxatdan o&apos;tish
             </Link>
           </p>
         </TabsContent>
 
-        {/* ===== Arenda turgan odam ===== */}
-        <TabsContent value="tenant">
-          <div className="mb-5 rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
+        <TabsContent value="tenant" className="mt-5">
+          <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-400">
             Arenda egasi bergan login va parol orqali kiring.
           </div>
 
@@ -238,43 +265,55 @@ function LoginPageContent() {
             className="space-y-4"
           >
             <div className="space-y-1.5">
-              <Label htmlFor="tenantLogin">Login</Label>
+              <Label htmlFor="tenantLogin" className={labelClass}>
+                Login
+              </Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="tenantLogin"
                   placeholder="user901234567"
-                  className="pl-9"
+                  className={fieldClass}
+                  autoComplete="username"
                   {...tenantForm.register("login")}
                 />
               </div>
               {tenantForm.formState.errors.login && (
-                <p className="text-xs text-destructive">
+                <p className="text-xs text-rose-300">
                   {tenantForm.formState.errors.login.message}
                 </p>
               )}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tenantPassword">Parol</Label>
+              <Label htmlFor="tenantPassword" className={labelClass}>
+                Parol
+              </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="tenantPassword"
                   type="password"
                   placeholder="••••••"
-                  className="pl-9"
+                  className={fieldClass}
+                  autoComplete="current-password"
                   {...tenantForm.register("password")}
                 />
               </div>
               {tenantForm.formState.errors.password && (
-                <p className="text-xs text-destructive">
+                <p className="text-xs text-rose-300">
                   {tenantForm.formState.errors.password.message}
                 </p>
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button
+              type="submit"
+              className={cn(
+                "w-full bg-sky-500 text-white hover:bg-sky-400"
+              )}
+              disabled={submitting}
+            >
               {submitting && <Loader2 className="size-4 animate-spin" />}
               Kirish
             </Button>
@@ -287,7 +326,9 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Yuklanmoqda...</div>}>
+    <Suspense
+      fallback={<div className="text-sm text-slate-400">Yuklanmoqda...</div>}
+    >
       <LoginPageContent />
     </Suspense>
   );

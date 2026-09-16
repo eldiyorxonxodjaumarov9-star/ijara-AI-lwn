@@ -20,6 +20,30 @@ export function computeTotalAmount(monthlyAmount: number, monthCount: number): n
   return monthly * months;
 }
 
+/** UI preview — intermediate input values must never crash the form. */
+export function previewMonthlyAmount(
+  areaSqm: number,
+  ratePerSqm: number
+): number {
+  try {
+    return computeMonthlyAmount(areaSqm, ratePerSqm);
+  } catch {
+    return 0;
+  }
+}
+
+/** UI preview — empty/0 monthCount while typing is allowed. */
+export function previewTotalAmount(
+  monthlyAmount: number,
+  monthCount: number
+): number {
+  try {
+    return computeTotalAmount(monthlyAmount, monthCount);
+  } catch {
+    return 0;
+  }
+}
+
 export function formatSomGrouped(amount: number): string {
   const n = Math.trunc(amount);
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");

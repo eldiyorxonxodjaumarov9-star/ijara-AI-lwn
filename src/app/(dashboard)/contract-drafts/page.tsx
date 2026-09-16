@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch, isApiConfigured } from "@/lib/api/client";
-import { computeMonthlyAmount, computeTotalAmount } from "@/lib/contract-money";
+import { previewMonthlyAmount, previewTotalAmount } from "@/lib/contract-money";
 
 type EligibleTenant = {
   id: string;
@@ -117,6 +117,12 @@ const LESSOR_PREVIEW_ROWS: { key: keyof LessorProfileView; label: string }[] = [
   { key: "lessorAccount", label: "Hisob raqami" },
 ];
 
+/** Keep typing stable: empty → 0, ignore non-finite intermediates. */
+function parseNumberInput(raw: string, fallback = 0): number {
+  if (raw.trim() === "") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
 export default function ContractDraftsPage() {
   const [eligible, setEligible] = useState<EligibleTenant[]>([]);
   const [requests, setRequests] = useState<DraftRequest[]>([]);
@@ -147,11 +153,11 @@ export default function ContractDraftsPage() {
   const [lessorMissing, setLessorMissing] = useState<string[]>([]);
 
   const monthly = useMemo(
-    () => computeMonthlyAmount(areaSqm, ratePerSqm),
+    () => previewMonthlyAmount(areaSqm, ratePerSqm),
     [areaSqm, ratePerSqm]
   );
   const total = useMemo(
-    () => computeTotalAmount(monthly, monthCount),
+    () => previewTotalAmount(monthly, monthCount),
     [monthly, monthCount]
   );
 
@@ -224,6 +230,24 @@ export default function ContractDraftsPage() {
     if (lessorIncomplete) {
       toast.error(
         `Ijaraga beruvchi rekvizitlari yetishmayapti: ${missingLabels.join(", ")}`
+      );
+      return;
+    }
+    if (
+      !Number.isFinite(areaSqm) ||
+      areaSqm <= 0 ||
+      !Number.isFinite(ratePerSqm) ||
+      ratePerSqm < 0 ||
+      !Number.isFinite(monthCount) ||
+      monthCount < 1 ||
+      !Number.isFinite(paymentDueDay) ||
+      paymentDueDay < 1 ||
+      paymentDueDay > 31 ||
+      !Number.isFinite(depositAmount) ||
+      depositAmount < 0
+    ) {
+      toast.error(
+        "Maydon, tarif, oylar soni, to‘lov kuni yoki depozit noto‘g‘ri"
       );
       return;
     }
@@ -330,6 +354,8 @@ export default function ContractDraftsPage() {
   const canSubmit =
     !saving &&
     Boolean(propertyId && contractDate && startDate && endDate && serviceName) &&
+    monthCount >= 1 &&
+    areaSqm > 0 &&
     !lessorIncomplete;
 
   return (
@@ -370,7 +396,12 @@ export default function ContractDraftsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Shartnomasi yo‘q mijozlar</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => void reload()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void reload()}
+          >
             <RefreshCw className="size-4" /> Yangilash
           </Button>
         </CardHeader>
@@ -403,7 +434,7 @@ export default function ContractDraftsPage() {
                     </span>
                   </p>
                 </div>
-                <Button onClick={() => openCreate(t)}>
+                <Button type="button" onClick={() => openCreate(t)}>
                   <Send className="size-4" /> Shartnoma tuzish
                 </Button>
               </div>
@@ -440,6 +471,7 @@ export default function ContractDraftsPage() {
                   {r.hasDocument && (
                     <>
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => void download(r.id)}
@@ -447,6 +479,7 @@ export default function ContractDraftsPage() {
                         <Download className="size-4" /> Yuklab olish
                       </Button>
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => void download(r.id)}
@@ -457,6 +490,7 @@ export default function ContractDraftsPage() {
                       {(r.status === "CREATED" ||
                         r.deliveryStatus === "FAILED") && (
                         <Button
+                          type="button"
                           size="sm"
                           variant="secondary"
                           onClick={() =>
@@ -472,6 +506,7 @@ export default function ContractDraftsPage() {
                   )}
                   {r.status === "FAILED" && (
                     <Button
+                      type="button"
                       size="sm"
                       onClick={() => void runAction(r.id, "retry")}
                     >
@@ -481,6 +516,7 @@ export default function ContractDraftsPage() {
                   {(r.status === "AWAITING_CLIENT" ||
                     r.status === "CLIENT_FORM_OPENED") && (
                     <Button
+                      type="button"
                       size="sm"
                       variant="outline"
                       onClick={() => void runAction(r.id, "regenerate-link")}
@@ -490,6 +526,7 @@ export default function ContractDraftsPage() {
                   )}
                   {r.status !== "CREATED" && r.status !== "CANCELLED" && (
                     <Button
+                      type="button"
                       size="sm"
                       variant="ghost"
                       onClick={() => void runAction(r.id, "cancel")}
@@ -509,7 +546,20 @@ export default function ContractDraftsPage() {
           <DialogHeader>
             <DialogTitle>Yangi shartnoma so‘rovi</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <form
+            className="grid gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+            }}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                (e.target as HTMLElement).tagName !== "TEXTAREA"
+              ) {
+                e.preventDefault();
+              }
+            }}
+          >
             {selectedTenant && (
               <div className="rounded-lg border bg-muted/40 p-3 text-sm">
                 <p className="font-medium">{selectedTenant.fullName}</p>
@@ -645,32 +695,56 @@ export default function ContractDraftsPage() {
                 <Label>Xona maydoni (m²)</Label>
                 <Input
                   type="number"
-                  value={areaSqm}
-                  onChange={(e) => setAreaSqm(Number(e.target.value))}
+                  inputMode="decimal"
+                  min={0}
+                  value={Number.isFinite(areaSqm) ? areaSqm : ""}
+                  onChange={(e) => setAreaSqm(parseNumberInput(e.target.value))}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>1 m² narxi</Label>
                 <Input
                   type="number"
-                  value={ratePerSqm}
-                  onChange={(e) => setRatePerSqm(Number(e.target.value))}
+                  inputMode="numeric"
+                  min={0}
+                  value={Number.isFinite(ratePerSqm) ? ratePerSqm : ""}
+                  onChange={(e) =>
+                    setRatePerSqm(parseNumberInput(e.target.value))
+                  }
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Oylar soni</Label>
                 <Input
                   type="number"
-                  value={monthCount}
-                  onChange={(e) => setMonthCount(Number(e.target.value))}
+                  inputMode="numeric"
+                  min={1}
+                  max={120}
+                  value={
+                    Number.isFinite(monthCount) && monthCount > 0
+                      ? monthCount
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setMonthCount(parseNumberInput(e.target.value, 0))
+                  }
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>To‘lov kuni</Label>
                 <Input
                   type="number"
-                  value={paymentDueDay}
-                  onChange={(e) => setPaymentDueDay(Number(e.target.value))}
+                  inputMode="numeric"
+                  min={1}
+                  max={31}
+                  value={
+                    Number.isFinite(paymentDueDay) && paymentDueDay > 0
+                      ? paymentDueDay
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setPaymentDueDay(parseNumberInput(e.target.value, 0))
+                  }
                 />
               </div>
             </div>
@@ -698,8 +772,12 @@ export default function ContractDraftsPage() {
               <Label>Depozit</Label>
               <Input
                 type="number"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(Number(e.target.value))}
+                inputMode="numeric"
+                min={0}
+                value={Number.isFinite(depositAmount) ? depositAmount : ""}
+                onChange={(e) =>
+                  setDepositAmount(parseNumberInput(e.target.value))
+                }
               />
             </div>
 
@@ -722,20 +800,29 @@ export default function ContractDraftsPage() {
               <p>Bir oylik to‘lov: {monthly.toLocaleString("uz-UZ")} so‘m</p>
               <p>Jami summa: {total.toLocaleString("uz-UZ")} so‘m</p>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Bekor
-            </Button>
-            <Button onClick={() => void submit()} disabled={!canSubmit}>
-              {saving ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Send className="size-4" />
-              )}
-              Mijozga yuborish
-            </Button>
-          </DialogFooter>
+
+            <DialogFooter className="px-0 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Bekor
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!canSubmit}
+              >
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
+                Mijozga yuborish
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

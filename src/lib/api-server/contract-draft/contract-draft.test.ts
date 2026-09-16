@@ -14,6 +14,8 @@ import {
   computeMonthlyAmount,
   computeTotalAmount,
   formatSomGrouped,
+  previewMonthlyAmount,
+  previewTotalAmount,
 } from "./money";
 import {
   createContractToken,
@@ -41,6 +43,15 @@ describe("contract-draft money", () => {
     assert.equal(computeTotalAmount(1_732_800, 4), 6_931_200);
     assert.notEqual(computeTotalAmount(1_732_800, 4), 6_526_880);
     assert.equal(formatSomGrouped(1732800), "1 732 800");
+  });
+
+  it("preview helpers never throw on intermediate typing values", () => {
+    assert.equal(previewTotalAmount(1_732_800, 0), 0);
+    assert.equal(previewTotalAmount(1_732_800, Number.NaN), 0);
+    assert.equal(previewMonthlyAmount(Number.NaN, 91200), 0);
+    assert.equal(previewMonthlyAmount(20, 91200), 1_824_000);
+    assert.equal(previewTotalAmount(1_824_000, 4), 7_296_000);
+    assert.throws(() => computeTotalAmount(1_732_800, 0));
   });
 });
 

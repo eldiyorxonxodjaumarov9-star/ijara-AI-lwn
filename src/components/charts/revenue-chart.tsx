@@ -19,27 +19,40 @@ function compact(value: number) {
   return String(value);
 }
 
-export function RevenueChart({ data }: { data: RevenuePoint[] }) {
+export function RevenueChart({
+  data,
+  premium = false,
+}: {
+  data: RevenuePoint[];
+  premium?: boolean;
+}) {
+  const grid = premium ? "rgb(148 163 184 / 0.12)" : "var(--border)";
+  const tick = premium ? "#94a3b8" : "var(--muted-foreground)";
+  const income = premium ? "#34d399" : "var(--color-chart-1)";
+  const expense = premium ? "#fb7185" : "var(--color-chart-4)";
+  const tipBg = premium ? "#0d1c34" : "var(--popover)";
+  const tipColor = premium ? "#e8eef8" : "var(--popover-foreground)";
+
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
         <defs>
           <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0} />
+            <stop offset="5%" stopColor={income} stopOpacity={0.35} />
+            <stop offset="95%" stopColor={income} stopOpacity={0} />
           </linearGradient>
           <linearGradient id="fillExpense" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--color-chart-4)" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="var(--color-chart-4)" stopOpacity={0} />
+            <stop offset="5%" stopColor={expense} stopOpacity={0.3} />
+            <stop offset="95%" stopColor={expense} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+        <CartesianGrid vertical={false} stroke={grid} strokeDasharray="3 3" />
         <XAxis
           dataKey="month"
           tickLine={false}
           axisLine={false}
           fontSize={12}
-          stroke="var(--muted-foreground)"
+          stroke={tick}
         />
         <YAxis
           tickFormatter={compact}
@@ -47,23 +60,25 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           axisLine={false}
           fontSize={12}
           width={42}
-          stroke="var(--muted-foreground)"
+          stroke={tick}
         />
         <Tooltip
           formatter={(value) => formatCurrency(Number(value))}
           contentStyle={{
-            background: "var(--popover)",
-            border: "1px solid var(--border)",
+            background: tipBg,
+            border: premium
+              ? "1px solid rgb(148 163 184 / 0.2)"
+              : "1px solid var(--border)",
             borderRadius: 12,
             fontSize: 12,
-            color: "var(--popover-foreground)",
+            color: tipColor,
           }}
         />
         <Area
           type="monotone"
           dataKey="daromad"
           name="Daromad"
-          stroke="var(--color-chart-1)"
+          stroke={income}
           strokeWidth={2}
           fill="url(#fillRevenue)"
         />
@@ -71,7 +86,7 @@ export function RevenueChart({ data }: { data: RevenuePoint[] }) {
           type="monotone"
           dataKey="xarajat"
           name="Xarajat"
-          stroke="var(--color-chart-4)"
+          stroke={expense}
           strokeWidth={2}
           fill="url(#fillExpense)"
         />

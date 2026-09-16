@@ -60,7 +60,9 @@ export default function RegisterPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Ro&apos;yxatdan o&apos;tish</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Ro&apos;yxatdan o&apos;tish
+          </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Yangi hisob yarating va platformadan foydalaning
         </p>
@@ -141,7 +143,11 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={submitting}>
+        <Button
+          type="submit"
+          className="w-full bg-sky-500 text-white hover:bg-sky-400"
+          disabled={submitting}
+        >
           {submitting && <Loader2 className="size-4 animate-spin" />}
           Ro&apos;yxatdan o&apos;tish
         </Button>
@@ -149,7 +155,7 @@ export default function RegisterPage() {
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Hisobingiz bormi?{" "}
-        <Link href="/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-medium text-sky-300 hover:underline">
           Kirish
         </Link>
       </p>

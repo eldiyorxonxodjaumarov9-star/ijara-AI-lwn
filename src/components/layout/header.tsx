@@ -51,14 +51,19 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md lg:px-6">
+    <header className="app-header sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 lg:px-6">
       <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-foreground hover:bg-white/10 lg:hidden"
+            aria-label="Menyu"
+          >
             <Menu className="size-5" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="left-0 top-0 h-full max-w-64 translate-x-0 translate-y-0 rounded-none border-r p-0 sm:rounded-none">
+        <DialogContent className="left-0 top-0 h-full max-w-64 translate-x-0 translate-y-0 rounded-none border-r border-white/10 bg-[#071429] p-0 sm:rounded-none">
           <Suspense fallback={null}>
             <SidebarContent onNavigate={() => setMobileOpen(false)} />
           </Suspense>
@@ -69,7 +74,7 @@ export function Header() {
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder={t("common.search")}
-          className="pl-9"
+          className="border-white/10 bg-white/5 pl-9 text-foreground placeholder:text-muted-foreground focus-visible:ring-sky-500/40 dark:border-white/10"
           aria-label={t("common.search")}
         />
       </div>
@@ -81,14 +86,14 @@ export function Header() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative"
+          className="relative hover:bg-white/10"
           asChild
           aria-label="Xabarlar"
         >
           <Link href="/notifications">
             <Bell className="size-4" />
             {unread > 0 && (
-              <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
                 {unread}
               </span>
             )}
@@ -97,26 +102,34 @@ export function Header() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="ml-1 flex items-center gap-2 rounded-full outline-none">
-              <Avatar>
+            <button
+              className="ml-1 flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
+              aria-label="Profil menyusi"
+            >
+              <Avatar className="border border-white/15">
                 <AvatarImage src={user?.photoURL} alt={user?.displayName} />
-                <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
+                <AvatarFallback className="bg-sky-500/20 text-sky-100">
+                  {getInitials(user?.displayName)}
+                </AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent
+            align="end"
+            className="w-56 border-white/10 bg-[#0d1c34] text-slate-100"
+          >
             <DropdownMenuLabel>
               <div className="flex flex-col">
                 <span className="font-semibold">{user?.displayName}</span>
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-xs font-normal text-slate-400">
                   {user?.email}
                 </span>
-                <span className="mt-1 text-xs font-normal text-primary">
+                <span className="mt-1 text-xs font-normal text-sky-300">
                   {user?.role ? ROLE_MAP[user.role] : ""}
                 </span>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-white/10" />
             <DropdownMenuItem asChild>
               <Link href="/settings">
                 <User className="size-4" /> {t("common.profile")}
@@ -127,10 +140,10 @@ export function Header() {
                 <Settings className="size-4" /> {t("nav.settings")}
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-white/10" />
             <DropdownMenuItem
               onClick={handleLogout}
-              className="text-destructive focus:text-destructive"
+              className="text-rose-300 focus:text-rose-200"
             >
               <LogOut className="size-4" /> {t("common.logout")}
             </DropdownMenuItem>

@@ -1,0 +1,11 @@
+/* Dashboard-specific helpers (shared tokens live in styles/app-shell.css) */
+
+.dash-grid-fade {
+  background-image:
+    linear-gradient(to right, rgb(148 163 184 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 163 184 / 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at top, black 15%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.65;
+}

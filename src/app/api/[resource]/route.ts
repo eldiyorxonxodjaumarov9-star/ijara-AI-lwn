@@ -7,6 +7,7 @@ import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { findRecentDuplicatePayment } from "@/lib/api-server/payment-dedupe";
 import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
+import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
@@ -18,8 +19,6 @@ const ALLOWED = [
   "maintenance",
   "notifications",
 ] as const satisfies readonly RbacResource[];
-
-type Resource = (typeof ALLOWED)[number];
 
 function delegate(resource: string): RbacResource | null {
   return (ALLOWED as readonly string[]).includes(resource)
@@ -75,7 +74,7 @@ export async function GET(
       return ok(paginated(data, total, page, limit));
     }
     case "expenses": {
-      const [data, total] = await Promise.all([
+      const [rows, total] = await Promise.all([
         prisma.expense.findMany({
           skip,
           take: limit,
@@ -84,6 +83,15 @@ export async function GET(
         }),
         prisma.expense.count(),
       ]);
+      const data = rows.map((row) => ({
+        ...row,
+        employee: row.employee
+          ? sanitizeEmployeeForRole(
+              row.employee as Record<string, unknown>,
+              auth.user.role
+            )
+          : null,
+      }));
       return ok(paginated(data, total, page, limit));
     }
     case "maintenance": {
@@ -231,21 +239,30 @@ export async function POST(
           monthlyType === "CUSTOM" && monthlyTypeCustomRaw
             ? String(monthlyTypeCustomRaw).trim() || null
             : null;
+        const created = await prisma.expense.create({
+          data: {
+            title: String(body.title ?? body.note ?? "Xarajat"),
+            amount: Number(body.amount ?? 0),
+            category: (body.category as never) ?? "OTHER",
+            date: new Date(String(body.date ?? Date.now())),
+            notes: body.notes ? String(body.notes) : undefined,
+            receiptUrl: body.receiptUrl ? String(body.receiptUrl) : undefined,
+            employeeId: employeeId || undefined,
+            monthlyType: (monthlyType as never) || undefined,
+            monthlyTypeCustom: monthlyTypeCustom || undefined,
+          },
+          include: { employee: { include: { company: true } } },
+        });
         return ok(
-          await prisma.expense.create({
-            data: {
-              title: String(body.title ?? body.note ?? "Xarajat"),
-              amount: Number(body.amount ?? 0),
-              category: (body.category as never) ?? "OTHER",
-              date: new Date(String(body.date ?? Date.now())),
-              notes: body.notes ? String(body.notes) : undefined,
-              receiptUrl: body.receiptUrl ? String(body.receiptUrl) : undefined,
-              employeeId: employeeId || undefined,
-              monthlyType: (monthlyType as never) || undefined,
-              monthlyTypeCustom: monthlyTypeCustom || undefined,
-            },
-            include: { employee: { include: { company: true } } },
-          }),
+          {
+            ...created,
+            employee: created.employee
+              ? sanitizeEmployeeForRole(
+                  created.employee as Record<string, unknown>,
+                  auth.user.role
+                )
+              : null,
+          },
           201
         );
       }

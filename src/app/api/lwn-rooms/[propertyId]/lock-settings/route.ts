@@ -15,6 +15,7 @@ import {
   mapUniqueToAlreadyAssigned,
   unassignTtlockLockFromRoom,
 } from "@/lib/api-server/ttlock/room-lock-assign";
+import { assertTtlockOwnerRole } from "@/lib/api-server/ttlock/service";
 import { isTtlockProviderName } from "@/lib/ttlock-room-lock-view";
 
 type Ctx = { params: Promise<{ propertyId: string }> };
@@ -64,6 +65,12 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
+
+  try {
+    assertTtlockOwnerRole(auth.user);
+  } catch (err) {
+    return failFromTtlock(err);
+  }
 
   const { propertyId } = await ctx.params;
   const found = await findLwnPropertyOrFail(propertyId);

@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireAnyStaffUser } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireAnyStaffUser(req);
   if (auth.error) return auth.error;
 
   const { page, limit, skip, search, sortBy, order } = parsePagination(

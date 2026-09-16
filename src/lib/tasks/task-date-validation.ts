@@ -44,3 +44,12 @@ export function isAbsurdTaskDate(
   if (Number.isNaN(d.getTime())) return true;
   return !isTaskDateYearInRange(d);
 }
+
+/** Prisma `dueAt` filter: past due within allowed year window (excludes legacy junk). */
+export function overdueTaskDueAtFilter(now = new Date()) {
+  return {
+    lt: now,
+    gte: new Date(Date.UTC(TASK_DATE_MIN_YEAR, 0, 1)),
+    lte: new Date(Date.UTC(TASK_DATE_MAX_YEAR, 11, 31, 23, 59, 59, 999)),
+  };
+}

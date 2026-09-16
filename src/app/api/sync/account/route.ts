@@ -67,10 +67,12 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function HEAD() {
+export async function HEAD(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+
   const backend = detectSyncBackend();
   return new NextResponse(null, {
     status: backend === "none" ? 501 : 200,
-    headers: { "X-Sync-Backend": backend },
   });
 }

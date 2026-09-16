@@ -6,6 +6,7 @@ import { deleteTenantAndLinkedClients } from "@/lib/api-server/clients";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
+import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
@@ -52,6 +53,17 @@ export async function GET(
         where: { id },
         include: { employee: { include: { company: true } } },
       });
+      if (found && typeof found === "object" && "employee" in found) {
+        const row = found as {
+          employee: Record<string, unknown> | null;
+        } & Record<string, unknown>;
+        found = {
+          ...row,
+          employee: row.employee
+            ? sanitizeEmployeeForRole(row.employee, auth.user.role)
+            : null,
+        };
+      }
       break;
     case "maintenance":
       found = await prisma.maintenance.findUnique({
@@ -181,13 +193,20 @@ export async function PATCH(
           const trimmed = raw == null ? "" : String(raw).trim();
           data.monthlyTypeCustom = trimmed || null;
         }
-        return ok(
-          await prisma.expense.update({
-            where: { id },
-            data: data as never,
-            include: { employee: { include: { company: true } } },
-          })
-        );
+        const updated = await prisma.expense.update({
+          where: { id },
+          data: data as never,
+          include: { employee: { include: { company: true } } },
+        });
+        return ok({
+          ...updated,
+          employee: updated.employee
+            ? sanitizeEmployeeForRole(
+                updated.employee as Record<string, unknown>,
+                auth.user.role
+              )
+            : null,
+        });
       }
       case "maintenance":
         return ok(await prisma.maintenance.update({ where: { id }, data: body as never }));

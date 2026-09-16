@@ -7,7 +7,7 @@
     "build": "prisma generate --schema=server/prisma/schema.prisma && next build",
     "vercel-build": "prisma generate --schema=server/prisma/schema.prisma && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npx --yes tsx --test \"src/**/*.test.ts\"",
     "postinstall": "prisma generate --schema=server/prisma/schema.prisma",

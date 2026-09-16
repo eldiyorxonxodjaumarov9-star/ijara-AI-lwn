@@ -44,8 +44,9 @@ export function formatTaskDueAt(
 ): string {
   if (!dueAt) return "—";
   const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
+  // Invalid / absurd legacy years → safe dash (never "Noto'g'ri sana" in UI).
   if (Number.isNaN(d.getTime()) || isAbsurdTaskDate(d)) {
-    return "Noto'g'ri sana";
+    return "—";
   }
   return new Intl.DateTimeFormat("uz-UZ", {
     timeZone,
@@ -64,7 +65,9 @@ export function isTaskOverdue(
 ): boolean {
   if (!dueAt) return false;
   if (!ACTIVE_TASK_STATUSES.includes(status)) return false;
+  if (isAbsurdTaskDate(dueAt)) return false;
   const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
+  if (Number.isNaN(d.getTime())) return false;
   return d.getTime() < now.getTime();
 }
 

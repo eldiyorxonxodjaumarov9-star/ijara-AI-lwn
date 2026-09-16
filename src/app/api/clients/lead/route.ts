@@ -34,8 +34,10 @@ export async function POST(req: NextRequest) {
     return fail("So'rov qabul qilinmadi", 400);
   }
 
+  // Honeypot: reject without writing. Same generic 400 as validation to avoid
+  // teaching bots which field tripped (and never persist spam).
   if (isLeadHoneypotTriggered(body)) {
-    return ok({ accepted: true }, 201);
+    return fail("So'rov qabul qilinmadi", 400);
   }
 
   const parsed = parsePublicLeadBody(body);

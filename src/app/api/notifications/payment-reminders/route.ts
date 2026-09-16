@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireStaffUser } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
@@ -31,7 +31,7 @@ function parseClientDebts(body: Record<string, unknown>): DebtReminderInput[] | 
 /** Admin: barcha qarzdorlarga to'lov eslatmasi yuborish */
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireStaffUser(req);
   if (auth.error) return auth.error;
 
   try {
@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   return ok({
     sampleMessage: buildPaymentReminderMessage({
       tenantName: "Arendator",

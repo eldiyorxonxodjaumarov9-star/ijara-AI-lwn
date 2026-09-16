@@ -5,8 +5,11 @@ import {
   assertValidTaskDueDate,
   isAbsurdTaskDate,
   isTaskDateYearInRange,
+  overdueTaskDueAtFilter,
   parseTaskDueDate,
   TASK_DATE_INVALID_MESSAGE,
+  TASK_DATE_MAX_YEAR,
+  TASK_DATE_MIN_YEAR,
 } from "./task-date-validation";
 
 describe("task date validation", () => {
@@ -38,5 +41,13 @@ describe("task date validation", () => {
     assert.equal(parseTaskDueDate(null), null);
     assert.equal(parseTaskDueDate("2200-01-01"), null);
     assert.ok(parseTaskDueDate("2026-05-01") instanceof Date);
+  });
+
+  it("overdueTaskDueAtFilter excludes absurd years", () => {
+    const now = new Date("2026-09-17T12:00:00.000Z");
+    const filter = overdueTaskDueAtFilter(now);
+    assert.equal(filter.lt.toISOString(), now.toISOString());
+    assert.equal(filter.gte.getUTCFullYear(), TASK_DATE_MIN_YEAR);
+    assert.equal(filter.lte.getUTCFullYear(), TASK_DATE_MAX_YEAR);
   });
 });

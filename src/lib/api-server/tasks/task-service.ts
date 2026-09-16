@@ -7,7 +7,10 @@ import type {
 
 import { prisma } from "@/lib/api-server/prisma";
 import { sendTelegramMessage } from "@/lib/api-server/telegram-bot";
-import { assertValidTaskDueDate } from "@/lib/tasks/task-date-validation";
+import {
+  assertValidTaskDueDate,
+  overdueTaskDueAtFilter,
+} from "@/lib/tasks/task-date-validation";
 import {
   ACTIVE_TASK_STATUSES,
   formatTaskDueAt,
@@ -280,7 +283,7 @@ export async function listTasks(opts: {
   }
   if (opts.overdueOnly) {
     where.status = { in: ACTIVE_TASK_STATUSES };
-    where.dueAt = { lt: new Date() };
+    where.dueAt = overdueTaskDueAtFilter();
   }
 
   const [total, rows] = await Promise.all([
@@ -311,7 +314,7 @@ export async function getTaskStats() {
   const overdue = await prisma.workTask.count({
     where: {
       status: { in: ACTIVE_TASK_STATUSES },
-      dueAt: { lt: new Date() },
+      dueAt: overdueTaskDueAtFilter(),
     },
   });
   return { byStatus, overdue, total: groups.reduce((s, g) => s + g._count._all, 0) };

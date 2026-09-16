@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireAdminUser } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import {
   getTelegramWebhookInfo,
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!isTelegramBotConfigured()) {
     return fail("TELEGRAM_BOT_TOKEN sozlanmagan", 501);
   }
-  const auth = await requireUser(req);
+  const auth = await requireAdminUser(req);
   if (auth.error) return auth.error;
 
   const origin = appOrigin(req);
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   if (!isTelegramBotConfigured()) {
     return ok({ configured: false });
   }
-  const auth = await requireUser(req);
+  const auth = await requireAdminUser(req);
   if (auth.error) return auth.error;
 
   const origin = appOrigin(req);

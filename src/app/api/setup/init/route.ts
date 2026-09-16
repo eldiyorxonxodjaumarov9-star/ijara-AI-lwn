@@ -8,7 +8,7 @@ import { ok, fail } from "@/lib/api-server/http";
 /** Bir marta: jadvallar + demo ma'lumotlar (Vercel/Neon) */
 export async function POST(req: Request) {
   const secret = req.headers.get("x-setup-secret");
-  const expected = process.env.SETUP_SECRET ?? process.env.JWT_ACCESS_SECRET;
+  const expected = process.env.SETUP_SECRET;
   if (!expected || secret !== expected) {
     return fail("Ruxsat yo'q", 403);
   }

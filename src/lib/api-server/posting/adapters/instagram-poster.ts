@@ -3,7 +3,6 @@ import { buildManualPackage, generatePostText } from "@/lib/posting/copy-generat
 import {
   InstagramError,
   isInstagramConnected,
-  isInstagramEnabled,
   loadInstagramConfig,
   publishInstagramPost,
 } from "@/lib/api-server/integrations/instagram-service";

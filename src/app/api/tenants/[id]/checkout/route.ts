@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import { checkoutTenant } from "@/lib/api-server/tenant-checkout";
@@ -10,7 +10,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "tenants", "POST");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;

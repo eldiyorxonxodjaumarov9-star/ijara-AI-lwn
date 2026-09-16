@@ -8,13 +8,28 @@ import {
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import { TtlockError } from "@/lib/api-server/ttlock/errors";
+import { assertTtlockOwnerRole } from "@/lib/api-server/ttlock/service";
 
 type Ctx = { params: Promise<{ propertyId: string }> };
+
+function failFromErr(err: unknown) {
+  if (err instanceof TtlockError) {
+    return fail(err.message, err.httpStatus, err.code);
+  }
+  return fail("Kirish tarixini yuklab bo'lmadi", 500);
+}
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
+
+  try {
+    assertTtlockOwnerRole(auth.user);
+  } catch (err) {
+    return failFromErr(err);
+  }
 
   const { propertyId } = await ctx.params;
   const found = await findLwnPropertyOrFail(propertyId);

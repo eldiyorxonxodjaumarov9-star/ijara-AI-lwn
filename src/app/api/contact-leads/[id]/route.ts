@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireAnyStaffUser } from "@/lib/api-server/rbac";
 import {
   interestToApi,
   mapContactLead,
@@ -13,7 +13,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireAnyStaffUser(req);
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;
@@ -49,7 +49,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(_req);
+  const auth = await requireAnyStaffUser(_req);
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;

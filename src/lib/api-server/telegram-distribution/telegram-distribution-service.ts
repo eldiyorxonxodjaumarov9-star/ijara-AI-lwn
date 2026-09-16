@@ -274,7 +274,7 @@ export async function getListingTelegramJobs(
 }
 
 export async function retryTelegramJob(jobId: string) {
-  const job = await prisma.telegramPostingJob.update({
+  await prisma.telegramPostingJob.update({
     where: { id: jobId },
     data: { status: "PENDING", retryCount: { increment: 1 } },
     include: { channel: true },

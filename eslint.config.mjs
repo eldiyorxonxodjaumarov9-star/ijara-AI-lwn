@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "scripts/.tmp*/**",
     "scripts/.tmp*",
+    // Vendored Hermes runtime / agent — not part of the Next.js app surface
+    "services/**",
   ]),
   {
     plugins: {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Arenda AI's scoped Hermes employee team once."""
+"""Run Ijara AI's scoped Hermes employee team once."""
 from __future__ import annotations
 
 import argparse
@@ -154,7 +154,7 @@ def run_hermes(role: str, skill: str, context: dict[str, Any]) -> tuple[str, Usa
     provider = os.getenv("HERMES_PROVIDER", "").strip()
     reasoning = os.getenv("HERMES_REASONING", "low").strip()
     prompt = (
-        f"Siz Arenda AI tizimidagi {role} agentsiz. "
+        f"Siz Ijara AI tizimidagi {role} agentsiz. "
         "Faqat server hisoblagan JSON asosida ishlang. Hech qanday raqam, mijoz, sabab "
         "yoki holat o'ylab topmang. Tool ishlatmang va tashqi amal bajarmang. "
         "O'zbek tilida juda qisqa javob bering.\n\n"

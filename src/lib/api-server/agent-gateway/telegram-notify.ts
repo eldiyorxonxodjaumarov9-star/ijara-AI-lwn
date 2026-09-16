@@ -54,7 +54,7 @@ export async function deliverDailyManagerTelegram(
     };
   }
 
-  // Exact figures are rebuilt inside Arenda AI. Hermes is never a source of
+  // Exact figures are rebuilt inside Ijara AI. Hermes is never a source of
   // truth for payment, occupancy, or expense numbers.
   const snapshot = trustedSnapshot;
   const text = snapshot
@@ -63,7 +63,7 @@ export async function deliverDailyManagerTelegram(
         input.recommendations ?? input.report.recommendations ?? []
       )
     : [
-        "🏢 ARENDA AI — KUNLIK HISOBOT",
+        "🏢 IJARA AI — KUNLIK HISOBOT",
         `📅 ${input.reportDate}`,
         "",
         "💰 TO‘LOVLAR",

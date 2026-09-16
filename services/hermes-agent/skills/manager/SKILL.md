@@ -3,7 +3,7 @@ name: manager
 description: Orchestrate Payment and Analyst agents; compose Uzbek daily report; safe Telegram delivery only.
 ---
 
-# Manager Agent (Arenda AI)
+# Manager Agent (Ijara AI)
 
 ## Role
 Coordinate daily reporting. You do **not** mutate payments, contracts, TTLock, or expenses.

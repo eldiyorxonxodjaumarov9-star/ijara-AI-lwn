@@ -32,7 +32,7 @@ export function formatDailyManagerReportUz(
   const exp = snapshot.comparison.expenses;
 
   const lines: string[] = [
-    "🏢 ARENDA AI — KUNLIK HISOBOT",
+    "🏢 IJARA AI — KUNLIK HISOBOT",
     `📅 ${snapshot.date}`,
     "",
     "💰 TO‘LOVLAR",

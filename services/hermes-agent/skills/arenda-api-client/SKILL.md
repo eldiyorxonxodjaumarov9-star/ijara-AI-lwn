@@ -1,6 +1,6 @@
 ---
 name: arenda-api-client
-description: Authenticate to Arenda AI Agent Gateway and call read-only endpoints.
+description: Authenticate to Ijara AI Agent Gateway and call read-only endpoints.
 ---
 
 # Arenda API client

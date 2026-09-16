@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ijaraai.uz"),
+  applicationName: "Ijara AI",
   title: {
     default: "Ijara AI — Ko'chmas mulk ijarasi boshqaruvi",
     template: "%s | Ijara AI",
@@ -35,6 +36,12 @@ export const metadata: Metadata = {
     description: "Ko'chmas mulk ijarasi boshqaruv platformasi",
     type: "website",
     url: "https://ijaraai.uz",
+    siteName: "Ijara AI",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ijara AI",
+    description: "Ko'chmas mulk ijarasi boshqaruv platformasi",
   },
 };
 

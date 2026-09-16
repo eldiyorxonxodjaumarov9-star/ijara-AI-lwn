@@ -1,4 +1,4 @@
-# Arenda AI × Hermes Agent Runtime
+# Ijara AI × Hermes Agent Runtime
 
 Official Hermes Agent (Nous Research) runs as a **separate persistent process**.
 It never receives `DATABASE_URL`, Telegram bot tokens, or TTLock secrets.
@@ -7,8 +7,8 @@ It never receives `DATABASE_URL`, Telegram bot tokens, or TTLock secrets.
 
 ```text
 Hermes runtime (this folder / Docker)
-  → Arenda AI Internal Agent Gateway (/api/internal/agent/v1/*)
-  → existing Arenda AI services + Prisma
+  → Ijara AI Internal Agent Gateway (/api/internal/agent/v1/*)
+  → existing Ijara AI services + Prisma
   → PostgreSQL
 ```
 
@@ -36,7 +36,7 @@ If device/OAuth login is required, complete it in the browser. Never paste token
 
 | Variable | Purpose |
 |---|---|
-| `HERMES_ARENDA_API_BASE_URL` | e.g. `https://www.arendaai.uz` |
+| `HERMES_ARENDA_API_BASE_URL` | e.g. `https://www.arendaai.uz` or `https://ijaraai.uz` |
 | `HERMES_ARENDA_CLIENT_ID` | must match `AGENT_GATEWAY_CLIENT_ID` |
 | `HERMES_ARENDA_CLIENT_SECRET` | must match `AGENT_GATEWAY_CLIENT_SECRET` |
 | `HERMES_DAILY_REPORT_TIMEZONE` | `Asia/Tashkent` |
@@ -46,7 +46,7 @@ If device/OAuth login is required, complete it in the browser. Never paste token
 
 ## Skills
 
-Custom Arenda skills live under `skills/` and should be linked/copied into
+Custom Ijara AI skills live under `skills/` and should be linked/copied into
 `$HERMES_HOME/skills/` after install (see `scripts/sync-skills.ps1`).
 
 ## Daily schedule
@@ -88,7 +88,7 @@ a Vercel serverless daemon.
 
 The runner obtains separate scoped tokens for Manager, Payment, and Analyst.
 Payment/Analyst model prompts receive aggregates without tenant names. The
-Telegram financial snapshot is rebuilt inside Arenda AI, so Hermes cannot
+Telegram financial snapshot is rebuilt inside Ijara AI, so Hermes cannot
 override amounts.
 
 ## Smoke tests
@@ -99,5 +99,4 @@ npm test -- src/lib/api-server/agent-gateway
 
 # Hermes CLI (after install)
 hermes doctor
-./scripts/smoke-check.sh   # or smoke-check.ps1
 ```

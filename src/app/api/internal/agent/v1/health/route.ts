@@ -27,12 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!detailed) {
-    return ok({
-      status: envEnabled && configured ? "ok" : "degraded",
-      service: "arenda-ai-agent-gateway",
-      aiEmployeesEnabled: envEnabled,
-      gatewayConfigured: configured,
-    });
+    return ok({ ok: envEnabled && configured });
   }
 
   let databaseOk = false;

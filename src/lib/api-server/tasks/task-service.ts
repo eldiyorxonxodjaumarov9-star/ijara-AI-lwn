@@ -7,6 +7,7 @@ import type {
 
 import { prisma } from "@/lib/api-server/prisma";
 import { sendTelegramMessage } from "@/lib/api-server/telegram-bot";
+import { assertValidTaskDueDate } from "@/lib/tasks/task-date-validation";
 import {
   ACTIVE_TASK_STATUSES,
   formatTaskDueAt,
@@ -114,6 +115,8 @@ export async function createTask(input: CreateTaskInput) {
     throw Object.assign(new Error("Faol xodim topilmadi"), { status: 400 });
   }
 
+  const dueAt = assertValidTaskDueDate(input.dueAt ?? null);
+
   const task = await prisma.$transaction(async (tx) => {
     const created = await tx.workTask.create({
       data: {
@@ -124,7 +127,7 @@ export async function createTask(input: CreateTaskInput) {
         createdByUserId: input.createdByUserId,
         source: input.source,
         priority: input.priority ?? "NORMAL",
-        dueAt: input.dueAt ?? null,
+        dueAt,
         status: "NEW",
         telegramDelivery: "PENDING",
       },

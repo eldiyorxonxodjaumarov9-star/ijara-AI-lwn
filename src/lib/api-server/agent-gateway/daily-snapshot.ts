@@ -7,6 +7,7 @@ import {
   tashkentMonthBounds,
   type YearMonth,
 } from "@/lib/monthly-comparison";
+import { occupancyRate } from "@/lib/occupancy";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import type { Expense, Payment } from "@/types";
 
@@ -32,6 +33,7 @@ export type DailySnapshot = {
     occupied: number;
     vacant: number;
     total: number;
+    rate: number;
   };
   comparison: {
     currentMonth: string;
@@ -211,6 +213,7 @@ export async function buildDailySnapshot(
       occupied,
       vacant,
       total: totalRooms,
+      rate: occupancyRate({ totalRooms, occupiedRooms: occupied }),
     },
     comparison: {
       currentMonth: compareRaw,

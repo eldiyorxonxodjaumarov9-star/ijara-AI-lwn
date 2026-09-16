@@ -2,12 +2,16 @@ import { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api-server/http";
 import { prisma } from "@/lib/api-server/prisma";
+import { requireStaffUser } from "@/lib/api-server/rbac";
 import { enqueueTelegramDistribution } from "@/lib/api-server/telegram-distribution/telegram-distribution-service";
 import type { DistributeOptions } from "@/lib/telegram-distribution/types";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const { id } = await params;
     const body = (await req.json()) as DistributeOptions;

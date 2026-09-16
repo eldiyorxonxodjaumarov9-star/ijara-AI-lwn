@@ -69,19 +69,6 @@ export async function createAndSendContractRequest(
   });
   if (!property) throw Object.assign(new Error("Xona/obyekt topilmadi"), { status: 404 });
 
-  const hasActiveLease = await prisma.contract.findFirst({
-    where: {
-      tenantId: tenant.id,
-      status: { in: ["ACTIVE", "PENDING"] },
-    },
-  });
-  if (hasActiveLease) {
-    throw Object.assign(
-      new Error("Mijozda amaldagi shartnoma bor"),
-      { status: 409 }
-    );
-  }
-
   const startDate = parseDateOnly(parsed.startDate);
   const endDate = parseDateOnly(parsed.endDate);
   const contractDate = parseDateOnly(parsed.contractDate);

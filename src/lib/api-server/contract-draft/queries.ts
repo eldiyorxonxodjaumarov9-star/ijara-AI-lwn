@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { User } from "@prisma/client";
 
 import { prisma } from "@/lib/api-server/prisma";
+import { resolveTenantAssignedProperty } from "@/lib/api-server/contract-draft/resolve-tenant-property";
 import { ACTIVE_REQUEST_STATUSES } from "@/lib/api-server/contract-draft/status";
 
 export function assertContractStaff(user: User) {
@@ -26,22 +27,13 @@ export async function listEligibleTenants() {
   const tenants = await prisma.tenant.findMany({
     where: {
       leftAt: null,
-      AND: [
-        {
-          NOT: {
-            contracts: {
-              some: { status: { in: ["ACTIVE", "PENDING"] } },
-            },
-          },
+      // Formal ContractRequest yo‘q bo‘lsa yetadi.
+      // Operatsion lease Contract (xona biriktirish) alohida — u yerda propertyId olinadi.
+      NOT: {
+        contractRequests: {
+          some: { status: { in: activeStatuses } },
         },
-        {
-          NOT: {
-            contractRequests: {
-              some: { status: { in: activeStatuses } },
-            },
-          },
-        },
-      ],
+      },
     },
     orderBy: { fullName: "asc" },
     select: {
@@ -52,29 +44,32 @@ export async function listEligibleTenants() {
       telegramChatId: true,
       contracts: {
         orderBy: { updatedAt: "desc" },
-        take: 1,
         select: {
           status: true,
-          property: { select: { id: true, title: true, address: true, area: true } },
+          updatedAt: true,
+          property: {
+            select: { id: true, title: true, address: true, area: true },
+          },
         },
       },
     },
   });
   return tenants.map((t) => {
-    const last = t.contracts[0] ?? null;
+    const resolved = resolveTenantAssignedProperty(t.contracts);
     return {
       id: t.id,
       fullName: t.fullName,
       phone: t.phone,
       clientNumber: t.clientNumber,
       telegramChatId: t.telegramChatId,
-      propertyId: last?.property.id ?? null,
-      propertyAddress: last?.property.address ?? null,
-      propertyTitle: last?.property.title ?? null,
-      propertyArea: last?.property.area ?? null,
-      leaseStatus: last?.status ?? null,
-      leaseStatusLabel: last
-        ? LEASE_STATUS_LABEL[last.status] ?? last.status
+      propertyId: resolved.propertyId,
+      propertyAddress: resolved.propertyAddress,
+      propertyTitle: resolved.propertyTitle,
+      propertyArea: resolved.propertyArea,
+      assignedProperties: resolved.assignedProperties,
+      leaseStatus: resolved.leaseStatus,
+      leaseStatusLabel: resolved.leaseStatus
+        ? LEASE_STATUS_LABEL[resolved.leaseStatus] ?? resolved.leaseStatus
         : "Shartnoma yo‘q",
     };
   });

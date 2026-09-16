@@ -10,8 +10,12 @@ async function hashPassword(value: string) {
   return bcrypt.hash(value, 10);
 }
 
-export function stripTenantSecret<T extends { password?: string | null }>(tenant: T) {
-  const { password: _password, ...rest } = tenant;
+export function stripTenantSecret<
+  T extends { password?: string | null; passwordHash?: string | null },
+>(tenant: T) {
+  const { password: _password, passwordHash: _passwordHash, ...rest } = tenant;
+  void _password;
+  void _passwordHash;
   return rest;
 }
 

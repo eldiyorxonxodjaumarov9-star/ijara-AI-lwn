@@ -6,7 +6,7 @@ import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
 import { findRecentDuplicatePayment } from "@/lib/api-server/payment-dedupe";
 import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
@@ -17,12 +17,14 @@ const ALLOWED = [
   "expenses",
   "maintenance",
   "notifications",
-] as const;
+] as const satisfies readonly RbacResource[];
 
 type Resource = (typeof ALLOWED)[number];
 
-function delegate(resource: string) {
-  return ALLOWED.includes(resource as Resource) ? (resource as Resource) : null;
+function delegate(resource: string): RbacResource | null {
+  return (ALLOWED as readonly string[]).includes(resource)
+    ? (resource as RbacResource)
+    : null;
 }
 
 export async function GET(
@@ -30,12 +32,12 @@ export async function GET(
   ctx: { params: Promise<{ resource: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
-  if (auth.error) return auth.error;
-
   const { resource } = await ctx.params;
   const name = delegate(resource);
   if (!name) return fail("Topilmadi", 404);
+
+  const auth = await requireResourceAccess(req, name, "GET");
+  if (auth.error) return auth.error;
 
   const { page, limit, skip, sortBy, order } = parsePagination(new URL(req.url));
 
@@ -117,12 +119,12 @@ export async function POST(
   ctx: { params: Promise<{ resource: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
-  if (auth.error) return auth.error;
-
   const { resource } = await ctx.params;
   const name = delegate(resource);
   if (!name) return fail("Topilmadi", 404);
+
+  const auth = await requireResourceAccess(req, name, "POST");
+  if (auth.error) return auth.error;
 
   const body = (await req.json()) as Record<string, unknown>;
 

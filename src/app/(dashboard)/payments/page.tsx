@@ -42,9 +42,12 @@ import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { paymentBillingPeriod } from "@/lib/debt-calculator";
 import {
+  selectCanonicalDebts,
+  summarizeCanonicalDebts,
+} from "@/lib/debts/canonical-debts";
+import {
   BILLING_STATUS_LABEL,
   buildMonthlyBillingLedger,
-  summarizeBillingLedger,
   type BillingInvoiceStatus,
   type MonthlyBillingInvoice,
 } from "@/lib/monthly-billing-ledger";
@@ -91,8 +94,11 @@ export default function PaymentsPage() {
   );
 
   const debtSummary = useMemo(
-    () => summarizeBillingLedger(ledger),
-    [ledger]
+    () =>
+      summarizeCanonicalDebts(
+        selectCanonicalDebts(contracts, data, tenants, tashkentNow)
+      ),
+    [contracts, data, tenants, tashkentNow]
   );
 
   const paymentsById = useMemo(() => {

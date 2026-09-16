@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "properties", "GET");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "properties", "PATCH");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;
@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "properties", "DELETE");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;

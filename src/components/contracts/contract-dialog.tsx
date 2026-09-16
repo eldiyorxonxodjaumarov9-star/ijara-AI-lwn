@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { zResolver } from "@/lib/form";
+import { getTenantContract } from "@/lib/tenant-room-assign";
 import { contractSchema, type ContractInput } from "@/lib/validations";
 import { CONTRACT_STATUS_MAP } from "@/lib/constants";
 import type { Contract, ContractStatus, Property, Tenant } from "@/types";
@@ -56,7 +57,9 @@ export function ContractDialog({
 }) {
   const { data: properties } = useCollection<Property>("properties");
   const { data: tenants } = useCollection<Tenant>("tenants");
+  const { data: contracts } = useCollection<Contract>("contracts");
   const { create, update } = useCollectionActions<Contract>("contracts");
+  const propertyTouchedRef = useRef(false);
 
   const {
     register,
@@ -70,8 +73,12 @@ export function ContractDialog({
     defaultValues: defaults,
   });
 
+  const tenantId = watch("tenantId");
+  const propertyId = watch("propertyId");
+
   useEffect(() => {
-    if (open)
+    if (open) {
+      propertyTouchedRef.current = Boolean(contract);
       reset(
         contract
           ? {
@@ -87,7 +94,19 @@ export function ContractDialog({
             }
           : defaults
       );
+    }
   }, [open, contract, reset]);
+
+  // Create: tenant → assigned room. Edit: keep existing contract room.
+  useEffect(() => {
+    if (!open || contract || !tenantId || propertyTouchedRef.current) return;
+    const assigned = getTenantContract(tenantId, contracts);
+    if (assigned?.propertyId) {
+      setValue("propertyId", assigned.propertyId, { shouldValidate: true });
+    } else {
+      setValue("propertyId", "", { shouldValidate: true });
+    }
+  }, [open, contract, tenantId, contracts, setValue]);
 
   const onSubmit = async (values: ContractInput) => {
     const property = properties.find((p) => p.id === values.propertyId);
@@ -127,34 +146,13 @@ export function ContractDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Mulk</Label>
-              <Select
-                value={watch("propertyId")}
-                onValueChange={(v) => setValue("propertyId", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Mulkni tanlang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.propertyId && (
-                <p className="text-xs text-destructive">
-                  {errors.propertyId.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
               <Label>Arendator</Label>
               <Select
-                value={watch("tenantId")}
-                onValueChange={(v) => setValue("tenantId", v)}
+                value={tenantId || undefined}
+                onValueChange={(v) => {
+                  propertyTouchedRef.current = false;
+                  setValue("tenantId", v, { shouldValidate: true });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Arendatorni tanlang" />
@@ -170,6 +168,33 @@ export function ContractDialog({
               {errors.tenantId && (
                 <p className="text-xs text-destructive">
                   {errors.tenantId.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Mulk</Label>
+              <Select
+                value={propertyId || undefined}
+                onValueChange={(v) => {
+                  propertyTouchedRef.current = true;
+                  setValue("propertyId", v, { shouldValidate: true });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Mulkni tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.propertyId && (
+                <p className="text-xs text-destructive">
+                  {errors.propertyId.message}
                 </p>
               )}
             </div>

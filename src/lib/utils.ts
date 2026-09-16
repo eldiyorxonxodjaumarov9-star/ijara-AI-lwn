@@ -19,10 +19,8 @@ export function parseDigits(value: string): number {
 }
 
 export function formatCurrency(value: number, currency = "UZS") {
-  const formatted = new Intl.NumberFormat("uz-UZ", {
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
-  return `${formatted} ${currency}`;
+  const amount = Number.isFinite(value) ? Math.round(value) : 0;
+  return `${formatDigitsWithSpaces(amount)} ${currency}`;
 }
 
 export function formatNumber(value: number) {

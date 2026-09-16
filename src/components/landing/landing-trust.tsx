@@ -58,7 +58,7 @@ export function LandingTrust() {
               Bu oddiy e’lon sayti emas. Bu ijara biznesining boshqaruv tizimi.
             </LandingTitle>
             <LandingLead>
-              Arenda AI mulk, moliya, jamoa, Telegram va smart access jarayonlarini
+              Ijara AI mulk, moliya, jamoa, Telegram va smart access jarayonlarini
               bitta operatsion markazga yig‘adi. Qidiruvdan emas — nazoratdan
               boshlanadi.
             </LandingLead>

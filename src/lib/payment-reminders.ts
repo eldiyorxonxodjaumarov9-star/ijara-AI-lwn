@@ -125,6 +125,7 @@ export async function fetchTenantNotifications(tenantId: string) {
   >("/notifications/tenant", {
     method: "POST",
     auth: false,
+    portalAuth: true,
     body: { tenantId },
   });
 

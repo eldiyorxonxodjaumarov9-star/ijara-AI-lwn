@@ -35,7 +35,10 @@ import {
 import type { RoomTenantRow } from "@/lib/lwn-room-detail";
 import { formatDate } from "@/lib/utils";
 import type { CreateAccessGrantInput } from "@/lib/lwn-room-lock-api";
-import { EKEY_RECEIVER_MISSING_HINT } from "@/lib/ttlock-access-view";
+import {
+  EKEY_RECEIVER_MISSING_HINT,
+  mapTtlockSyncStatusLabel,
+} from "@/lib/ttlock-access-view";
 import type { RoomLockSettingsRecord } from "@/types/smart-lock";
 import type { RoomAccessGrantRecord } from "@/types/smart-lock";
 import {
@@ -498,7 +501,7 @@ export function LwnRoomAccessRightsTab({
                         </Badge>
                         {g.delivery?.syncStatus && (
                           <Badge variant="outline" className="font-normal">
-                            {g.delivery.syncStatus}
+                            {mapTtlockSyncStatusLabel(g.delivery.syncStatus)}
                           </Badge>
                         )}
                       </div>

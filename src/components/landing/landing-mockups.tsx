@@ -92,7 +92,7 @@ export function HeroProductVisual() {
     <div className="relative mx-auto w-full max-w-[520px] lg:max-w-none">
       <div className="landing-glow pointer-events-none absolute -inset-6 rounded-[2.5rem] bg-[radial-gradient(circle_at_30%_20%,rgba(37,99,235,0.28),transparent_55%)] blur-2xl" />
 
-      <WindowChrome title="Arenda AI · Boshqaruv paneli" className="relative z-10">
+      <WindowChrome title="Ijara AI · Boshqaruv paneli" className="relative z-10">
         <div className="p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
@@ -152,7 +152,7 @@ export function HeroProductVisual() {
           <Lock className="size-3.5 text-blue-300" aria-hidden />
           Smart Lock
         </div>
-        <p className="text-sm font-medium text-white">305-xona · PIN faol</p>
+        <p className="text-sm font-medium text-white">305-xona · Demo PIN (namuna)</p>
         <p className="mt-1 text-xs text-slate-400">Muddat: 15.09 — 15.10</p>
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-300">
           <Wifi className="size-3" aria-hidden />
@@ -267,16 +267,17 @@ export function AccessPreview() {
       <div className="p-4">
         <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white">305 · vaqtli PIN</p>
+            <p className="text-sm font-medium text-white">305 · Demo PIN (namuna)</p>
             <KeyRound className="size-4 text-blue-300" />
           </div>
           <p className="mt-2 font-mono text-2xl tracking-[0.3em] text-white">4821</p>
+          <p className="mt-1 text-[11px] text-slate-500">Marketing ko‘rinishi — haqiqiy PIN emas</p>
           <p className="mt-2 text-xs text-slate-400">15.09.2026 09:00 — 15.10.2026 18:00</p>
         </div>
         <div className="mt-3 space-y-2 text-xs text-slate-400">
           <div className="flex justify-between rounded-lg bg-white/[0.03] px-3 py-2">
             <span>Huquq</span>
-            <span className="text-emerald-300">Faol</span>
+            <span className="text-amber-300">API&apos;ga yuborilgan</span>
           </div>
           <div className="flex justify-between rounded-lg bg-white/[0.03] px-3 py-2">
             <span>Oxirgi kirish</span>

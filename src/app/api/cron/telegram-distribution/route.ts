@@ -1,12 +1,10 @@
+import { assertFailClosedCronAuth } from "@/lib/api-server/cron-auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { processTelegramQueue } from "@/lib/api-server/telegram-distribution/telegram-queue";
 
 export async function GET(req: Request) {
-  const auth = req.headers.get("authorization");
-  const secret = process.env.CRON_SECRET?.trim();
-  if (secret && auth !== `Bearer ${secret}`) {
-    return fail("Unauthorized", 401);
-  }
+  const denied = assertFailClosedCronAuth(req);
+  if (denied) return denied;
 
   try {
     const results = await processTelegramQueue({ limit: 20 });

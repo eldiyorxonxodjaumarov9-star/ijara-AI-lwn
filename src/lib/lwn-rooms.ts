@@ -1,5 +1,9 @@
 import type { Property } from "@/types";
 import { LWN_ADDRESS, LWN_BUILDING } from "@/lib/constants";
+import {
+  occupancyFromPropertyStatuses,
+  occupancyRate,
+} from "@/lib/occupancy";
 
 export function isLwnRoom(property: Property) {
   return property.building === LWN_BUILDING || property.district === LWN_BUILDING;
@@ -11,10 +15,12 @@ export function filterLwnRooms(properties: Property[]) {
 
 export function getLwnRoomStats(properties: Property[]) {
   const rooms = filterLwnRooms(properties);
+  const { totalRooms, occupiedRooms } = occupancyFromPropertyStatuses(rooms);
   return {
-    total: rooms.length,
+    total: totalRooms,
     vacant: rooms.filter((p) => p.status === "available").length,
-    rented: rooms.filter((p) => p.status === "rented").length,
+    rented: occupiedRooms,
+    occupancyRate: occupancyRate({ totalRooms, occupiedRooms }),
   };
 }
 

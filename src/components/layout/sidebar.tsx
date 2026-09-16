@@ -62,11 +62,18 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <ul className="space-y-1">
                 {items.map((item) => {
                   const active = isNavActive(item.href, pathname, searchParams);
+                  const title = t(item.titleKey);
+                  const debtsLabel =
+                    item.href === "/debts" && liveDebtCount > 0
+                      ? `${title}, ${liveDebtCount} ta`
+                      : title;
                   return (
                     <li key={item.href}>
                       <Link
                         href={item.href}
                         onClick={onNavigate}
+                        aria-label={debtsLabel}
+                        title={debtsLabel}
                         className={cn(
                           "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                           active
@@ -80,9 +87,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                             active && "text-sky-300"
                           )}
                         />
-                        <span className="flex-1">{t(item.titleKey)}</span>
+                        <span className="min-w-0 flex-1 truncate">{title}</span>
                         {item.href === "/debts" && liveDebtCount > 0 && (
-                          <span className="flex size-5 items-center justify-center rounded-full bg-rose-500/90 text-[10px] font-bold text-white">
+                          <span
+                            className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-rose-500/90 text-[10px] font-bold leading-none text-white"
+                            aria-hidden="true"
+                          >
                             {liveDebtCount > 99 ? "99+" : liveDebtCount}
                           </span>
                         )}

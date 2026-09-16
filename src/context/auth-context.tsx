@@ -21,7 +21,12 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase/config";
-import { apiFetch, isApiConfigured, tokenStore } from "@/lib/api/client";
+import {
+  apiFetch,
+  isApiConfigured,
+  portalTokenStore,
+  tokenStore,
+} from "@/lib/api/client";
 import { MAPPERS } from "@/lib/api/mappers";
 import { recordClientLead } from "@/lib/clients";
 import {
@@ -292,6 +297,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             auth: false,
             body: { login, password },
           });
+          const portalToken =
+            typeof raw.portalToken === "string" ? raw.portalToken : null;
+          if (portalToken) {
+            portalTokenStore.set(portalToken);
+          }
           match = MAPPERS.tenants!.fromApi(raw) as Tenant;
         } catch {
           match = undefined;
@@ -417,6 +427,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const clearTenantSession = () => {
+    portalTokenStore.clear();
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(DEMO_SESSION_KEY);
     }

@@ -349,6 +349,10 @@ export function buildMonthlyBillingLedger(
   });
 }
 
+/**
+ * Invoice-ledger summary (payments page jadvali uchun).
+ * Sidebar / qarzdorlik badge uchun `selectCanonicalDebts` (canonical-debts.ts) ishlating.
+ */
 export function summarizeBillingLedger(rows: MonthlyBillingInvoice[]) {
   const debtorTenantIds = new Set<string>();
   let totalDebt = 0;

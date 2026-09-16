@@ -3,7 +3,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it, beforeEach, afterEach } from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -224,4 +224,20 @@ describe("ttlock callback retry cron route auth", () => {
     );
     assert.match(status, /requireUser/);
   });
+});
+
+describe("all cron routes use fail-closed auth", () => {
+  const cronDir = join(repoRoot, "src/app/api/cron");
+  const routes = readdirSync(cronDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => join(cronDir, e.name, "route.ts"));
+
+  for (const routePath of routes) {
+    it(`${routePath.replace(repoRoot + "/", "")} uses assertFailClosedCronAuth`, () => {
+      const src = readFileSync(routePath, "utf8");
+      assert.match(src, /assertFailClosedCronAuth/);
+      assert.equal(/if\s*\(\s*cronSecret\s*\)/.test(src), false);
+      assert.equal(/if\s*\(\s*secret\s*&&/.test(src), false);
+    });
+  }
 });

@@ -485,3 +485,18 @@ export async function getInstagramPublicStatus() {
     error: connectionError,
   };
 }
+
+/** Staff-facing status — no app id fragments, tokens, or internal redirect URIs. */
+export async function getInstagramStaffStatus() {
+  const raw = await getInstagramPublicStatus();
+  return {
+    enabled: raw.enabled,
+    connected: raw.connected,
+    username: raw.username ?? null,
+    accountType: raw.accountType ?? null,
+    accountName: raw.accountName ?? null,
+    profilePictureUrl: raw.profilePictureUrl ?? null,
+    configured: Boolean(raw.hasAppId && raw.redirectUri),
+    hasError: Boolean(raw.error),
+  };
+}

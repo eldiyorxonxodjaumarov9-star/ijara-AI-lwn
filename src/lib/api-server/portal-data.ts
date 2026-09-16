@@ -49,7 +49,12 @@ export async function getPortalDataForTenant(tenantId: string) {
     }),
   ]);
 
-  const payments = contracts.flatMap((contract) =>
+  const safeContracts = contracts.map(({ tenant: nestedTenant, ...contract }) => ({
+    ...contract,
+    tenant: stripTenantSecret(nestedTenant),
+  }));
+
+  const payments = safeContracts.flatMap((contract) =>
     contract.payments.map((payment) => ({
       ...payment,
       contract,
@@ -58,7 +63,7 @@ export async function getPortalDataForTenant(tenantId: string) {
 
   return {
     tenant: stripTenantSecret(tenant),
-    contracts,
+    contracts: safeContracts,
     payments,
     maintenance,
     availableProperties,

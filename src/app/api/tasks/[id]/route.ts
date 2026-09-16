@@ -1,11 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
-  assertStaffCanManageTasks,
   cancelTask,
   getTaskById,
   mapTask,
@@ -18,13 +17,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "tasks", "GET");
   if (auth.error) return auth.error;
-  try {
-    await assertStaffCanManageTasks(auth.user);
-  } catch {
-    return fail("Ruxsat yo‘q", 403);
-  }
 
   const { id } = await ctx.params;
   const task = mapTask(await getTaskById(id));
@@ -40,13 +34,8 @@ const actionSchema = z.object({
 
 export async function POST(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "tasks", "POST");
   if (auth.error) return auth.error;
-  try {
-    await assertStaffCanManageTasks(auth.user);
-  } catch {
-    return fail("Ruxsat yo‘q", 403);
-  }
 
   const { id } = await ctx.params;
   let body: unknown;

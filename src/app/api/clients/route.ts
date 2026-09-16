@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import {
   mapClientCreate,
   mapClientUpdate,
@@ -11,7 +11,7 @@ import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "clients", "GET");
   if (auth.error) return auth.error;
 
   const { page, limit, skip, search, sortBy, order } = parsePagination(new URL(req.url));
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "clients", "POST");
   if (auth.error) return auth.error;
 
   try {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "clients", "PUT");
   if (auth.error) return auth.error;
 
   try {

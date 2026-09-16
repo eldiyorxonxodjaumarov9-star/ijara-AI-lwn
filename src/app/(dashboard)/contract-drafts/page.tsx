@@ -37,6 +37,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch, isApiConfigured } from "@/lib/api/client";
 import { previewMonthlyAmount, previewTotalAmount } from "@/lib/contract-money";
 
+type AssignedPropertyOpt = {
+  id: string;
+  title: string;
+  address: string;
+  area: number | null;
+};
+
 type EligibleTenant = {
   id: string;
   fullName: string;
@@ -47,6 +54,7 @@ type EligibleTenant = {
   propertyAddress: string | null;
   propertyTitle: string | null;
   propertyArea: number | null;
+  assignedProperties?: AssignedPropertyOpt[];
   leaseStatus: string | null;
   leaseStatusLabel: string;
 };
@@ -136,6 +144,8 @@ export default function ContractDraftsPage() {
   );
   const [tenantId, setTenantId] = useState("");
   const [propertyId, setPropertyId] = useState("");
+  /** Manual room pick — do not overwrite on re-render; reset on tenant change. */
+  const [propertyTouched, setPropertyTouched] = useState(false);
   const [partyUiType, setPartyUiType] = useState("individual");
   const [contractNumber, setContractNumber] = useState("");
   const [contractDate, setContractDate] = useState("");
@@ -161,9 +171,62 @@ export default function ContractDraftsPage() {
     [monthly, monthCount]
   );
 
+  const assignedForTenant = useMemo(() => {
+    if (!selectedTenant) return [] as AssignedPropertyOpt[];
+    if (
+      selectedTenant.assignedProperties &&
+      selectedTenant.assignedProperties.length > 0
+    ) {
+      return selectedTenant.assignedProperties;
+    }
+    if (selectedTenant.propertyId) {
+      return [
+        {
+          id: selectedTenant.propertyId,
+          title: selectedTenant.propertyTitle || "Xona",
+          address: selectedTenant.propertyAddress || "",
+          area: selectedTenant.propertyArea,
+        },
+      ];
+    }
+    return [];
+  }, [selectedTenant]);
+
+  const propertyOptions = useMemo(() => {
+    const map = new Map<string, PropertyOpt>();
+    for (const p of properties) {
+      map.set(p.id, {
+        id: p.id,
+        title: p.title,
+        address: p.address,
+        area: p.area,
+      });
+    }
+    for (const p of assignedForTenant) {
+      if (!map.has(p.id)) {
+        map.set(p.id, {
+          id: p.id,
+          title: p.title,
+          address: p.address,
+          area: p.area ?? undefined,
+        });
+      }
+    }
+    // Multiple assigned rooms and no manual pick yet → only those rooms.
+    if (assignedForTenant.length > 1 && !propertyTouched) {
+      return assignedForTenant.map((p) => ({
+        id: p.id,
+        title: p.title,
+        address: p.address,
+        area: p.area ?? undefined,
+      }));
+    }
+    return Array.from(map.values());
+  }, [properties, assignedForTenant, propertyTouched]);
+
   const selectedProperty = useMemo(
-    () => properties.find((p) => p.id === propertyId) ?? null,
-    [properties, propertyId]
+    () => propertyOptions.find((p) => p.id === propertyId) ?? null,
+    [propertyOptions, propertyId]
   );
 
   const lessorIncomplete = (lessor?.missing.length ?? 0) > 0 || lessorMissing.length > 0;
@@ -204,23 +267,55 @@ export default function ContractDraftsPage() {
     void reload();
   }, [reload]);
 
-  const openCreate = (t: EligibleTenant) => {
+  const applyTenantRoom = useCallback((t: EligibleTenant) => {
     setSelectedTenant(t);
     setTenantId(t.id);
     setPhone(t.phone);
-    setPropertyId(t.propertyId ?? "");
-    if (t.propertyArea && t.propertyArea > 0) {
-      setAreaSqm(Math.round(t.propertyArea));
+    setPropertyTouched(false);
+    const assigned =
+      t.assignedProperties && t.assignedProperties.length > 0
+        ? t.assignedProperties
+        : t.propertyId
+          ? [
+              {
+                id: t.propertyId,
+                title: t.propertyTitle || "Xona",
+                address: t.propertyAddress || "",
+                area: t.propertyArea,
+              },
+            ]
+          : [];
+    // Prefer API-resolved propertyId (latest / single). Never invent when multi-active left null.
+    const autoId =
+      t.propertyId ?? (assigned.length === 1 ? assigned[0].id : "");
+    setPropertyId(autoId);
+    const area =
+      assigned.find((p) => p.id === autoId)?.area ?? t.propertyArea;
+    if (area && area > 0) {
+      setAreaSqm(Math.round(area));
     }
+  }, []);
+
+  const openCreate = (t: EligibleTenant) => {
+    applyTenantRoom(t);
     if (lessor?.lessorCity && !contractCity) {
       setContractCity(lessor.lessorCity);
     }
     setOpen(true);
   };
 
+  const onTenantChange = (id: string) => {
+    const t = eligible.find((x) => x.id === id);
+    if (!t) return;
+    applyTenantRoom(t);
+  };
+
   const onPropertyChange = (id: string) => {
+    setPropertyTouched(true);
     setPropertyId(id);
-    const p = properties.find((x) => x.id === id);
+    const p =
+      propertyOptions.find((x) => x.id === id) ??
+      properties.find((x) => x.id === id);
     if (p?.area && p.area > 0) {
       setAreaSqm(Math.round(p.area));
     }
@@ -395,7 +490,7 @@ export default function ContractDraftsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Shartnomasi yo‘q mijozlar</CardTitle>
+          <CardTitle>Shartnoma so‘rovi yo‘q mijozlar</CardTitle>
           <Button
             type="button"
             variant="outline"
@@ -578,6 +673,22 @@ export default function ContractDraftsPage() {
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <Label>Arendator / mijoz</Label>
+              <Select value={tenantId || undefined} onValueChange={onTenantChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tanlang" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligible.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2 rounded-lg border p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">
@@ -662,14 +773,17 @@ export default function ContractDraftsPage() {
 
             <div className="space-y-1.5">
               <Label>Obyekt / xona</Label>
-              <Select value={propertyId} onValueChange={onPropertyChange}>
+              <Select
+                value={propertyId || undefined}
+                onValueChange={onPropertyChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Tanlang" />
                 </SelectTrigger>
                 <SelectContent>
-                  {properties.map((p) => (
+                  {propertyOptions.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.address} — {p.title}
+                      {p.title} — {p.address}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -678,6 +792,13 @@ export default function ContractDraftsPage() {
                 <p className="text-xs text-muted-foreground">
                   Obyekt: {selectedProperty.address} · Xona:{" "}
                   {selectedProperty.title}
+                </p>
+              )}
+              {selectedTenant && !propertyId && (
+                <p className="text-xs text-muted-foreground">
+                  {assignedForTenant.length > 1
+                    ? "Bu arendatorga bir nechta xona biriktirilgan — tanlang."
+                    : "Bu arendatorga xona biriktirilmagan."}
                 </p>
               )}
             </div>

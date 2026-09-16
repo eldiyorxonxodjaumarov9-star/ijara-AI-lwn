@@ -1,4 +1,4 @@
-export const LANDING_BRAND = "Arenda AI";
+export const LANDING_BRAND = "Ijara AI";
 
 export const LANDING_NAV = [
   { href: "/#platforma", label: "Platforma" },

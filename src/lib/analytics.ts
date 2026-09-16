@@ -5,8 +5,16 @@ import type {
   Property,
   Tenant,
 } from "@/types";
-import { computeContractDebt, paymentBillingPeriod } from "@/lib/debt-calculator";
-import { getTashkentDateParts } from "@/lib/payment-due-schedule";
+import { countOverdueContracts } from "@/lib/contracts/contract-overdue";
+import { paymentBillingPeriod } from "@/lib/debt-calculator";
+import {
+  computeDebts,
+  selectCanonicalDebts,
+  summarizeCanonicalDebts,
+  type CanonicalDebtRow,
+} from "@/lib/debts/canonical-debts";
+import { computeDashboardOccupancyRate } from "@/lib/occupancy";
+import { REPORT_PERIOD_LABELS } from "@/lib/report-periods";
 
 const MONTHS_UZ = [
   "Yan",
@@ -68,28 +76,6 @@ export function getExpectedMonthlyIncome(
   return sumTenantRent(tenants);
 }
 
-function computeOccupancy(
-  properties: Property[],
-  contracts: Contract[],
-  tenants: Tenant[]
-) {
-  const totalRooms = properties.reduce((sum, p) => sum + (p.rooms || 0), 0);
-  if (totalRooms > 0) {
-    const occupiedFromContracts = contracts.filter(
-      (c) => c.status === "active"
-    ).length;
-    const occupiedFromTenants = tenants.filter((t) => (t.rentAmount || 0) > 0)
-      .length;
-    const occupied = occupiedFromContracts || occupiedFromTenants;
-    return Math.min(100, Math.round((occupied / totalRooms) * 100));
-  }
-
-  const rented = properties.filter((p) => p.status === "rented").length;
-  return properties.length > 0
-    ? Math.round((rented / properties.length) * 100)
-    : 0;
-}
-
 function isSameMonth(date: Date, ref: Date) {
   return (
     date.getMonth() === ref.getMonth() &&
@@ -126,13 +112,14 @@ export function computeMetrics({
     .filter((e) => isSameMonth(new Date(e.date), now))
     .reduce((sum, e) => sum + (e.amount || 0), 0);
 
-  const overdueContracts = contracts.filter((c) => {
-    const end = new Date(c.endDate);
-    return c.status === "expired" || (c.status === "active" && end < now);
-  }).length;
+  const overdueContracts = countOverdueContracts(contracts, now);
 
   const netIncome = monthlyIncome - monthlyExpenses;
-  const occupancyRate = computeOccupancy(properties, contracts, tenants);
+  const occupancyRate = computeDashboardOccupancyRate(
+    properties,
+    contracts,
+    tenants
+  );
 
   return {
     totalProperties: properties.length,
@@ -152,6 +139,7 @@ export interface RevenuePoint {
   xarajat: number;
 }
 
+/** Cash-flow: groups by payment.date (see report-periods.ts). */
 export function buildRevenueSeries({
   payments,
   expenses,
@@ -213,47 +201,15 @@ export function buildPropertyStatusSeries(properties: Property[]) {
   return map;
 }
 
-export interface DebtRow {
-  contractId: string;
-  propertyName: string;
-  tenantName: string;
-  monthsDue: number;
-  expected: number;
-  paid: number;
-  debt: number;
-  endDate: string;
-  overdueDays: number;
-}
+export type DebtRow = CanonicalDebtRow;
 
-export function computeDebts(
-  contracts: Contract[],
-  payments: Payment[],
-  tenants: Tenant[] = [],
-  now = new Date()
-): DebtRow[] {
-  const tenantById = new Map(tenants.map((t) => [t.id, t]));
+export {
+  computeDebts,
+  selectCanonicalDebts,
+  summarizeCanonicalDebts,
+};
 
-  return contracts
-    .filter((c) => c.status === "active" || c.status === "expired")
-    .map((c) => {
-      const tenant = tenantById.get(c.tenantId);
-      const result = computeContractDebt(c, payments, tenant, now);
-      return {
-        contractId: c.id,
-        propertyName: c.propertyName ?? "—",
-        tenantName: c.tenantName ?? tenant?.fullName ?? "—",
-        monthsDue: result.monthsDue,
-        expected: result.expected,
-        paid: result.paid,
-        debt: result.debt,
-        endDate: c.endDate,
-        overdueDays: result.overdueDays,
-      };
-    })
-    .filter((row) => row.debt > 0)
-    .sort((a, b) => b.debt - a.debt);
-}
-
+/** Rental performance: periodMonth (see report-periods.ts). */
 export function buildPaymentReportRows({
   payments,
   tenants = [],
@@ -290,16 +246,7 @@ export function buildPaymentReportRows({
     }));
 }
 
-export function getOverdueContracts(contracts: Contract[], now = new Date()) {
-  const today = getTashkentDateParts(now);
-  return contracts.filter((c) => {
-    if (c.status === "expired") return true;
-    if (c.status !== "active") return false;
-    const end = getTashkentDateParts(new Date(c.endDate));
-    if (end.year < today.year) return true;
-    if (end.year > today.year) return false;
-    if (end.month < today.month) return true;
-    if (end.month > today.month) return false;
-    return end.day < today.day;
-  });
-}
+export { getOverdueContracts } from "@/lib/contracts/contract-overdue";
+
+/** @internal Documented in report-periods.ts */
+export const REVENUE_SERIES_PERIOD_HINT = REPORT_PERIOD_LABELS.cash_flow;

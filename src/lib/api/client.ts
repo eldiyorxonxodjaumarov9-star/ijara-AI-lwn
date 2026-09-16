@@ -37,6 +37,7 @@ export const isApiConfigured = Boolean(RAW_API_URL);
 
 const ACCESS_KEY = "arendahub:access";
 const REFRESH_KEY = "arendahub:refresh";
+const PORTAL_TOKEN_KEY = "arendahub:portalToken";
 
 export const tokenStore = {
   get access() {
@@ -59,6 +60,22 @@ export const tokenStore = {
   },
 };
 
+/** Signed portal (tenant) session JWT from POST /portal/lookup */
+export const portalTokenStore = {
+  get token() {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(PORTAL_TOKEN_KEY);
+  },
+  set(token: string) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(PORTAL_TOKEN_KEY, token);
+  },
+  clear() {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(PORTAL_TOKEN_KEY);
+  },
+};
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -72,6 +89,8 @@ export class ApiError extends Error {
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
   auth?: boolean;
+  /** Bearer portal JWT (tenant session); skips staff access-token refresh */
+  portalAuth?: boolean;
   isForm?: boolean;
 }
 
@@ -185,14 +204,23 @@ export async function apiFetch<T = unknown>(
     throw new ApiError("API sozlanmagan", 0, "API_NOT_CONFIGURED");
   }
 
-  const { auth = true, isForm = false, body, headers, ...rest } = options;
+  const {
+    auth = true,
+    portalAuth = false,
+    isForm = false,
+    body,
+    headers,
+    ...rest
+  } = options;
 
   const doRequest = async (): Promise<Response> => {
     const finalHeaders: Record<string, string> = {
       ...(headers as Record<string, string>),
     };
     if (!isForm) finalHeaders["Content-Type"] = "application/json";
-    if (auth && tokenStore.access) {
+    if (portalAuth && portalTokenStore.token) {
+      finalHeaders["Authorization"] = `Bearer ${portalTokenStore.token}`;
+    } else if (auth && tokenStore.access) {
       finalHeaders["Authorization"] = `Bearer ${tokenStore.access}`;
     }
     return fetch(`${API_URL}${path}`, {
@@ -218,7 +246,7 @@ export async function apiFetch<T = unknown>(
     );
   }
 
-  if (response.status === 401 && auth && tokenStore.refresh) {
+  if (response.status === 401 && auth && !portalAuth && tokenStore.refresh) {
     const ok = await tryRefresh();
     if (ok) {
       response = await doRequest();

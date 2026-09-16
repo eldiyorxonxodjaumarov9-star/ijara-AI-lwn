@@ -1,17 +1,14 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { sanitizeEmployeesForRole } from "@/lib/api-server/employees/sanitize";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { normalizeEmployeePhone } from "@/lib/employee-units";
 
-function assertStaffRole(role: string) {
-  return role === "SUPER_ADMIN" || role === "ADMIN" || role === "MANAGER";
-}
-
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "employees", "GET");
   if (auth.error) return auth.error;
 
   const url = new URL(req.url);
@@ -55,16 +52,14 @@ export async function GET(req: NextRequest) {
     prisma.employee.count({ where }),
   ]);
 
-  return ok(paginated(data, total, page, limit));
+  const safe = sanitizeEmployeesForRole(data, auth.user.role);
+  return ok(paginated(safe, total, page, limit));
 }
 
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "employees", "POST");
   if (auth.error) return auth.error;
-  if (!assertStaffRole(auth.user.role)) {
-    return fail("Ruxsat yo'q", 403);
-  }
 
   try {
     const body = (await req.json()) as Record<string, unknown>;

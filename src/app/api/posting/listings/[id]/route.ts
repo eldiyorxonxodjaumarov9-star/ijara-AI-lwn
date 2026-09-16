@@ -2,6 +2,10 @@ import { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api-server/http";
 import {
+  requireAnyStaffUser,
+  requireStaffUser,
+} from "@/lib/api-server/rbac";
+import {
   getPostingLogsByListingId,
   retryAllEphemeral,
   retryAllPostingJobs,
@@ -13,6 +17,9 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   const { id } = await ctx.params;
 
   try {
@@ -38,9 +45,12 @@ export async function POST(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireAnyStaffUser(req);
+  if (auth.error) return auth.error;
+
   const { id } = await ctx.params;
 
   try {

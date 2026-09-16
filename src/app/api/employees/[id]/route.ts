@@ -1,19 +1,16 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { normalizeEmployeePhone } from "@/lib/employee-units";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function assertStaffRole(role: string) {
-  return role === "SUPER_ADMIN" || role === "ADMIN" || role === "MANAGER";
-}
-
 export async function GET(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "employees", "GET");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;
@@ -22,16 +19,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     include: { company: true },
   });
   if (!item) return fail("Xodim topilmadi", 404);
-  return ok(item);
+  return ok(sanitizeEmployeeForRole(item, auth.user.role));
 }
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "employees", "PATCH");
   if (auth.error) return auth.error;
-  if (!assertStaffRole(auth.user.role)) {
-    return fail("Ruxsat yo'q", 403);
-  }
 
   const { id } = await ctx.params;
   try {
@@ -128,11 +122,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 /** Soft terminate — hard delete yo‘q */
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "employees", "DELETE");
   if (auth.error) return auth.error;
-  if (!assertStaffRole(auth.user.role)) {
-    return fail("Ruxsat yo'q", 403);
-  }
 
   const { id } = await ctx.params;
   try {

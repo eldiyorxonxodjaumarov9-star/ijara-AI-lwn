@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { mapClientUpdate, deleteTenantAndClientsForClient } from "@/lib/api-server/clients";
 import { syncDepositFromClient } from "@/lib/api-server/deposit-sync";
 import { fail, ok } from "@/lib/api-server/http";
@@ -11,7 +11,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "clients", "PATCH");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;
@@ -44,7 +44,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(_req);
+  const auth = await requireResourceAccess(_req, "clients", "DELETE");
   if (auth.error) return auth.error;
 
   const { id } = await ctx.params;

@@ -17,7 +17,7 @@ export function LandingHow() {
           <div className="max-w-3xl">
             <LandingEyebrow tone="navy">How it works</LandingEyebrow>
             <LandingTitle className="mt-3 text-white">
-              Arenda AI qanday ishlaydi?
+              Ijara AI qanday ishlaydi?
             </LandingTitle>
             <LandingLead className="text-slate-300">
               Bosqichma-bosqich: mulkdan moliyaga, jamoadan AI hisobotgacha.

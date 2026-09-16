@@ -7,8 +7,15 @@ import {
 } from "@/lib/api-server/posting/channels";
 import type { PostingPlatform } from "@/lib/posting/types";
 import { POSTING_PLATFORMS } from "@/lib/posting/types";
+import {
+  requireAnyStaffUser,
+  requireStaffUser,
+} from "@/lib/api-server/rbac";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAnyStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const channels = await getPostingChannelsPublic();
     return ok(channels);
@@ -19,6 +26,10 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  // Secrets / channel config — privileged staff only
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const body = (await req.json()) as {
       platform?: PostingPlatform;

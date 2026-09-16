@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "properties", "GET");
   if (auth.error) return auth.error;
 
   const url = new URL(req.url);
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "properties", "POST");
   if (auth.error) return auth.error;
 
   try {

@@ -29,6 +29,11 @@ describe("task shared helpers", () => {
     assert.ok(s.includes("2026") || s.includes("31") || s.includes("08"));
   });
 
+  it("shows Noto'g'ri sana for absurd years", () => {
+    assert.equal(formatTaskDueAt("2200-01-01T00:00:00.000Z"), "Noto'g'ri sana");
+    assert.equal(formatTaskDueAt("invalid"), "Noto'g'ri sana");
+  });
+
   it("masks phone", () => {
     assert.equal(maskPhone("998901112233"), "***2233");
   });

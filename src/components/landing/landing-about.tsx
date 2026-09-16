@@ -20,12 +20,12 @@ export function LandingAbout() {
                 Mahalliy ijara biznesi uchun yaratilgan zamonaviy boshqaruv tizimi.
               </LandingTitle>
               <LandingLead>
-                Arenda AI O‘zbekiston ijara va property management bozoridagi real
+                Ijara AI O‘zbekiston ijara va property management bozoridagi real
                 operatsion muammolarni bitta platformaga birlashtirish uchun
                 yaratilgan: moliya, xodim, kirish nazorati va AI tahlil.
               </LandingLead>
               <blockquote className="mt-8 border-l-2 border-blue-600 pl-5 text-base font-medium leading-relaxed tracking-tight text-slate-900 sm:text-lg">
-                Arenda AI — shunchaki AI qo‘shilgan CRM emas. Bu ijara
+                Ijara AI — shunchaki AI qo‘shilgan CRM emas. Bu ijara
                 operatsiyalarini yagona tizimda boshqarishga yordam beradigan
                 Property Management platforma.
               </blockquote>

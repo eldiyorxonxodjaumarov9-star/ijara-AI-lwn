@@ -4,6 +4,17 @@ import { NextRequest } from "next/server";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
 
+/**
+ * Listing / property image uploads (authenticated POST only).
+ *
+ * SECURITY NOTE (QA-008): blobs are stored with `access: "public"` so existing
+ * listing URLs keep working. Sensitive files (task attachments) use private
+ * blobs + authenticated proxy at `/api/tasks/attachments/[id]`.
+ *
+ * Migration path: switch to `access: "private"` + a signed GET proxy route;
+ * keep returning legacy public URLs until assets are re-uploaded or migrated.
+ */
+
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "image/jpeg",

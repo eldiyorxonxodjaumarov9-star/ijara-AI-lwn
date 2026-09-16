@@ -5,6 +5,8 @@ import type {
   WorkTaskUnit,
 } from "@prisma/client";
 
+import { isAbsurdTaskDate } from "@/lib/tasks/task-date-validation";
+
 export const TASK_STATUS_LABELS: Record<WorkTaskStatus, string> = {
   NEW: "Yangi",
   IN_PROGRESS: "Bajarilmoqda",
@@ -42,7 +44,9 @@ export function formatTaskDueAt(
 ): string {
   if (!dueAt) return "—";
   const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime()) || isAbsurdTaskDate(d)) {
+    return "Noto'g'ri sana";
+  }
   return new Intl.DateTimeFormat("uz-UZ", {
     timeZone,
     year: "numeric",

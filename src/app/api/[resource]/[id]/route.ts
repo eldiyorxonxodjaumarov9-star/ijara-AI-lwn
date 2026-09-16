@@ -5,11 +5,11 @@ import { mapTenantBody, stripTenantSecret } from "@/lib/api-server/tenants";
 import { deleteTenantAndLinkedClients } from "@/lib/api-server/clients";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 
-const ALLOWED = new Set([
+const ALLOWED = new Set<RbacResource>([
   "tenants",
   "contracts",
   "payments",
@@ -23,11 +23,11 @@ export async function GET(
   ctx: { params: Promise<{ resource: string; id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
-  if (auth.error) return auth.error;
-
   const { resource, id } = await ctx.params;
-  if (!ALLOWED.has(resource)) return fail("Topilmadi", 404);
+  if (!ALLOWED.has(resource as RbacResource)) return fail("Topilmadi", 404);
+
+  const auth = await requireResourceAccess(req, resource as RbacResource, "GET");
+  if (auth.error) return auth.error;
 
   let found: unknown = null;
   switch (resource) {
@@ -73,11 +73,12 @@ export async function PATCH(
   ctx: { params: Promise<{ resource: string; id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const { resource, id } = await ctx.params;
+  if (!ALLOWED.has(resource as RbacResource)) return fail("Topilmadi", 404);
+
+  const auth = await requireResourceAccess(req, resource as RbacResource, "PATCH");
   if (auth.error) return auth.error;
 
-  const { resource, id } = await ctx.params;
-  if (!ALLOWED.has(resource)) return fail("Topilmadi", 404);
   const body = (await req.json()) as Record<string, unknown>;
 
   try {
@@ -213,11 +214,11 @@ export async function DELETE(
   ctx: { params: Promise<{ resource: string; id: string }> }
 ) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
-  if (auth.error) return auth.error;
-
   const { resource, id } = await ctx.params;
-  if (!ALLOWED.has(resource)) return fail("Topilmadi", 404);
+  if (!ALLOWED.has(resource as RbacResource)) return fail("Topilmadi", 404);
+
+  const auth = await requireResourceAccess(req, resource as RbacResource, "DELETE");
+  if (auth.error) return auth.error;
 
   try {
     switch (resource) {

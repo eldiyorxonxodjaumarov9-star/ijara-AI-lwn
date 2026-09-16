@@ -35,6 +35,10 @@ import {
 } from "@/lib/api-server/telegram-bot";
 import { getOwnerByAdminChatId } from "@/lib/api-server/telegram-admin-auth";
 import {
+  assertValidTaskDueDate,
+  TASK_DATE_INVALID_MESSAGE,
+} from "@/lib/tasks/task-date-validation";
+import {
   formatTaskDueAt,
   isStaffRole,
   maskPhone,
@@ -709,12 +713,13 @@ export async function handleAdminTaskWizardText(chatId: string, text: string) {
   if (wizard.step === "due") {
     let dueAt: string | undefined;
     if (text !== "O‘tkazib yuborish") {
-      const d = new Date(text.replace(" ", "T") + (text.includes(":") ? "" : "T18:00:00"));
-      if (Number.isNaN(d.getTime())) {
-        await sendTelegramMessage(chatId, "Sana noto‘g‘ri. Qayta yozing.");
+      const raw = text.replace(" ", "T") + (text.includes(":") ? "" : "T18:00:00");
+      try {
+        dueAt = assertValidTaskDueDate(raw)!.toISOString();
+      } catch {
+        await sendTelegramMessage(chatId, `${TASK_DATE_INVALID_MESSAGE} Qayta yozing.`);
         return true;
       }
-      dueAt = d.toISOString();
     }
     const draft = { ...wizard.draft, dueAt };
     await setWizard(

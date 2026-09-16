@@ -27,7 +27,7 @@ export function LandingOs() {
       <LandingContainer>
         <Reveal>
           <div className="max-w-3xl">
-            <LandingEyebrow>Arenda AI OS</LandingEyebrow>
+            <LandingEyebrow>Ijara AI OS</LandingEyebrow>
             <LandingTitle className="mt-3">
               Barcha jarayonlar — bitta boshqaruv markazida
             </LandingTitle>

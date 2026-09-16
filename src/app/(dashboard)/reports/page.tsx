@@ -44,7 +44,9 @@ import {
   buildPaymentReportRows,
   buildRevenueSeries,
   MONTHS_UZ_FULL,
+  REVENUE_SERIES_PERIOD_HINT,
 } from "@/lib/analytics";
+import { REPORT_PERIOD_LABELS } from "@/lib/report-periods";
 import { exportToExcel, exportToPdf } from "@/lib/export";
 import { PAYMENT_METHOD_MAP } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -228,7 +230,7 @@ function ReportsContent() {
               <CardTitle>To&apos;lovlar ro&apos;yxati</CardTitle>
               <CardDescription>
                 Har bir arendatorning ism-familiyasi va berilgan summa (
-                {periodLabel})
+                {periodLabel}) — {REPORT_PERIOD_LABELS.rental_performance}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -283,7 +285,9 @@ function ReportsContent() {
           <Card>
             <CardHeader>
               <CardTitle>Daromad va xarajat taqqoslamasi</CardTitle>
-              <CardDescription>Oylik kesimda</CardDescription>
+              <CardDescription>
+                Oylik kesimda — {REVENUE_SERIES_PERIOD_HINT}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (

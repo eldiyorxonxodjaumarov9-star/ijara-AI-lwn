@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api-server/http";
+import { requireStaffUser } from "@/lib/api-server/rbac";
 import {
   deleteTelegramChannel,
   updateTelegramChannel,
@@ -10,6 +11,9 @@ import type { TelegramChannelInput } from "@/lib/telegram-distribution/types";
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const { id } = await params;
     const body = (await req.json()) as Partial<TelegramChannelInput>;
@@ -20,7 +24,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const { id } = await params;
     await deleteTelegramChannel(id);

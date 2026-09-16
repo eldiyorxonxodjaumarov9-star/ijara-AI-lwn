@@ -36,12 +36,25 @@ export function sanitizeUser(user: User) {
   return rest;
 }
 
+function parseExpiresIn(
+  raw: string | undefined,
+  fallback: string
+): jwt.SignOptions["expiresIn"] {
+  const value = raw?.trim();
+  if (!value) return fallback as jwt.SignOptions["expiresIn"];
+  // Accept numeric seconds or timespan like 15m / 7d / 1h
+  if (/^\d+$/.test(value) || /^\d+[smhdw]$/i.test(value)) {
+    return value as jwt.SignOptions["expiresIn"];
+  }
+  return fallback as jwt.SignOptions["expiresIn"];
+}
+
 export async function signTokens(payload: JwtPayload) {
   const accessToken = jwt.sign(payload, secret("access"), {
-    expiresIn: (process.env.JWT_ACCESS_EXPIRES ?? "15m") as jwt.SignOptions["expiresIn"],
+    expiresIn: parseExpiresIn(process.env.JWT_ACCESS_EXPIRES, "15m"),
   });
   const refreshToken = jwt.sign(payload, secret("refresh"), {
-    expiresIn: (process.env.JWT_REFRESH_EXPIRES ?? "7d") as jwt.SignOptions["expiresIn"],
+    expiresIn: parseExpiresIn(process.env.JWT_REFRESH_EXPIRES, "7d"),
   });
   return { accessToken, refreshToken };
 }

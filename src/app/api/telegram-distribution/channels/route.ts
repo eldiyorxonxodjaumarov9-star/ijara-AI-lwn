@@ -6,9 +6,16 @@ import {
   createTelegramChannel,
   listTelegramChannels,
 } from "@/lib/api-server/telegram-distribution/telegram-distribution-service";
+import {
+  requireAnyStaffUser,
+  requireStaffUser,
+} from "@/lib/api-server/rbac";
 import type { TelegramChannelInput } from "@/lib/telegram-distribution/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAnyStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     if (!(await isTelegramDistributionDbReady())) {
       return ok([]);
@@ -21,6 +28,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     if (!(await isTelegramDistributionDbReady())) {
       return fail("Telegram distribution jadvallari migratsiya qilinmagan", 503);

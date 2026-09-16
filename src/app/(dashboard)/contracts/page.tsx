@@ -44,11 +44,13 @@ import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
 import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CONTRACT_STATUS_MAP } from "@/lib/constants";
+import { getContractStatusBadge } from "@/lib/contracts/contract-overdue";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { generateContractPdf } from "@/lib/pdf";
 import type { Client, Contract, Property } from "@/types";
 
 export default function ContractsPage() {
+  const tashkentNow = useTashkentNow();
   const { data, loading, api } = useCollection<Contract>("contracts");
   const { data: clients, loading: loadingClients } = useCollection<Client>("clients");
   const { data: properties } = useCollection<Property>("properties");
@@ -205,7 +207,7 @@ export default function ContractsPage() {
               </TableHeader>
               <TableBody>
                 {paged.map((c) => {
-                  const status = CONTRACT_STATUS_MAP[c.status];
+                  const status = getContractStatusBadge(c, tashkentNow);
                   return (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">

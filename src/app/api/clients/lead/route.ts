@@ -1,28 +1,52 @@
 import { NextRequest } from "next/server";
 
-import { upsertClientLead } from "@/lib/api-server/clients";
+import { checkRateLimit } from "@/lib/api-server/contract-draft/rate-limit";
+import {
+  isLeadHoneypotTriggered,
+  parsePublicLeadBody,
+  upsertPublicClientLead,
+} from "@/lib/api-server/clients/public-lead";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 
-/** Portal kirishida CRM lead yozuvi (autentifikatsiyasiz) */
+function clientIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    "unknown"
+  );
+}
+
+/** Portal kirishida CRM lead yozuvi (autentifikatsiyasiz, rate-limited). */
 export async function POST(req: NextRequest) {
-  if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
+  if (!isDatabaseConfigured()) return fail("So'rov qabul qilinmadi", 501);
+
+  const ip = clientIp(req);
+  const rl = checkRateLimit(`clients-lead:${ip}`, 8, 60_000);
+  if (!rl.ok) {
+    return fail("So'rov qabul qilinmadi", 429);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return fail("So'rov qabul qilinmadi", 400);
+  }
+
+  if (isLeadHoneypotTriggered(body)) {
+    return ok({ accepted: true }, 201);
+  }
+
+  const parsed = parsePublicLeadBody(body);
+  if (!parsed.ok) {
+    return fail("So'rov qabul qilinmadi", 400);
+  }
 
   try {
-    const body = (await req.json()) as Record<string, unknown>;
-    const fullName = String(body.fullName ?? "").trim();
-    const phone = String(body.phone ?? "").trim();
-    if (!fullName || !phone) {
-      return fail("Ism va telefon talab qilinadi", 400);
-    }
-
-    const client = await upsertClientLead({
-      fullName,
-      phone,
-      tenantId: body.tenantId ? String(body.tenantId) : undefined,
-    });
-    return ok(client, 201);
+    await upsertPublicClientLead(parsed.data);
+    return ok({ accepted: true }, 201);
   } catch {
-    return fail("Saqlash xatosi", 500);
+    return fail("So'rov qabul qilinmadi", 500);
   }
 }

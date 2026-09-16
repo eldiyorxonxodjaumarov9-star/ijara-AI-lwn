@@ -34,8 +34,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { computeDebts } from "@/lib/analytics";
+import { getContractStatusBadge } from "@/lib/contracts/contract-overdue";
 import {
-  CONTRACT_STATUS_MAP,
   LANDLORD_CONTACT,
   MAINTENANCE_STATUS_MAP,
   PAYMENT_METHOD_MAP,
@@ -394,7 +394,7 @@ export default function PortalPage() {
             />
           ) : (
             myContracts.map((c) => {
-              const status = CONTRACT_STATUS_MAP[c.status];
+              const status = getContractStatusBadge(c, tashkentNow);
               return (
                 <div key={c.id} className="rounded-lg border p-4 text-sm">
                   <div className="flex items-start justify-between gap-2">

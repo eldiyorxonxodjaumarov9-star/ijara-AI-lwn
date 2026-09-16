@@ -29,26 +29,21 @@ export async function POST(req: Request) {
       execSync("npm run db:seed", { stdio: "pipe", env: process.env });
     }
 
-    return ok({
-      status: "ready",
-      users: await prisma.user.count(),
-      properties: await prisma.property.count(),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Setup xatosi";
-    return fail(message, 500);
+    return ok({ status: "ready" });
+  } catch {
+    return fail("Setup xatosi", 500);
   }
 }
 
+/** Public probe — no user/property counts (admin POST uses x-setup-secret). */
 export async function GET() {
   if (!isDatabaseConfigured()) {
-    return NextResponse.json({ ready: false, reason: "no_database" });
+    return NextResponse.json({ ready: false });
   }
   try {
     await prisma.$queryRaw`SELECT 1`;
-    const users = await prisma.user.count();
-    return NextResponse.json({ ready: true, users });
+    return NextResponse.json({ ready: true });
   } catch {
-    return NextResponse.json({ ready: false, reason: "db_error" });
+    return NextResponse.json({ ready: false });
   }
 }

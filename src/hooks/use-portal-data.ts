@@ -113,6 +113,7 @@ export function usePortalData(): PortalDataState {
       }>("/portal/data", {
         method: "POST",
         auth: false,
+        portalAuth: true,
         body: { tenantId },
       });
       setRemote(mapPortalResponse(raw));

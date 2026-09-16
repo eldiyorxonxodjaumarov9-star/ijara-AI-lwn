@@ -1,15 +1,15 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/api-server/auth";
+import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
-  assertStaffCanManageTasks,
   createTask,
   getTaskStats,
   listTasks,
 } from "@/lib/api-server/tasks/task-service";
+import { assertValidTaskDueDate } from "@/lib/tasks/task-date-validation";
 
 const createSchema = z.object({
   title: z.string().min(2),
@@ -23,14 +23,8 @@ const createSchema = z.object({
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "tasks", "GET");
   if (auth.error) return auth.error;
-
-  try {
-    await assertStaffCanManageTasks(auth.user);
-  } catch {
-    return fail("Ruxsat yo‘q", 403);
-  }
 
   const url = new URL(req.url);
   if (url.searchParams.get("stats") === "1") {
@@ -74,14 +68,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
-  const auth = await requireUser(req);
+  const auth = await requireResourceAccess(req, "tasks", "POST");
   if (auth.error) return auth.error;
-
-  try {
-    await assertStaffCanManageTasks(auth.user);
-  } catch {
-    return fail("Ruxsat yo‘q", 403);
-  }
 
   let body: unknown;
   try {
@@ -96,6 +84,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const dueAt = assertValidTaskDueDate(parsed.data.dueAt ?? null);
     const result = await createTask({
       title: parsed.data.title,
       description: parsed.data.description,
@@ -104,7 +93,7 @@ export async function POST(req: NextRequest) {
       createdByUserId: auth.user.id,
       source: "WEB",
       priority: parsed.data.priority,
-      dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
+      dueAt,
       notifyTelegram: parsed.data.notifyTelegram,
     });
     return ok(result, 201);

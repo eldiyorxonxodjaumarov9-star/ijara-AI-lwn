@@ -2,9 +2,13 @@ import { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api-server/http";
 import { publishListing } from "@/lib/api-server/posting/posting-service";
+import { requireStaffUser } from "@/lib/api-server/rbac";
 import type { ListingPostInput } from "@/lib/posting/types";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const body = (await req.json()) as Partial<ListingPostInput>;
 

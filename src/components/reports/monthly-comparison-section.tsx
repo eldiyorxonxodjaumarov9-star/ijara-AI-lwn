@@ -681,12 +681,12 @@ function OverviewTab({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <MonthSummaryCard
-          title="1-oy xulosasi"
+          title={`${result.base.label} xulosasi`}
           totals={result.base}
           loading={loading}
         />
         <MonthSummaryCard
-          title="2-oy xulosasi"
+          title={`${result.compare.label} xulosasi`}
           totals={result.compare}
           loading={loading}
         />
@@ -745,7 +745,7 @@ function OverviewTab({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">
-              Rejalashtirilgan xarajat (1-oy)
+              Rejalashtirilgan xarajat ({result.base.label})
             </p>
             <p className="mt-1 text-xl font-bold text-amber-500">
               {formatCurrency(result.base.plannedExpense)}
@@ -755,7 +755,7 @@ function OverviewTab({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">
-              Rejalashtirilgan xarajat (2-oy)
+              Rejalashtirilgan xarajat ({result.compare.label})
             </p>
             <p className="mt-1 text-xl font-bold text-amber-500">
               {formatCurrency(result.compare.plannedExpense)}
@@ -821,8 +821,8 @@ function OverviewTab({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Xarajat turi</TableHead>
-                    <TableHead>1-oy summasi</TableHead>
-                    <TableHead>2-oy summasi</TableHead>
+                    <TableHead>{result.base.label} summasi</TableHead>
+                    <TableHead>{result.compare.label} summasi</TableHead>
                     <TableHead>Farq</TableHead>
                     <TableHead>Foiz</TableHead>
                     <TableHead>Holat</TableHead>
@@ -1464,14 +1464,14 @@ export function MonthlyComparisonSection({
           </div>
           <IncomeMonthBlock
             key={`income-base-${result.base.label}`}
-            title="1-oy kirimlari"
+            title={`${result.base.label} kirimlari`}
             totals={result.base}
             rows={result.baseIncomes}
             loading={loading}
           />
           <IncomeMonthBlock
             key={`income-compare-${result.compare.label}`}
-            title="2-oy kirimlari"
+            title={`${result.compare.label} kirimlari`}
             totals={result.compare}
             rows={result.compareIncomes}
             loading={loading}

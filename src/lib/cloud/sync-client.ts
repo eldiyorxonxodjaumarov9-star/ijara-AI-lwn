@@ -8,6 +8,7 @@ import {
   pushToFirestore,
 } from "@/lib/cloud/firestore-sync";
 import type { CollectionName } from "@/lib/data/store";
+import { tokenStore } from "@/lib/api/client";
 import type { AppUser } from "@/types";
 
 const STORAGE_PREFIX = "arendahub:";
@@ -16,6 +17,11 @@ const DEMO_SESSION_KEY = "arendahub:session";
 const SYNC_META_KEY = "arendahub:sync-updated-at";
 
 export type CloudSyncStatus = "checking" | "active" | "offline";
+
+function syncAuthHeaders(): HeadersInit {
+  const token = tokenStore.access;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 let cachedSyncStatus: CloudSyncStatus = "checking";
 
@@ -128,10 +134,10 @@ export async function pullAccountState(
   if (fromFirestore) return fromFirestore;
 
   try {
-    const res = await fetch(
-      `/api/sync/account?email=${encodeURIComponent(accountSyncKey(email))}`,
-      { cache: "no-store" }
-    );
+    const res = await fetch("/api/sync/account", {
+      cache: "no-store",
+      headers: syncAuthHeaders(),
+    });
     if (res.ok) {
       const data = (await res.json()) as AccountSyncState | null;
       return data?.updatedAt ? data : null;
@@ -161,11 +167,11 @@ export async function pushAccountState(
   try {
     const res = await fetch("/api/sync/account", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: accountSyncKey(email),
-        state: payload,
-      }),
+      headers: {
+        "Content-Type": "application/json",
+        ...syncAuthHeaders(),
+      },
+      body: JSON.stringify({ state: payload }),
     });
     if (res.ok) {
       window.localStorage.setItem(SYNC_META_KEY, payload.updatedAt);

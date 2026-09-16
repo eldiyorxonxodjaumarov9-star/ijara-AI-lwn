@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { assertFailClosedCronAuth } from "@/lib/api-server/cron-auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
@@ -25,15 +26,10 @@ function parseSlot(req: NextRequest): ReminderTimeSlot | null {
     : null;
 }
 
-/** Kunlik avtomatik to'lov eslatmasi — Telegram bot (Vercel Cron, Toshkent vaqti) */
+/** Kunlik avtomatik to'lov eslatmasi — fail-closed CRON_SECRET */
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return fail("Ruxsat yo'q", 403);
-    }
-  }
+  const denied = assertFailClosedCronAuth(req);
+  if (denied) return denied;
 
   if (!isDatabaseConfigured()) {
     return fail("DATABASE_URL sozlanmagan", 501);

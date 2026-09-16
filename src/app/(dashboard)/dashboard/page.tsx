@@ -36,11 +36,9 @@ import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import {
   PAYMENT_METHOD_MAP,
   PROPERTY_STATUS_MAP,
-  CLIENT_STATUS_MAP,
 } from "@/lib/constants";
 import { useAuth } from "@/context/auth-context";
 import type {
-  Client,
   Contract,
   Expense,
   Payment,
@@ -53,12 +51,11 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const { data: properties, loading: lp } = useCollection<Property>("properties");
   const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
-  const { data: clients, loading: lcl } = useCollection<Client>("clients");
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lpay } = useCollection<Payment>("payments");
   const { data: expenses, loading: le } = useCollection<Expense>("expenses");
 
-  const loading = lp || lt || lcl || lc || lpay || le;
+  const loading = lp || lt || lc || lpay || le;
   const tashkentNow = useTashkentNow();
 
   const metrics = useMemo(
@@ -85,7 +82,6 @@ export default function DashboardPage() {
 
   const recentPayments = payments.slice(0, 5);
   const recentTenants = tenants.slice(0, 5);
-  const recentClients = clients.slice(0, 5);
   const overdue = useMemo(
     () => getOverdueContracts(contracts, tashkentNow),
     [contracts, tashkentNow]
@@ -378,7 +374,7 @@ export default function DashboardPage() {
           </DashboardPanel>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4">
           <DashboardPanel
             title={t("dashboard.recentTenants")}
             description={t("dashboard.recentTenantsDesc")}
@@ -410,45 +406,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               ))}
-            />
-          </DashboardPanel>
-
-          <DashboardPanel
-            title={t("dashboard.recentClients")}
-            description={t("dashboard.recentClientsDesc")}
-            actionHref="/clients"
-            actionLabel={t("dashboard.all")}
-            delayMs={200}
-          >
-            <ListBody
-              loading={loading}
-              empty={t("dashboard.noClients")}
-              items={recentClients.map((client) => {
-                const st = CLIENT_STATUS_MAP[client.status];
-                return (
-                  <div key={client.id} className="app-row">
-                    <Avatar className="size-9 border border-white/10">
-                      <AvatarFallback className="bg-violet-500/15 text-violet-200">
-                        {getInitials(client.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-100">
-                        {client.fullName}
-                      </p>
-                      <p className="truncate text-xs text-slate-400">
-                        {client.phone} • {formatDate(client.lastLoginAt)}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={st?.variant}
-                      className="border-white/10 bg-white/5 text-slate-200"
-                    >
-                      {st?.label}
-                    </Badge>
-                  </div>
-                );
-              })}
             />
           </DashboardPanel>
         </div>

@@ -7,12 +7,22 @@ import {
   saveInstagramSettings,
   testInstagramConnection,
 } from "@/lib/api-server/integrations/instagram-service";
+import {
+  requireAnyStaffUser,
+  requireStaffUser,
+} from "@/lib/api-server/rbac";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAnyStaffUser(req);
+  if (auth.error) return auth.error;
+
   return ok(await getInstagramPublicStatus());
 }
 
 export async function PATCH(req: NextRequest) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const body = (await req.json()) as {
       enabled?: boolean;
@@ -33,6 +43,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireStaffUser(req);
+  if (auth.error) return auth.error;
+
   const body = (await req.json().catch(() => ({}))) as { action?: string };
 
   if (body.action === "test") {

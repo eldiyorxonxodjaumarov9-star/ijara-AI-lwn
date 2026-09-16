@@ -50,7 +50,7 @@ export function InstagramSettingsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/integrations/instagram/status", { cache: "no-store" });
+      const res = await fetch("/api/integrations/instagram", { cache: "no-store" });
       const data = await parseRes<InstagramStatus>(res);
       setStatus(data);
       setEnabled(data.enabled);

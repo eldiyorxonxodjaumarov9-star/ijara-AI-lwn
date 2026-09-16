@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Dashboard page guard (defense in depth).
+ * API routes enforce their own JWT/RBAC — never rely on this alone.
+ * See `src/lib/api-server/route-auth-matrix.md`.
+ */
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 

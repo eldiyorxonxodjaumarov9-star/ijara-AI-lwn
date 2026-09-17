@@ -12,6 +12,10 @@ import {
   reopenTask,
   reviewTaskReport,
 } from "@/lib/api-server/tasks/task-service";
+import {
+  isRecordInWorkspace,
+  resolveUserWorkspaceContext,
+} from "@/lib/api-server/workspace";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -20,8 +24,17 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const auth = await requireResourceAccess(req, "tasks", "GET");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
-  const task = mapTask(await getTaskById(id));
+  const raw = await getTaskById(id);
+  if (!isRecordInWorkspace(raw, wsCtx.workspace.id)) {
+    return fail("Topilmadi", 404);
+  }
+  const task = mapTask(raw);
   if (!task) return fail("Topilmadi", 404);
   return ok(task);
 }
@@ -37,7 +50,17 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const auth = await requireResourceAccess(req, "tasks", "POST");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
+  const existing = await getTaskById(id);
+  if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
+    return fail("Topilmadi", 404);
+  }
+
   let body: unknown;
   try {
     body = await req.json();

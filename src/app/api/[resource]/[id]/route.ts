@@ -9,6 +9,10 @@ import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac"
 import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import {
+  isRecordInWorkspace,
+  resolveUserWorkspaceContext,
+} from "@/lib/api-server/workspace";
 
 const ALLOWED = new Set<RbacResource>([
   "tenants",
@@ -18,6 +22,14 @@ const ALLOWED = new Set<RbacResource>([
   "maintenance",
   "notifications",
 ]);
+
+async function resolveWorkspace(user: Parameters<typeof resolveUserWorkspaceContext>[0]) {
+  const wsCtx = await resolveUserWorkspaceContext(user);
+  if (!wsCtx.hasAccess) {
+    return { error: fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED") };
+  }
+  return { workspaceId: wsCtx.workspace.id };
+}
 
 export async function GET(
   req: NextRequest,
@@ -30,54 +42,75 @@ export async function GET(
   const auth = await requireResourceAccess(req, resource as RbacResource, "GET");
   if (auth.error) return auth.error;
 
-  let found: unknown = null;
+  const ws = await resolveWorkspace(auth.user);
+  if ("error" in ws) return ws.error;
+
+  let found: { workspaceId?: string | null } | null = null;
   switch (resource) {
-    case "tenants":
-      found = await prisma.tenant.findUnique({ where: { id } });
-      if (found) found = stripTenantSecret(found);
+    case "tenants": {
+      const row = await prisma.tenant.findUnique({ where: { id } });
+      found = row;
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) {
+        return ok(stripTenantSecret(row));
+      }
       break;
-    case "contracts":
-      found = await prisma.contract.findUnique({
+    }
+    case "contracts": {
+      const row = await prisma.contract.findUnique({
         where: { id },
         include: { property: true, tenant: true },
       });
+      found = row;
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(row);
       break;
-    case "payments":
-      found = await prisma.payment.findUnique({
+    }
+    case "payments": {
+      const row = await prisma.payment.findUnique({
         where: { id },
         include: { contract: { include: { property: true, tenant: true } } },
       });
+      found = row;
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(row);
       break;
-    case "expenses":
-      found = await prisma.expense.findUnique({
+    }
+    case "expenses": {
+      const row = await prisma.expense.findUnique({
         where: { id },
         include: { employee: { include: { company: true } } },
       });
-      if (found && typeof found === "object" && "employee" in found) {
-        const row = found as {
-          employee: Record<string, unknown> | null;
-        } & Record<string, unknown>;
-        found = {
+      found = row;
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) {
+        return ok({
           ...row,
           employee: row.employee
-            ? sanitizeEmployeeForRole(row.employee, auth.user.role)
+            ? sanitizeEmployeeForRole(
+                row.employee as Record<string, unknown>,
+                auth.user.role
+              )
             : null,
-        };
+        });
       }
       break;
-    case "maintenance":
-      found = await prisma.maintenance.findUnique({
+    }
+    case "maintenance": {
+      const row = await prisma.maintenance.findUnique({
         where: { id },
         include: { property: true },
       });
+      found = row;
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(row);
       break;
-    case "notifications":
-      found = await prisma.notification.findUnique({ where: { id } });
+    }
+    case "notifications": {
+      const row = await prisma.notification.findUnique({ where: { id } });
+      found = row;
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(row);
       break;
+    }
   }
 
   if (!found) return fail("Topilmadi", 404);
-  return ok(found);
+  return fail("Topilmadi", 404);
 }
 
 export async function PATCH(
@@ -91,11 +124,19 @@ export async function PATCH(
   const auth = await requireResourceAccess(req, resource as RbacResource, "PATCH");
   if (auth.error) return auth.error;
 
+  const ws = await resolveWorkspace(auth.user);
+  if ("error" in ws) return ws.error;
+
   const body = (await req.json()) as Record<string, unknown>;
+  delete body.workspaceId;
 
   try {
     switch (resource) {
       case "tenants": {
+        const existing = await prisma.tenant.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         const updated = await prisma.tenant.update({
           where: { id },
           data: await mapTenantBody(body),
@@ -111,7 +152,11 @@ export async function PATCH(
         }
         return ok(stripTenantSecret(updated));
       }
-      case "contracts":
+      case "contracts": {
+        const existing = await prisma.contract.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         return ok(
           await prisma.contract.update({
             where: { id },
@@ -123,7 +168,12 @@ export async function PATCH(
             include: { property: true, tenant: true },
           })
         );
+      }
       case "payments": {
+        const existing = await prisma.payment.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         const data: Record<string, unknown> = {};
         if (body.contractId != null) data.contractId = String(body.contractId);
         if (body.amount != null) data.amount = Number(body.amount);
@@ -159,6 +209,10 @@ export async function PATCH(
         );
       }
       case "expenses": {
+        const existing = await prisma.expense.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         const data: Record<string, unknown> = {};
         if (body.title != null || body.note != null) {
           data.title = String(body.title ?? body.note ?? "Xarajat");
@@ -208,9 +262,18 @@ export async function PATCH(
             : null,
         });
       }
-      case "maintenance":
+      case "maintenance": {
+        const existing = await prisma.maintenance.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         return ok(await prisma.maintenance.update({ where: { id }, data: body as never }));
-      case "notifications":
+      }
+      case "notifications": {
+        const existing = await prisma.notification.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         return ok(
           await prisma.notification.update({
             where: { id },
@@ -220,6 +283,7 @@ export async function PATCH(
             },
           })
         );
+      }
       default:
         return fail("Topilmadi", 404);
     }
@@ -239,26 +303,59 @@ export async function DELETE(
   const auth = await requireResourceAccess(req, resource as RbacResource, "DELETE");
   if (auth.error) return auth.error;
 
+  const ws = await resolveWorkspace(auth.user);
+  if ("error" in ws) return ws.error;
+
   try {
     switch (resource) {
-      case "tenants":
+      case "tenants": {
+        const existing = await prisma.tenant.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         await deleteTenantAndLinkedClients(id);
         break;
-      case "contracts":
+      }
+      case "contracts": {
+        const existing = await prisma.contract.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         await prisma.contract.delete({ where: { id } });
         break;
-      case "payments":
+      }
+      case "payments": {
+        const existing = await prisma.payment.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         await prisma.payment.delete({ where: { id } });
         break;
-      case "expenses":
+      }
+      case "expenses": {
+        const existing = await prisma.expense.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         await prisma.expense.delete({ where: { id } });
         break;
-      case "maintenance":
+      }
+      case "maintenance": {
+        const existing = await prisma.maintenance.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         await prisma.maintenance.delete({ where: { id } });
         break;
-      case "notifications":
+      }
+      case "notifications": {
+        const existing = await prisma.notification.findUnique({ where: { id } });
+        if (!isRecordInWorkspace(existing, ws.workspaceId)) {
+          return fail("Topilmadi", 404);
+        }
         await prisma.notification.delete({ where: { id } });
         break;
+      }
     }
     return ok({ message: "O'chirildi" });
   } catch {

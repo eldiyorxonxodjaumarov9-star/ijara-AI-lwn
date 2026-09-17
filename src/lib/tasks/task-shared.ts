@@ -121,6 +121,7 @@ export type CreateTaskInput = {
   unit: WorkTaskUnit;
   assignedEmployeeId: string;
   createdByUserId: string;
+  workspaceId: string;
   source: WorkTaskSource;
   priority?: WorkTaskPriority;
   dueAt?: Date | null;

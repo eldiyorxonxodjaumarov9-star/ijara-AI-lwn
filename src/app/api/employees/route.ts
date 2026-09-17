@@ -5,18 +5,28 @@ import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { normalizeEmployeePhone } from "@/lib/employee-units";
+import {
+  resolveUserWorkspaceContext,
+  workspaceWhere,
+} from "@/lib/api-server/workspace";
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireResourceAccess(req, "employees", "GET");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const ws = workspaceWhere(wsCtx.workspace.id);
+
   const url = new URL(req.url);
   const { page, limit, skip, search, sortBy, order } = parsePagination(url);
   const activeOnly = url.searchParams.get("active") === "1";
   const companyId = url.searchParams.get("companyId")?.trim();
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { ...ws };
   if (activeOnly) where.active = true;
   if (companyId) where.companyId = companyId;
   if (search) {
@@ -61,6 +71,13 @@ export async function POST(req: NextRequest) {
   const auth = await requireResourceAccess(req, "employees", "POST");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const workspaceId = wsCtx.workspace.id;
+  const ws = workspaceWhere(workspaceId);
+
   try {
     const body = (await req.json()) as Record<string, unknown>;
     const fullName = String(body.fullName ?? "").trim();
@@ -87,7 +104,7 @@ export async function POST(req: NextRequest) {
     );
     if (phone) {
       const dup = await prisma.employee.findFirst({
-        where: { phone },
+        where: { phone, ...ws },
         select: { id: true },
       });
       if (dup) return fail("Bu telefon raqam band", 409);
@@ -114,6 +131,7 @@ export async function POST(req: NextRequest) {
 
     const created = await prisma.employee.create({
       data: {
+        workspaceId,
         fullName,
         phone,
         position,

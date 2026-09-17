@@ -9,64 +9,99 @@ import {
 } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import {
+  createDemoWorkspaceForUser,
+  resolveUserWorkspaceContext,
+  toPublicSubscriptionView,
+} from "@/lib/api-server/workspace";
+import { registerSchema } from "@/lib/validations";
+
+function isPublicRegistrationAllowed(): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  if (process.env.ALLOW_PUBLIC_REGISTER === "true") return true;
+  if (process.env.ENABLE_WORKSPACE_SIGNUP === "true") return true;
+  return false;
+}
 
 /**
- * Public registration — always EMPLOYEE.
- * Privileged roles (SUPER_ADMIN/ADMIN/MANAGER) cannot be self-assigned.
+ * Workspace signup — always ADMIN (workspace owner).
+ * Privileged roles (SUPER_ADMIN) cannot be self-assigned.
  */
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) {
     return fail("DATABASE_URL sozlanmagan", 501);
   }
 
-  // Production: disable open registration unless explicitly enabled.
-  if (
-    process.env.NODE_ENV === "production" &&
-    process.env.ALLOW_PUBLIC_REGISTER !== "true"
-  ) {
+  if (!isPublicRegistrationAllowed()) {
     return fail("Ochiq ro‘yxatdan o‘tish o‘chirilgan", 403);
   }
 
   try {
-    const body = (await req.json()) as {
-      email?: string;
-      password?: string;
-      fullName?: string;
-      phone?: string;
-      role?: string;
-    };
-    const email = body.email?.trim().toLowerCase();
-    if (!email || !body.password || !body.fullName) {
-      return fail("Majburiy maydonlar to'ldirilmagan", 400);
-    }
-    if (String(body.password).length < 6) {
-      return fail("Parol kamida 6 ta belgi bo‘lishi kerak", 400);
+    let json: unknown;
+    try {
+      json = await req.json();
+    } catch {
+      return fail("Noto'g'ri so'rov", 400);
     }
 
-    // Ignore any client-supplied role (QA-001).
-    void body.role;
+    const parsed = registerSchema.safeParse(json);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0]?.message;
+      return fail(first ?? "Ma'lumotlar noto'g'ri", 400);
+    }
 
-    const exists = await prisma.user.findUnique({ where: { email } });
+    const { email, password, company, phone } = parsed.data;
+    const fullName = (
+      parsed.data.displayName?.trim() ||
+      parsed.data.fullName?.trim() ||
+      ""
+    ).slice(0, 120);
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const exists = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
     if (exists) {
       return fail("Bu email allaqachon ro'yxatdan o'tgan", 409);
     }
 
     const user = await prisma.user.create({
       data: {
-        email,
-        password: await bcrypt.hash(body.password, 10),
-        fullName: body.fullName.trim(),
-        phone: body.phone?.trim() || undefined,
-        role: Role.EMPLOYEE,
+        email: normalizedEmail,
+        password: await bcrypt.hash(password, 10),
+        fullName,
+        phone: phone?.trim() || undefined,
+        role: Role.ADMIN,
       },
     });
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    await createDemoWorkspaceForUser({
+      userId: user.id,
+      workspaceName: company?.trim() || fullName,
+    });
+
+    const ctx = await resolveUserWorkspaceContext(user);
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      workspaceId: ctx.workspace.id,
+    };
     const tokens = await signTokens(payload);
     await persistRefreshToken(user.id, tokens.refreshToken);
 
-    return ok({ user: sanitizeUser(user), ...tokens }, 201);
-  } catch {
+    return ok(
+      {
+        user: sanitizeUser(user),
+        workspace: toPublicSubscriptionView(ctx),
+        ...tokens,
+      },
+      201
+    );
+  } catch (err) {
+    console.error("[auth/register] unexpected error", err);
     return fail("Ro'yxatdan o'tish xatosi", 500);
   }
 }

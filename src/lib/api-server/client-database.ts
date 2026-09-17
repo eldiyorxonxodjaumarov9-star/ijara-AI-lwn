@@ -6,9 +6,12 @@ function interestFromApi(v: string): ContactInterest {
   return String(v ?? "CALLED").toLowerCase() as ContactInterest;
 }
 
-export async function ensureAllTenantClientNumbers() {
+export async function ensureAllTenantClientNumbers(workspaceId?: string) {
   const missing = await prisma.tenant.findMany({
-    where: { clientNumber: null },
+    where: {
+      clientNumber: null,
+      ...(workspaceId ? { workspaceId } : {}),
+    },
     select: { id: true },
     orderBy: { createdAt: "asc" },
   });
@@ -17,12 +20,24 @@ export async function ensureAllTenantClientNumbers() {
   }
 }
 
-export async function buildClientDatabaseRows(): Promise<ClientDatabaseRow[]> {
-  await ensureAllTenantClientNumbers();
+export async function buildClientDatabaseRows(
+  workspaceId?: string
+): Promise<ClientDatabaseRow[]> {
+  await ensureAllTenantClientNumbers(workspaceId);
+
+  const wsFilter = workspaceId ? { workspaceId } : {};
+  const archiveFilter = workspaceId
+    ? {
+        OR: [
+          { tenant: { workspaceId } },
+          { contract: { workspaceId } },
+        ],
+      }
+    : {};
 
   const [tenants, archives, contacts] = await Promise.all([
     prisma.tenant.findMany({
-      where: { leftAt: null },
+      where: { leftAt: null, ...wsFilter },
       orderBy: { createdAt: "desc" },
       include: {
         contracts: {
@@ -36,8 +51,14 @@ export async function buildClientDatabaseRows(): Promise<ClientDatabaseRow[]> {
         },
       },
     }),
-    prisma.tenantArchive.findMany({ orderBy: { leaveDate: "desc" } }),
-    prisma.contactLead.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.tenantArchive.findMany({
+      where: archiveFilter,
+      orderBy: { leaveDate: "desc" },
+    }),
+    prisma.contactLead.findMany({
+      where: wsFilter,
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const activeRows: ClientDatabaseRow[] = tenants.map((t) => {

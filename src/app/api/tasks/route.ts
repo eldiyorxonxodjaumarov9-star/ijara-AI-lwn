@@ -9,6 +9,7 @@ import {
   getTaskStats,
   listTasks,
 } from "@/lib/api-server/tasks/task-service";
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 import { assertValidTaskDueDate } from "@/lib/tasks/task-date-validation";
 
 const createSchema = z.object({
@@ -26,9 +27,15 @@ export async function GET(req: NextRequest) {
   const auth = await requireResourceAccess(req, "tasks", "GET");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const workspaceId = wsCtx.workspace.id;
+
   const url = new URL(req.url);
   if (url.searchParams.get("stats") === "1") {
-    const stats = await getTaskStats();
+    const stats = await getTaskStats(workspaceId);
     return ok(stats);
   }
 
@@ -55,6 +62,7 @@ export async function GET(req: NextRequest) {
     page,
     limit,
     skip,
+    workspaceId,
     search,
     unit: unit ?? undefined,
     status: status ?? undefined,
@@ -70,6 +78,11 @@ export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireResourceAccess(req, "tasks", "POST");
   if (auth.error) return auth.error;
+
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
 
   let body: unknown;
   try {
@@ -91,6 +104,7 @@ export async function POST(req: NextRequest) {
       unit: parsed.data.unit,
       assignedEmployeeId: parsed.data.assignedEmployeeId,
       createdByUserId: auth.user.id,
+      workspaceId: wsCtx.workspace.id,
       source: "WEB",
       priority: parsed.data.priority,
       dueAt,

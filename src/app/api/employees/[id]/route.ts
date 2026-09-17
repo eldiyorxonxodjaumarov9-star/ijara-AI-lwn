@@ -5,6 +5,11 @@ import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { normalizeEmployeePhone } from "@/lib/employee-units";
+import {
+  isRecordInWorkspace,
+  resolveUserWorkspaceContext,
+  workspaceWhere,
+} from "@/lib/api-server/workspace";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -13,12 +18,19 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const auth = await requireResourceAccess(req, "employees", "GET");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
   const item = await prisma.employee.findUnique({
     where: { id },
     include: { company: true },
   });
-  if (!item) return fail("Xodim topilmadi", 404);
+  if (!isRecordInWorkspace(item, wsCtx.workspace.id)) {
+    return fail("Xodim topilmadi", 404);
+  }
   return ok(sanitizeEmployeeForRole(item, auth.user.role));
 }
 
@@ -27,9 +39,21 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const auth = await requireResourceAccess(req, "employees", "PATCH");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const ws = workspaceWhere(wsCtx.workspace.id);
+
   const { id } = await ctx.params;
   try {
+    const existing = await prisma.employee.findUnique({ where: { id } });
+    if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
+      return fail("Xodim topilmadi", 404);
+    }
+
     const body = (await req.json()) as Record<string, unknown>;
+    delete body.workspaceId;
     const data: Record<string, unknown> = {};
 
     if (body.fullName != null) {
@@ -43,7 +67,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       );
       if (phone) {
         const dup = await prisma.employee.findFirst({
-          where: { phone, NOT: { id } },
+          where: { phone, ...ws, NOT: { id } },
           select: { id: true },
         });
         if (dup) return fail("Bu telefon raqam band", 409);
@@ -125,8 +149,17 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const auth = await requireResourceAccess(req, "employees", "DELETE");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
   try {
+    const existing = await prisma.employee.findUnique({ where: { id } });
+    if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
+      return fail("Xodim topilmadi", 404);
+    }
     const updated = await prisma.employee.update({
       where: { id },
       data: { active: false },

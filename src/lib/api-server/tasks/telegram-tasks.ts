@@ -47,6 +47,7 @@ import {
   TASK_UNIT_LABELS,
 } from "@/lib/tasks/task-shared";
 import { matchEmployeeUnit } from "@/lib/employee-units";
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 
 export const EMPLOYEE_MENU_KEYBOARD = {
   keyboard: [
@@ -548,6 +549,7 @@ export async function handleAdminTaskCallback(chatId: string, data: string) {
 
   if (data.startsWith("atask:unit:")) {
     const unit = data.split(":")[2] as WorkTaskUnit;
+    const wsCtx = await resolveUserWorkspaceContext(owner);
     await setWizard(
       chatId,
       buildWizard({
@@ -557,7 +559,7 @@ export async function handleAdminTaskCallback(chatId: string, data: string) {
       })
     );
     const employees = await prisma.employee.findMany({
-      where: { active: true },
+      where: { active: true, workspaceId: wsCtx.workspace.id },
       include: { company: true },
       orderBy: { fullName: "asc" },
       take: 40,
@@ -624,12 +626,14 @@ export async function handleAdminTaskCallback(chatId: string, data: string) {
       return;
     }
     try {
+      const wsCtx = await resolveUserWorkspaceContext(owner);
       const result = await createTask({
         title: d.title,
         description: d.description,
         unit: d.unit,
         assignedEmployeeId: d.employeeId,
         createdByUserId: owner.id,
+        workspaceId: wsCtx.workspace.id,
         source: "TELEGRAM",
         priority: d.priority ?? "NORMAL",
         dueAt: d.dueAt ? new Date(d.dueAt) : null,
@@ -760,12 +764,22 @@ export async function handleAdminTaskWizardText(chatId: string, text: string) {
 }
 
 export async function handleAdminTaskMenuText(chatId: string, text: string) {
+  const owner = await getOwnerByAdminChatId(chatId);
+  const workspaceId = owner
+    ? (await resolveUserWorkspaceContext(owner)).workspace.id
+    : undefined;
+
   if (text === "➕ Vazifa berish") {
     await startAdminCreateTaskWizard(chatId);
     return true;
   }
   if (text === "📋 Barcha vazifalar") {
-    const { data } = await listTasks({ page: 1, limit: 10, skip: 0 });
+    const { data } = await listTasks({
+      page: 1,
+      limit: 10,
+      skip: 0,
+      workspaceId,
+    });
     if (!data.length) {
       await sendTelegramMessage(chatId, "Vazifalar yo‘q.");
       return true;
@@ -784,6 +798,7 @@ export async function handleAdminTaskMenuText(chatId: string, text: string) {
       page: 1,
       limit: 10,
       skip: 0,
+      workspaceId,
       status: "SUBMITTED",
     });
     if (!data.length) {

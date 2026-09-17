@@ -8,21 +8,34 @@ import {
 } from "@/lib/api-server/clients";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import {
+  resolveUserWorkspaceContext,
+  workspaceWhere,
+} from "@/lib/api-server/workspace";
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireResourceAccess(req, "clients", "GET");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const ws = workspaceWhere(wsCtx.workspace.id);
+
   const { page, limit, skip, search, sortBy, order } = parsePagination(new URL(req.url));
-  const where = search
-    ? {
-        OR: [
-          { fullName: { contains: search, mode: "insensitive" as const } },
-          { phone: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where = {
+    ...ws,
+    ...(search
+      ? {
+          OR: [
+            { fullName: { contains: search, mode: "insensitive" as const } },
+            { phone: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
   const [data, total] = await Promise.all([
     prisma.client.findMany({
@@ -42,9 +55,16 @@ export async function POST(req: NextRequest) {
   const auth = await requireResourceAccess(req, "clients", "POST");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   try {
     const body = (await req.json()) as Record<string, unknown>;
-    const created = await prisma.client.create({ data: mapClientCreate(body) });
+    const created = await prisma.client.create({
+      data: { ...mapClientCreate(body), workspaceId: wsCtx.workspace.id },
+    });
     return ok(created, 201);
   } catch {
     return fail("Saqlash xatosi", 500);
@@ -55,6 +75,11 @@ export async function PUT(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireResourceAccess(req, "clients", "PUT");
   if (auth.error) return auth.error;
+
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
 
   try {
     const synced = await syncClientsFromTenants();

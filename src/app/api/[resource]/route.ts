@@ -10,6 +10,10 @@ import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac"
 import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import {
+  resolveUserWorkspaceContext,
+  workspaceWhere,
+} from "@/lib/api-server/workspace";
 
 const ALLOWED = [
   "tenants",
@@ -38,13 +42,24 @@ export async function GET(
   const auth = await requireResourceAccess(req, name, "GET");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const ws = workspaceWhere(wsCtx.workspace.id);
+
   const { page, limit, skip, sortBy, order } = parsePagination(new URL(req.url));
 
   switch (name) {
     case "tenants": {
       const [rows, total] = await Promise.all([
-        prisma.tenant.findMany({ skip, take: limit, orderBy: { [sortBy]: order } }),
-        prisma.tenant.count(),
+        prisma.tenant.findMany({
+          where: { ...ws },
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: order },
+        }),
+        prisma.tenant.count({ where: { ...ws } }),
       ]);
       const data = rows.map(stripTenantSecret);
       return ok(paginated(data, total, page, limit));
@@ -52,36 +67,39 @@ export async function GET(
     case "contracts": {
       const [data, total] = await Promise.all([
         prisma.contract.findMany({
+          where: { ...ws },
           skip,
           take: limit,
           orderBy: { [sortBy]: order },
           include: { property: true, tenant: true },
         }),
-        prisma.contract.count(),
+        prisma.contract.count({ where: { ...ws } }),
       ]);
       return ok(paginated(data, total, page, limit));
     }
     case "payments": {
       const [data, total] = await Promise.all([
         prisma.payment.findMany({
+          where: { ...ws },
           skip,
           take: limit,
           orderBy: { [sortBy]: order },
           include: { contract: { include: { property: true, tenant: true } } },
         }),
-        prisma.payment.count(),
+        prisma.payment.count({ where: { ...ws } }),
       ]);
       return ok(paginated(data, total, page, limit));
     }
     case "expenses": {
       const [rows, total] = await Promise.all([
         prisma.expense.findMany({
+          where: { ...ws },
           skip,
           take: limit,
           orderBy: { [sortBy]: order },
           include: { employee: { include: { company: true } } },
         }),
-        prisma.expense.count(),
+        prisma.expense.count({ where: { ...ws } }),
       ]);
       const data = rows.map((row) => ({
         ...row,
@@ -97,23 +115,25 @@ export async function GET(
     case "maintenance": {
       const [data, total] = await Promise.all([
         prisma.maintenance.findMany({
+          where: { ...ws },
           skip,
           take: limit,
           orderBy: { [sortBy]: order },
           include: { property: true },
         }),
-        prisma.maintenance.count(),
+        prisma.maintenance.count({ where: { ...ws } }),
       ]);
       return ok(paginated(data, total, page, limit));
     }
     case "notifications": {
       const [data, total] = await Promise.all([
         prisma.notification.findMany({
+          where: { ...ws },
           skip,
           take: limit,
           orderBy: { [sortBy]: order },
         }),
-        prisma.notification.count(),
+        prisma.notification.count({ where: { ...ws } }),
       ]);
       return ok(paginated(data, total, page, limit));
     }
@@ -134,13 +154,19 @@ export async function POST(
   const auth = await requireResourceAccess(req, name, "POST");
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const workspaceId = wsCtx.workspace.id;
+
   const body = (await req.json()) as Record<string, unknown>;
 
   try {
     switch (name) {
       case "tenants": {
         const created = await prisma.tenant.create({
-          data: await mapTenantCreate(body),
+          data: { ...(await mapTenantCreate(body)), workspaceId },
         });
         await ensureTenantClientNumber(created.id);
         const fresh = await prisma.tenant.findUnique({ where: { id: created.id } });
@@ -152,6 +178,7 @@ export async function POST(
         return ok(
           await prisma.contract.create({
             data: {
+              workspaceId,
               propertyId: String(body.propertyId),
               tenantId: String(body.tenantId),
               startDate: new Date(String(body.startDate)),
@@ -207,6 +234,7 @@ export async function POST(
 
         const created = await prisma.payment.create({
           data: {
+            workspaceId,
             contractId,
             amount,
             paymentDate,
@@ -241,6 +269,7 @@ export async function POST(
             : null;
         const created = await prisma.expense.create({
           data: {
+            workspaceId,
             title: String(body.title ?? body.note ?? "Xarajat"),
             amount: Number(body.amount ?? 0),
             category: (body.category as never) ?? "OTHER",
@@ -270,6 +299,7 @@ export async function POST(
         return ok(
           await prisma.maintenance.create({
             data: {
+              workspaceId,
               propertyId: String(body.propertyId),
               title: String(body.title ?? body.issue ?? ""),
               description: String(body.description ?? body.issue ?? ""),
@@ -285,6 +315,7 @@ export async function POST(
         return ok(
           await prisma.notification.create({
             data: {
+              workspaceId,
               title: String(body.title ?? ""),
               message: String(body.message ?? ""),
               type: (body.type as never) ?? "INFO",

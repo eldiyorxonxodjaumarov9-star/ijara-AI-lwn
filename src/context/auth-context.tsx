@@ -37,7 +37,7 @@ import {
 } from "@/lib/cloud/sync-client";
 import { getCollectionApi } from "@/lib/data/store";
 import { clearDemoStorage } from "@/lib/demo-storage";
-import type { AppUser, Role, Tenant } from "@/types";
+import type { AppUser, Role, Tenant, WorkspaceSubscriptionView } from "@/types";
 
 function mapApiRole(role?: string): Role {
   switch (role) {
@@ -94,14 +94,17 @@ interface RegisterPayload {
 
 interface AuthContextValue {
   user: AppUser | null;
+  workspace: WorkspaceSubscriptionView | null;
   loading: boolean;
+  workspaceLoading: boolean;
   demoMode: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   loginTenant: (login: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUser: (data: Partial<AppUser>) => Promise<void>;
+  refreshWorkspace: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -145,23 +148,56 @@ function writeDemoUsers(users: (AppUser & { password: string })[]) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceSubscriptionView | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const apiMode = isApiConfigured;
   const demoMode = !isFirebaseConfigured && !isApiConfigured;
+
+  const refreshWorkspace = useCallback(async () => {
+    if (!apiMode || !tokenStore.access) {
+      setWorkspace(null);
+      return;
+    }
+    setWorkspaceLoading(true);
+    try {
+      const ws = await apiFetch<WorkspaceSubscriptionView>("/workspace/me");
+      setWorkspace(ws);
+    } catch {
+      setWorkspace(null);
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }, [apiMode]);
 
   useEffect(() => {
     // API (NestJS backend) rejimi
     if (apiMode) {
       if (tokenStore.access) {
         clearDemoStorage();
-        apiFetch<ApiUser>("/auth/me")
-          .then((u) => setUser(mapApiUser(u)))
+        setWorkspaceLoading(true);
+        Promise.all([
+          apiFetch<ApiUser>("/auth/me"),
+          apiFetch<WorkspaceSubscriptionView>("/workspace/me").catch(
+            () => null
+          ),
+        ])
+          .then(([u, ws]) => {
+            setUser(mapApiUser(u));
+            setWorkspace(ws);
+          })
           .catch(() => {
             tokenStore.clear();
             clearDemoStorage();
             setUser(null);
+            setWorkspace(null);
           })
-          .finally(() => setLoading(false));
+          .finally(() => {
+            setLoading(false);
+            setWorkspaceLoading(false);
+          });
       } else {
         // Eski demo sessiya — server rejimida admin sifatida qoldirilmaydi
         const raw =
@@ -239,22 +275,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [apiMode, demoMode]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (identifier: string, password: string) => {
       if (apiMode) {
         const res = await apiFetch<{
           user: ApiUser;
+          workspace: WorkspaceSubscriptionView;
           accessToken: string;
           refreshToken: string;
         }>("/auth/login", {
           method: "POST",
           auth: false,
-          body: { email, password },
+          body: { identifier, password },
         });
         tokenStore.set(res.accessToken, res.refreshToken);
         clearDemoStorage();
         setUser(mapApiUser(res.user));
+        setWorkspace(res.workspace);
+        await refreshWorkspace();
         return;
       }
+      const email = identifier;
       if (!demoMode && auth) {
         await signInWithEmailAndPassword(auth, email, password);
         return;
@@ -282,7 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(safe));
       setUser(safe);
     },
-    [apiMode, demoMode]
+    [apiMode, demoMode, refreshWorkspace]
   );
 
   const loginTenant = useCallback(
@@ -363,6 +403,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         const res = await apiFetch<{
           user: ApiUser;
+          workspace: WorkspaceSubscriptionView;
           accessToken: string;
           refreshToken: string;
         }>("/auth/register", {
@@ -378,6 +419,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tokenStore.set(res.accessToken, res.refreshToken);
         clearDemoStorage();
         setUser(mapApiUser(res.user));
+        setWorkspace(res.workspace);
+        await refreshWorkspace();
         return;
       }
       if (!demoMode && auth && db) {
@@ -423,7 +466,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(safe);
       await pushAccountState(safe.email);
     },
-    [apiMode, demoMode]
+    [apiMode, demoMode, refreshWorkspace]
   );
 
   const clearTenantSession = () => {
@@ -447,6 +490,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearDemoStorage();
       clearTenantSession();
       setUser(null);
+      setWorkspace(null);
       return;
     }
     if (!demoMode && auth) {
@@ -536,7 +580,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      workspace,
       loading,
+      workspaceLoading,
       demoMode,
       login,
       loginTenant,
@@ -544,10 +590,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       resetPassword,
       updateUser,
+      refreshWorkspace,
     }),
     [
       user,
+      workspace,
       loading,
+      workspaceLoading,
       demoMode,
       login,
       loginTenant,
@@ -555,6 +604,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       resetPassword,
       updateUser,
+      refreshWorkspace,
     ]
   );
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Lock, LogOut, Mail } from "lucide-react";
+import { Loader2, Lock, LogOut, UserRound } from "lucide-react";
 import { Suspense } from "react";
 import { toast } from "sonner";
 
@@ -25,7 +25,7 @@ function loginErrorMessage(error: unknown): string {
       return "Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring.";
     }
     if (error.status === 401 || error.status === 403) {
-      return "Email yoki parol noto‘g‘ri.";
+      return "Email/telefon yoki parol noto‘g‘ri";
     }
     if (error.status >= 500) {
       return "Kirish vaqtida server xatosi yuz berdi.";
@@ -53,13 +53,13 @@ function LoginPageContent() {
 
   const ownerForm = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { identifier: "", password: "" },
   });
 
   const onOwnerSubmit = async (values: LoginInput) => {
     try {
       setSubmitting(true);
-      await login(values.email, values.password);
+      await login(values.identifier ?? "", values.password);
       toast.success("Xush kelibsiz!");
       router.push("/dashboard");
     } catch (error) {
@@ -138,23 +138,23 @@ function LoginPageContent() {
         className="space-y-4"
       >
         <div className="space-y-1.5">
-          <Label htmlFor="email" className={labelClass}>
-            Email
+          <Label htmlFor="identifier" className={labelClass}>
+            Email yoki telefon
           </Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+            <UserRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
             <Input
-              id="email"
-              type="email"
-              placeholder="siz@example.com"
+              id="identifier"
+              type="text"
+              placeholder="siz@example.com yoki +998901234567"
               className={fieldClass}
-              autoComplete="email"
-              {...ownerForm.register("email")}
+              autoComplete="username"
+              {...ownerForm.register("identifier")}
             />
           </div>
-          {ownerForm.formState.errors.email && (
+          {ownerForm.formState.errors.identifier && (
             <p className="text-xs text-rose-300">
-              {ownerForm.formState.errors.email.message}
+              {ownerForm.formState.errors.identifier.message}
             </p>
           )}
         </div>

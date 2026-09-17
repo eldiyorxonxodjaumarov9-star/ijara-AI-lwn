@@ -114,7 +114,12 @@ export async function createTask(input: CreateTaskInput) {
     where: { id: input.assignedEmployeeId },
     include: { company: true },
   });
-  if (!employee || !employee.active) {
+  if (
+    !employee ||
+    !employee.active ||
+    (employee.workspaceId != null &&
+      employee.workspaceId !== input.workspaceId)
+  ) {
     throw Object.assign(new Error("Faol xodim topilmadi"), { status: 400 });
   }
 
@@ -123,6 +128,7 @@ export async function createTask(input: CreateTaskInput) {
   const task = await prisma.$transaction(async (tx) => {
     const created = await tx.workTask.create({
       data: {
+        workspaceId: input.workspaceId,
         title: input.title.trim(),
         description: input.description?.trim() || null,
         unit: input.unit,
@@ -256,6 +262,7 @@ export async function listTasks(opts: {
   page: number;
   limit: number;
   skip: number;
+  workspaceId?: string;
   search?: string;
   unit?: WorkTaskUnit;
   status?: WorkTaskStatus;
@@ -265,6 +272,7 @@ export async function listTasks(opts: {
   assignedEmployeeId?: string;
 }) {
   const where: Record<string, unknown> = {};
+  if (opts.workspaceId) where.workspaceId = opts.workspaceId;
   if (opts.unit) where.unit = opts.unit;
   if (opts.status) where.status = opts.status;
   if (opts.employeeId) where.assignedEmployeeId = opts.employeeId;
@@ -303,9 +311,11 @@ export async function listTasks(opts: {
   };
 }
 
-export async function getTaskStats() {
+export async function getTaskStats(workspaceId?: string) {
+  const wsFilter = workspaceId ? { workspaceId } : {};
   const groups = await prisma.workTask.groupBy({
     by: ["status"],
+    where: wsFilter,
     _count: { _all: true },
   });
   const byStatus = Object.fromEntries(
@@ -313,6 +323,7 @@ export async function getTaskStats() {
   ) as Partial<Record<WorkTaskStatus, number>>;
   const overdue = await prisma.workTask.count({
     where: {
+      ...wsFilter,
       status: { in: ACTIVE_TASK_STATUSES },
       dueAt: overdueTaskDueAtFilter(),
     },

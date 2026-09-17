@@ -1,22 +1,40 @@
 import { z } from "zod";
 
-export const loginSchema = z.object({
-  email: z.string().email("To'g'ri email kiriting"),
-  password: z.string().min(6, "Parol kamida 6 ta belgidan iborat bo'lsin"),
-});
+export const loginSchema = z
+  .object({
+    identifier: z.string().min(3, "Email yoki telefon kiriting").optional(),
+    email: z.string().min(3).optional(),
+    phone: z.string().min(3).optional(),
+    password: z.string().min(6, "Parol kamida 6 ta belgidan iborat bo'lsin"),
+  })
+  .refine(
+    (data) =>
+      Boolean(
+        data.identifier?.trim() || data.email?.trim() || data.phone?.trim()
+      ),
+    {
+      message: "Email yoki telefon kiriting",
+      path: ["identifier"],
+    }
+  );
 
 export const registerSchema = z
   .object({
-    displayName: z.string().min(2, "Ism kiriting"),
+    displayName: z.string().min(2, "Ism kiriting").optional(),
+    fullName: z.string().min(2, "Ism kiriting").optional(),
     company: z.string().optional(),
     email: z.string().email("To'g'ri email kiriting"),
+    phone: z.string().optional(),
     password: z.string().min(6, "Parol kamida 6 ta belgi"),
     confirmPassword: z.string(),
-    role: z.enum(["admin", "manager", "employee"]).default("manager"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Parollar mos kelmadi",
     path: ["confirmPassword"],
+  })
+  .refine((data) => Boolean(data.displayName?.trim() || data.fullName?.trim()), {
+    message: "Ism kiriting",
+    path: ["displayName"],
   });
 
 export const forgotPasswordSchema = z.object({

@@ -7,6 +7,10 @@ import {
 } from "@/lib/api-server/client-database";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import {
+  isRecordInWorkspace,
+  resolveUserWorkspaceContext,
+} from "@/lib/api-server/workspace";
 
 export async function PATCH(
   req: NextRequest,
@@ -16,10 +20,21 @@ export async function PATCH(
   const auth = await requireAnyStaffUser(req);
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
   const body = (await req.json()) as Record<string, unknown>;
+  delete body.workspaceId;
 
   try {
+    const existing = await prisma.contactLead.findUnique({ where: { id } });
+    if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
+      return fail("Topilmadi", 404);
+    }
+
     const updated = await prisma.contactLead.update({
       where: { id },
       data: {
@@ -52,8 +67,17 @@ export async function DELETE(
   const auth = await requireAnyStaffUser(_req);
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
   try {
+    const existing = await prisma.contactLead.findUnique({ where: { id } });
+    if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
+      return fail("Topilmadi", 404);
+    }
     await prisma.contactLead.delete({ where: { id } });
     return ok({ message: "O'chirildi" });
   } catch {

@@ -3,7 +3,7 @@
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { Building2, Cloud, Globe, KeyRound, Loader2, Moon, Radio, User } from "lucide-react";
+import { Building2, Cloud, CreditCard, Globe, KeyRound, Loader2, Moon, Radio, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/shared/page-header";
@@ -41,6 +41,7 @@ import { InstagramSettingsPanel } from "@/components/listings/instagram-settings
 import { TelegramDistributionPanel } from "@/components/listings/telegram-distribution-panel";
 import { TtlockSettingsPanel } from "@/components/settings/ttlock-settings-panel";
 import { LessorProfilePanel } from "@/components/settings/lessor-profile-panel";
+import { SubscriptionPanel } from "@/components/settings/subscription-panel";
 
 export default function SettingsPage() {
   return (
@@ -200,6 +201,9 @@ function SettingsPageContent() {
           <TabsTrigger value="integrations">
             <KeyRound className="mr-1.5 size-4" /> Integratsiyalar
           </TabsTrigger>
+          <TabsTrigger value="subscription">
+            <CreditCard className="mr-1.5 size-4" /> Obuna
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -334,6 +338,10 @@ function SettingsPageContent() {
 
         <TabsContent value="integrations" className="space-y-6">
           <TtlockSettingsPanel />
+        </TabsContent>
+
+        <TabsContent value="subscription">
+          <SubscriptionPanel />
         </TabsContent>
 
         <TabsContent value="appearance">

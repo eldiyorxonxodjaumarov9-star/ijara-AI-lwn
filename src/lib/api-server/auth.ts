@@ -10,6 +10,8 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: Role;
+  /** Active workspace; omitted in legacy tokens — resolved server-side on each request. */
+  workspaceId?: string;
 }
 
 function secret(key: "access" | "refresh") {

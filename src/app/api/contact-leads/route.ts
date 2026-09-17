@@ -7,25 +7,38 @@ import {
 } from "@/lib/api-server/client-database";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import {
+  resolveUserWorkspaceContext,
+  workspaceWhere,
+} from "@/lib/api-server/workspace";
 
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireAnyStaffUser(req);
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+  const ws = workspaceWhere(wsCtx.workspace.id);
+
   const { page, limit, skip, search, sortBy, order } = parsePagination(
     new URL(req.url)
   );
 
-  const where = search
-    ? {
-        OR: [
-          { fullName: { contains: search, mode: "insensitive" as const } },
-          { phone: { contains: search, mode: "insensitive" as const } },
-          { notes: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where = {
+    ...ws,
+    ...(search
+      ? {
+          OR: [
+            { fullName: { contains: search, mode: "insensitive" as const } },
+            { phone: { contains: search, mode: "insensitive" as const } },
+            { notes: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
   const [data, total] = await Promise.all([
     prisma.contactLead.findMany({
@@ -45,6 +58,11 @@ export async function POST(req: NextRequest) {
   const auth = await requireAnyStaffUser(req);
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) {
+    return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+  }
+
   try {
     const body = (await req.json()) as Record<string, unknown>;
     const fullName = String(body.fullName ?? "").trim();
@@ -55,6 +73,7 @@ export async function POST(req: NextRequest) {
 
     const created = await prisma.contactLead.create({
       data: {
+        workspaceId: wsCtx.workspace.id,
         fullName,
         phone,
         interest: interestToApi(String(body.interest ?? "called")),

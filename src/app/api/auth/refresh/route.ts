@@ -6,6 +6,7 @@ import type { JwtPayload } from "@/lib/api-server/auth";
 import { persistRefreshToken, signTokens } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user?.refreshTokenHash) {
+    if (!user?.refreshTokenHash || !user.isActive) {
       return fail("Sessiya topilmadi", 401);
     }
 
@@ -41,10 +42,13 @@ export async function POST(req: NextRequest) {
       return fail("Refresh token mos kelmadi", 401);
     }
 
+    const ctx = await resolveUserWorkspaceContext(user);
+
     const tokens = await signTokens({
       sub: user.id,
       email: user.email,
       role: user.role,
+      workspaceId: ctx.workspace.id,
     });
     await persistRefreshToken(user.id, tokens.refreshToken);
     return ok(tokens);

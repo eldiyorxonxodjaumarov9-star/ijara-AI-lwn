@@ -28,6 +28,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TashkentClock } from "@/components/layout/tashkent-clock";
 import { SidebarContent } from "@/components/layout/sidebar";
+import { WorkspaceStatusBadge } from "@/components/subscription/workspace-status-badge";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useCollection } from "@/hooks/use-collection";
@@ -38,7 +39,7 @@ import { Suspense, useState } from "react";
 
 export function Header() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, workspace } = useAuth();
   const { t } = useLanguage();
   const { data: notifications } = useCollection<AppNotification>("notifications");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -69,6 +70,10 @@ export function Header() {
           </Suspense>
         </DialogContent>
       </Dialog>
+
+      {workspace && workspace.status === "DEMO" && !workspace.isInternal && (
+        <WorkspaceStatusBadge workspace={workspace} compact className="lg:hidden" />
+      )}
 
       <div className="relative hidden max-w-sm flex-1 md:block">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

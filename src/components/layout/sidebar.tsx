@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { navigation } from "@/config/navigation";
 import { BrandLogo } from "@/components/brand-logo";
+import { WorkspaceStatusBadge } from "@/components/subscription/workspace-status-badge";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useLiveDebtCount } from "@/hooks/use-live-debt-count";
@@ -35,16 +36,42 @@ function isNavActive(
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, workspace } = useAuth();
   const { t } = useLanguage();
   const liveDebtCount = useLiveDebtCount();
 
   return (
     <div className="app-sidebar flex h-full flex-col">
-      <div className="flex h-16 items-center border-b border-white/10 px-6">
+      <div className="border-b border-white/10 px-6 py-4">
         <Link href="/" onClick={onNavigate} title="Asosiy sayt">
           <BrandLogo className="[&_span]:text-slate-50 [&_.text-primary]:text-sky-400 [&_>div]:bg-sky-500 [&_>div]:text-white [&_>div]:shadow-none" />
         </Link>
+        {workspace && (
+          <div className="mt-3 space-y-1.5">
+            <p className="truncate text-xs font-medium text-slate-300">
+              {workspace.workspaceName}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <WorkspaceStatusBadge workspace={workspace} />
+              {workspace.status === "DEMO" && !workspace.isInternal && (
+                <span className="text-[11px] text-amber-200/80">Demo rejim</span>
+              )}
+            </div>
+            {workspace.status === "DEMO" &&
+              workspace.demoEndsAt &&
+              !workspace.isInternal && (
+                <p className="text-[11px] text-slate-500">
+                  Demo muddati:{" "}
+                  {new Intl.DateTimeFormat("uz-UZ", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  }).format(new Date(workspace.demoEndsAt))}{" "}
+                  gacha
+                </p>
+              )}
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">

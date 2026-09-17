@@ -1,5 +1,18 @@
 export type Role = "admin" | "manager" | "employee" | "tenant";
 
+export type WorkspaceSubscriptionView = {
+  status: "DEMO" | "ACTIVE" | "PAST_DUE" | "CANCELED";
+  plan: string | null;
+  demoEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  hasAccess: boolean;
+  accessReason: string;
+  isInternal: boolean;
+  workspaceId: string;
+  workspaceName: string;
+  trialDays: number;
+};
+
 export type Language = "uz" | "ru" | "en" | "kk";
 
 export interface AppUser {

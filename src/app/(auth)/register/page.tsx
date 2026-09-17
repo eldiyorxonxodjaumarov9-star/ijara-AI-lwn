@@ -10,13 +10,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/context/auth-context";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 import { zResolver } from "@/lib/form";
@@ -28,22 +21,19 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zResolver<RegisterInput>(registerSchema),
-    defaultValues: { role: "manager" },
+    defaultValues: { displayName: "", email: "", password: "", confirmPassword: "" },
   });
 
   const onSubmit = async (values: RegisterInput) => {
     try {
       setSubmitting(true);
       await registerUser({
-        displayName: values.displayName,
+        displayName: values.displayName ?? values.fullName ?? "",
         email: values.email,
         password: values.password,
-        role: values.role,
         company: values.company,
       });
       toast.success("Hisob yaratildi!");
@@ -84,32 +74,12 @@ export default function RegisterPage() {
           <Input id="company" placeholder="Kompaniya nomi" {...register("company")} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="email" {...register("email")} />
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <Label>Rol</Label>
-            <Select
-              value={watch("role")}
-              onValueChange={(v) =>
-                setValue("role", v as "admin" | "manager" | "employee")
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Administrator</SelectItem>
-                <SelectItem value="manager">Menejer</SelectItem>
-                <SelectItem value="employee">Xodim</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" placeholder="email" {...register("email")} />
+          {errors.email && (
+            <p className="text-xs text-destructive">{errors.email.message}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">

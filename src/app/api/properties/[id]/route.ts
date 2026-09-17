@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
   const item = await prisma.property.findUnique({
-    where: { id },
+    where: { id, workspaceId: wsCtx.workspace.id },
     include: { contracts: true, maintenances: true },
   });
   if (!isRecordInWorkspace(item, wsCtx.workspace.id)) {

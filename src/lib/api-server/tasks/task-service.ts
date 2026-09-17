@@ -92,9 +92,9 @@ async function writeStatusEvent(opts: {
   });
 }
 
-export async function getTaskById(id: string) {
+export async function getTaskById(id: string, workspaceId?: string) {
   return prisma.workTask.findUnique({
-    where: { id },
+    where: { id, ...(workspaceId ? { workspaceId } : {}) },
     include: taskInclude,
   });
 }

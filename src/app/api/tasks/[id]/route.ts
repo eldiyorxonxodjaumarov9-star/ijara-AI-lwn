@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   }
 
   const { id } = await ctx.params;
-  const raw = await getTaskById(id);
+  const raw = await getTaskById(id, wsCtx.workspace.id);
   if (!isRecordInWorkspace(raw, wsCtx.workspace.id)) {
     return fail("Topilmadi", 404);
   }

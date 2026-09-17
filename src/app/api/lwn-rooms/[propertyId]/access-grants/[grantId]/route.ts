@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (auth.error) return auth.error;
 
   const { propertyId, grantId } = await ctx.params;
-  const found = await findLwnPropertyOrFail(propertyId);
+  const found = await findLwnPropertyOrFail(propertyId, auth.user);
   if ("error" in found && found.error) return found.error;
 
   try {
@@ -51,7 +51,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   if (auth.error) return auth.error;
 
   const { propertyId, grantId } = await ctx.params;
-  const found = await findLwnPropertyOrFail(propertyId);
+  const found = await findLwnPropertyOrFail(propertyId, auth.user);
   if ("error" in found && found.error) return found.error;
 
   const existing = await prisma.roomAccessGrant.findFirst({

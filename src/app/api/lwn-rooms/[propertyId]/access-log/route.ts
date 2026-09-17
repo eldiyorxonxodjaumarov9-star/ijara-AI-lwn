@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   }
 
   const { propertyId } = await ctx.params;
-  const found = await findLwnPropertyOrFail(propertyId);
+  const found = await findLwnPropertyOrFail(propertyId, auth.user);
   if ("error" in found && found.error) return found.error;
 
   const url = new URL(req.url);

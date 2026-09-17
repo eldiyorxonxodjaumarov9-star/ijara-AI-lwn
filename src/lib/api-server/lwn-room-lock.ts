@@ -1,3 +1,5 @@
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
+import type { User } from "@prisma/client";
 import type { Property } from "@prisma/client";
 import type { Role } from "@prisma/client";
 
@@ -19,9 +21,11 @@ export function isLwnPropertyRecord(property: Pick<Property, "building" | "distr
   );
 }
 
-export async function findLwnPropertyOrFail(propertyId: string) {
+export async function findLwnPropertyOrFail(propertyId: string, user: User) {
+  const ctx = await resolveUserWorkspaceContext(user);
+  if (!ctx.hasAccess) return { error: fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED") };
   const property = await prisma.property.findUnique({
-    where: { id: propertyId },
+    where: { id: propertyId, workspaceId: ctx.workspace.id },
   });
   if (!property) {
     return { error: fail("Xona topilmadi", 404) };

@@ -48,7 +48,7 @@ export async function GET(
   let found: { workspaceId?: string | null } | null = null;
   switch (resource) {
     case "tenants": {
-      const row = await prisma.tenant.findUnique({ where: { id } });
+      const row = await prisma.tenant.findUnique({ where: { id, workspaceId: ws.workspaceId } });
       found = row;
       if (row && isRecordInWorkspace(row, ws.workspaceId)) {
         return ok(stripTenantSecret(row));
@@ -57,7 +57,7 @@ export async function GET(
     }
     case "contracts": {
       const row = await prisma.contract.findUnique({
-        where: { id },
+        where: { id, workspaceId: ws.workspaceId },
         include: { property: true, tenant: true },
       });
       found = row;
@@ -66,7 +66,7 @@ export async function GET(
     }
     case "payments": {
       const row = await prisma.payment.findUnique({
-        where: { id },
+        where: { id, workspaceId: ws.workspaceId },
         include: { contract: { include: { property: true, tenant: true } } },
       });
       found = row;
@@ -75,7 +75,7 @@ export async function GET(
     }
     case "expenses": {
       const row = await prisma.expense.findUnique({
-        where: { id },
+        where: { id, workspaceId: ws.workspaceId },
         include: { employee: { include: { company: true } } },
       });
       found = row;
@@ -94,7 +94,7 @@ export async function GET(
     }
     case "maintenance": {
       const row = await prisma.maintenance.findUnique({
-        where: { id },
+        where: { id, workspaceId: ws.workspaceId },
         include: { property: true },
       });
       found = row;
@@ -102,7 +102,7 @@ export async function GET(
       break;
     }
     case "notifications": {
-      const row = await prisma.notification.findUnique({ where: { id } });
+      const row = await prisma.notification.findUnique({ where: { id, workspaceId: ws.workspaceId } });
       found = row;
       if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(row);
       break;

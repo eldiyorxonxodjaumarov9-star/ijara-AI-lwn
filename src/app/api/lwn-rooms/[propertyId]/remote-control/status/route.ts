@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   if (auth.error) return auth.error;
 
   const { propertyId } = await ctx.params;
-  const found = await findLwnPropertyOrFail(propertyId);
+  const found = await findLwnPropertyOrFail(propertyId, auth.user);
   if ("error" in found && found.error) return found.error;
 
   try {

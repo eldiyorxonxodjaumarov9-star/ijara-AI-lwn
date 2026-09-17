@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -27,9 +28,12 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  if (!wsCtx.hasAccess) return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+
   const { id } = await ctx.params;
   const attachment = await prisma.workTaskAttachment.findUnique({
-    where: { id },
+    where: { id, report: { task: { workspaceId: wsCtx.workspace.id } } },
     include: {
       report: {
         include: {

@@ -41,6 +41,21 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("To'g'ri email kiriting"),
 });
 
+export const emailOtpSendSchema = z.object({
+  email: z.string().email("To'g'ri email kiriting"),
+});
+
+export const emailOtpVerifySchema = z.object({
+  email: z.string().email("To'g'ri email kiriting"),
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "6 xonali kod kiriting"),
+});
+
+export type EmailOtpSendInput = z.infer<typeof emailOtpSendSchema>;
+export type EmailOtpVerifyInput = z.infer<typeof emailOtpVerifySchema>;
+
 export const tenantLoginSchema = z.object({
   login: z.string().min(3, "Login kiriting"),
   password: z.string().min(6, "Parol kamida 6 ta belgi"),

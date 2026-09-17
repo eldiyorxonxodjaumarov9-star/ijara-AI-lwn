@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { isEmailSendingConfigured } from "@/lib/api-server/email/config";
 import { fail, ok } from "@/lib/api-server/http";
 import {
   createPasswordResetRawToken,
@@ -10,13 +11,7 @@ import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 const GENERIC_MESSAGE =
   "Agar hisob mavjud bo'lsa, parolni tiklash ko'rsatmasi yuborildi";
 
-export function isEmailSendingConfigured(): boolean {
-  return (
-    process.env.EMAIL_ENABLED === "true" ||
-    Boolean(process.env.RESEND_API_KEY?.trim()) ||
-    Boolean(process.env.SMTP_HOST?.trim())
-  );
-}
+export { isEmailSendingConfigured };
 
 /** Enumeration-safe password reset request. */
 export async function POST(req: NextRequest) {

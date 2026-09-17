@@ -99,6 +99,8 @@ interface AuthContextValue {
   workspaceLoading: boolean;
   demoMode: boolean;
   login: (identifier: string, password: string) => Promise<void>;
+  sendEmailOtp: (email: string) => Promise<{ retryAfterSec: number }>;
+  verifyEmailOtp: (email: string, code: string) => Promise<void>;
   loginTenant: (login: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
@@ -273,6 +275,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setLoading(false);
   }, [apiMode, demoMode]);
+
+  const sendEmailOtp = useCallback(async (email: string) => {
+    if (!apiMode) {
+      throw new Error("Email OTP faqat server rejimida mavjud");
+    }
+    const res = await apiFetch<{ message: string; retryAfterSec?: number }>(
+      "/auth/email/send-code",
+      {
+        method: "POST",
+        auth: false,
+        body: { email },
+      }
+    );
+    return { retryAfterSec: res.retryAfterSec ?? 60 };
+  }, [apiMode]);
+
+  const verifyEmailOtp = useCallback(
+    async (email: string, code: string) => {
+      if (!apiMode) {
+        throw new Error("Email OTP faqat server rejimida mavjud");
+      }
+      const res = await apiFetch<{
+        user: ApiUser;
+        workspace: WorkspaceSubscriptionView;
+        accessToken: string;
+        refreshToken: string;
+      }>("/auth/email/verify-code", {
+        method: "POST",
+        auth: false,
+        body: { email, code },
+      });
+      tokenStore.set(res.accessToken, res.refreshToken);
+      clearDemoStorage();
+      setUser(mapApiUser(res.user));
+      setWorkspace(res.workspace);
+      await refreshWorkspace();
+    },
+    [apiMode, refreshWorkspace]
+  );
 
   const login = useCallback(
     async (identifier: string, password: string) => {
@@ -585,6 +626,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workspaceLoading,
       demoMode,
       login,
+      sendEmailOtp,
+      verifyEmailOtp,
       loginTenant,
       register,
       logout,
@@ -599,6 +642,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workspaceLoading,
       demoMode,
       login,
+      sendEmailOtp,
+      verifyEmailOtp,
       loginTenant,
       register,
       logout,

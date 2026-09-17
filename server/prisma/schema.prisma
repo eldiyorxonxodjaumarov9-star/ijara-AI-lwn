@@ -196,6 +196,22 @@ model User {
   @@map("users")
 }
 
+/** Email OTP for passwordless login/signup — code stored hashed only. */
+model EmailOtpVerification {
+  id          String    @id @default(uuid())
+  email       String
+  codeHash    String
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email, consumedAt])
+  @@index([expiresAt])
+  @@map("email_otp_verifications")
+}
+
 /** SaaS workspace (company/organization). Existing production data → one internal workspace. */
 model Workspace {
   id         String   @id @default(uuid())

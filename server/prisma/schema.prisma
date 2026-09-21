@@ -142,6 +142,31 @@ enum TtlockAccessSyncStatus {
   REVOKE_PENDING
   REVOKED
   FAILED
+  READY_FOR_BLUETOOTH
+  BLUETOOTH_SYNCING
+  INSTALLED_ON_LOCK
+  BLUETOOTH_SYNC_FAILED
+}
+
+enum TtlockTransport {
+  REMOTE_GATEWAY
+  REMOTE_WIFI
+  LOCAL_BLUETOOTH
+}
+
+enum TtlockBluetoothSessionStatus {
+  CREATED
+  SYNCING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum TtlockBluetoothEntryStatus {
+  READY_FOR_BLUETOOTH
+  BLUETOOTH_SYNCING
+  INSTALLED_ON_LOCK
+  BLUETOOTH_SYNC_FAILED
 }
 
 enum TtlockRemoteCommandType {
@@ -1282,6 +1307,7 @@ model TtlockAccessCredential {
   ttlockCachedLockId  String
   accessType          TtlockAccessCredentialType
   syncStatus          TtlockAccessSyncStatus     @default(PLANNED)
+  transport           TtlockTransport            @default(REMOTE_GATEWAY)
   /**
    * Sciener qaytargan tashqi access ID
    */
@@ -1298,14 +1324,56 @@ model TtlockAccessCredential {
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
 
-  grant      RoomAccessGrant  @relation(fields: [roomAccessGrantId], references: [id], onDelete: Cascade)
-  connection TtlockConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  lock       TtlockCachedLock @relation(fields: [ttlockCachedLockId], references: [id], onDelete: Restrict)
+  grant             RoomAccessGrant            @relation(fields: [roomAccessGrantId], references: [id], onDelete: Cascade)
+  connection        TtlockConnection           @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  lock              TtlockCachedLock           @relation(fields: [ttlockCachedLockId], references: [id], onDelete: Restrict)
+  bluetoothEntries  TtlockBluetoothSyncEntry[]
 
   @@index([connectionId])
   @@index([ttlockCachedLockId])
   @@index([syncStatus])
   @@map("ttlock_access_credentials")
+}
+
+model TtlockBluetoothSyncSession {
+  id                 String                       @id @default(uuid())
+  ownerUserId        String
+  propertyId         String
+  ttlockCachedLockId String
+  tokenHash          String                       @unique
+  status             TtlockBluetoothSessionStatus @default(CREATED)
+  expiresAt          DateTime
+  usedAt             DateTime?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  entries TtlockBluetoothSyncEntry[]
+
+  @@index([ownerUserId, propertyId])
+  @@index([expiresAt])
+  @@map("ttlock_bluetooth_sync_sessions")
+}
+
+model TtlockBluetoothSyncEntry {
+  id                    String                     @id @default(uuid())
+  sessionId             String
+  credentialId          String
+  status                TtlockBluetoothEntryStatus @default(READY_FOR_BLUETOOTH)
+  validFrom             DateTime
+  validTo               DateTime
+  credentialDeliveredAt DateTime?
+  installedAt           DateTime?
+  lastErrorCode         String?
+  lastErrorMessage      String?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  session    TtlockBluetoothSyncSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  credential TtlockAccessCredential     @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, credentialId])
+  @@index([credentialId])
+  @@map("ttlock_bluetooth_sync_entries")
 }
 
 /**

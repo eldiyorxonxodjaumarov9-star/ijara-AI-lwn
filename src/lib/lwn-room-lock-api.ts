@@ -164,3 +164,33 @@ export async function syncRoomAccessHistory(propertyId: string) {
     body: {},
   });
 }
+
+/** Client javobi — PIN/credential plaintext yo‘q (faqat reference + oynalar). */
+export type BluetoothSyncSessionPublic = {
+  sessionId: string;
+  roomId: string;
+  lockId: string;
+  lockMac: string | null;
+  lockModel: string | null;
+  keyboardPwdVersion: number | null;
+  sessionToken: string;
+  expiresAt: string;
+  entries: Array<{
+    entryId: string;
+    credentialReference: string;
+    startDate: string;
+    endDate: string;
+    status: "READY_FOR_BLUETOOTH";
+  }>;
+};
+
+/** Bridge/SDK uchun Bluetooth sync session (server: createBluetoothSyncSession). */
+export async function createBluetoothSyncSession(propertyId: string) {
+  return apiFetch<BluetoothSyncSessionPublic>(
+    `/ttlock/bluetooth-sync/session`,
+    {
+      method: "POST",
+      body: { propertyId },
+    }
+  );
+}

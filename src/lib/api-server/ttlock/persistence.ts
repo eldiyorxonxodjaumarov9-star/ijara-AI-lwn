@@ -16,7 +16,16 @@ export type TtlockAccessSyncStatus =
   | "EXPIRED"
   | "REVOKE_PENDING"
   | "REVOKED"
-  | "FAILED";
+  | "FAILED"
+  | "READY_FOR_BLUETOOTH"
+  | "BLUETOOTH_SYNCING"
+  | "INSTALLED_ON_LOCK"
+  | "BLUETOOTH_SYNC_FAILED";
+
+export type TtlockTransport =
+  | "REMOTE_GATEWAY"
+  | "REMOTE_WIFI"
+  | "LOCAL_BLUETOOTH";
 
 /** Tashqi Sciener ID — har doim String */
 export function toExternalIdString(value: string | number | null | undefined): string {

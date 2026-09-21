@@ -1,10 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { Reveal } from "@/components/landing/landing-reveal";
 import { LandingContainer, LandingSection } from "@/components/landing/landing-shell";
+import { useLandingT } from "@/hooks/use-landing-t";
 
 export function LandingCta() {
+  const t = useLandingT();
+
   return (
     <LandingSection tone="light" className="pb-16 sm:pb-20">
       <LandingContainer>
@@ -14,25 +19,24 @@ export function LandingCta() {
             <div className="pointer-events-none absolute -top-16 right-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
             <div className="relative mx-auto max-w-3xl text-center">
               <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem]">
-                Ijara boshqaruvini keyingi bosqichga olib chiqing.
+                {t("cta.title")}
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-slate-300 sm:text-lg">
-                To‘lovlar, mulklar, xodimlar, kirish nazorati va AI tahlil — bitta
-                platformada.
+                {t("cta.lead")}
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
                   href="/login"
                   className="inline-flex h-12 min-w-[11.5rem] items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-[#071429] transition-colors hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                 >
-                  Platformani ochish
+                  {t("cta.primary")}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
                 <Link
                   href="/login"
                   className="inline-flex h-12 min-w-[11.5rem] items-center justify-center rounded-xl border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
                 >
-                  Kirish
+                  {t("cta.secondary")}
                 </Link>
               </div>
             </div>

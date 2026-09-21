@@ -1,3 +1,5 @@
+"use client";
+
 import {
   AlertTriangle,
   Bot,
@@ -9,6 +11,8 @@ import {
   Wifi,
 } from "lucide-react";
 
+import { useLandingT } from "@/hooks/use-landing-t";
+import { formatLandingMessage } from "@/lib/i18n/landing";
 import { cn } from "@/lib/utils";
 
 function WindowChrome({
@@ -88,47 +92,89 @@ function Stat({
 }
 
 export function HeroProductVisual() {
+  const t = useLandingT();
+
+  const paymentRows = [
+    {
+      nameKey: "mockups.hero.payment.paid" as const,
+      w: "72%",
+      color: "bg-blue-500",
+    },
+    {
+      nameKey: "mockups.hero.payment.pending" as const,
+      w: "18%",
+      color: "bg-amber-400",
+    },
+    {
+      nameKey: "mockups.hero.payment.overdue" as const,
+      w: "10%",
+      color: "bg-rose-400",
+    },
+  ];
+
   return (
     <div className="relative mx-auto w-full max-w-[520px] lg:max-w-none">
       <div className="landing-glow pointer-events-none absolute -inset-6 rounded-[2.5rem] bg-[radial-gradient(circle_at_30%_20%,rgba(37,99,235,0.28),transparent_55%)] blur-2xl" />
 
-      <WindowChrome title="Ijara AI · Boshqaruv paneli" className="relative z-10">
+      <WindowChrome title={t("mockups.hero.windowTitle")} className="relative z-10">
         <div className="p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-slate-400">Live Work Network · Avgust 2026</p>
-              <p className="text-sm font-medium text-white">Operatsion holat</p>
+              <p className="text-xs text-slate-400">{t("mockups.hero.network")}</p>
+              <p className="text-sm font-medium text-white">
+                {t("mockups.hero.statusTitle")}
+              </p>
             </div>
             <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] text-emerald-300">
-              42 / 48 band
+              {t("mockups.hero.occupancy")}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <Stat label="Oylik daromad" value="186.4 mln" hint="+6.1%" tone="good" />
-            <Stat label="Xarajat" value="41.2 mln" hint="+12.8%" tone="warn" />
-            <Stat label="Qarzdorlar" value="7 ta" hint="19.8 mln" tone="bad" />
-            <Stat label="Vazifalar" value="12" hint="4 kutilmoqda" />
+            <Stat
+              label={t("mockups.hero.stat.revenue.label")}
+              value={t("mockups.hero.stat.revenue.value")}
+              hint={t("mockups.hero.stat.revenue.hint")}
+              tone="good"
+            />
+            <Stat
+              label={t("mockups.hero.stat.expense.label")}
+              value={t("mockups.hero.stat.expense.value")}
+              hint={t("mockups.hero.stat.expense.hint")}
+              tone="warn"
+            />
+            <Stat
+              label={t("mockups.hero.stat.debtors.label")}
+              value={t("mockups.hero.stat.debtors.value")}
+              hint={t("mockups.hero.stat.debtors.hint")}
+              tone="bad"
+            />
+            <Stat
+              label={t("mockups.hero.stat.tasks.label")}
+              value={t("mockups.hero.stat.tasks.value")}
+              hint={t("mockups.hero.stat.tasks.hint")}
+            />
           </div>
 
           <div className="mt-3 grid gap-2.5 sm:grid-cols-[1.3fr_1fr]">
             <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-[11px] text-slate-400 uppercase">To‘lov statuslari</p>
+                <p className="text-[11px] text-slate-400 uppercase">
+                  {t("mockups.hero.paymentsTitle")}
+                </p>
                 <TrendingUp className="size-3.5 text-blue-400" aria-hidden />
               </div>
               <div className="space-y-2">
-                {[
-                  { name: "To‘langan", w: "72%", color: "bg-blue-500" },
-                  { name: "Kutilmoqda", w: "18%", color: "bg-amber-400" },
-                  { name: "Kechikkan", w: "10%", color: "bg-rose-400" },
-                ].map((row) => (
-                  <div key={row.name}>
+                {paymentRows.map((row) => (
+                  <div key={row.nameKey}>
                     <div className="mb-1 flex justify-between text-[11px] text-slate-400">
-                      <span>{row.name}</span>
+                      <span>{t(row.nameKey)}</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div className={cn("h-full rounded-full", row.color)} style={{ width: row.w }} />
+                      <div
+                        className={cn("h-full rounded-full", row.color)}
+                        style={{ width: row.w }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -137,10 +183,10 @@ export function HeroProductVisual() {
             <div className="rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
               <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-blue-200">
                 <Bot className="size-3.5" aria-hidden />
-                AI insight
+                {t("mockups.hero.aiInsightLabel")}
               </div>
               <p className="text-sm leading-snug text-white">
-                Avgust oyida elektr xarajati iyulga nisbatan 18% oshgan.
+                {t("mockups.hero.aiInsightText")}
               </p>
             </div>
           </div>
@@ -150,21 +196,25 @@ export function HeroProductVisual() {
       <div className="landing-float absolute -left-2 top-[62%] z-20 hidden w-[190px] rounded-2xl border border-white/10 bg-[#0d1c33]/95 p-3 shadow-xl shadow-black/30 backdrop-blur-md xl:block">
         <div className="mb-2 flex items-center gap-2 text-[11px] text-slate-400">
           <Lock className="size-3.5 text-blue-300" aria-hidden />
-          Smart Lock
+          {t("mockups.hero.lockLabel")}
         </div>
-        <p className="text-sm font-medium text-white">305-xona · Demo PIN (namuna)</p>
-        <p className="mt-1 text-xs text-slate-400">Muddat: 15.09 — 15.10</p>
+        <p className="text-sm font-medium text-white">{t("mockups.hero.lockRoom")}</p>
+        <p className="mt-1 text-xs text-slate-400">{t("mockups.hero.lockPeriod")}</p>
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-300">
           <Wifi className="size-3" aria-hidden />
-          Gateway ulangan
+          {t("mockups.hero.lockGateway")}
         </div>
       </div>
 
       <div className="landing-float-slow absolute right-0 -bottom-5 z-20 hidden w-[210px] rounded-2xl border border-white/10 bg-[#0d1c33]/95 p-3 shadow-xl shadow-black/30 backdrop-blur-md md:block lg:right-1 xl:-right-1">
-        <p className="text-[11px] tracking-wide text-slate-400 uppercase">305-xona · AI tekshiruv</p>
-        <p className="mt-1 text-sm font-medium text-white">Holat: tekshirish kerak</p>
+        <p className="text-[11px] tracking-wide text-slate-400 uppercase">
+          {t("mockups.hero.inspectionLabel")}
+        </p>
+        <p className="mt-1 text-sm font-medium text-white">
+          {t("mockups.hero.inspectionStatus")}
+        </p>
         <p className="mt-1 text-xs leading-relaxed text-slate-400">
-          2 ta o‘zgarish aniqlandi · stol yuzasida tirnalish
+          {t("mockups.hero.inspectionDetail")}
         </p>
       </div>
     </div>
@@ -172,24 +222,55 @@ export function HeroProductVisual() {
 }
 
 export function PropertyPreview() {
+  const t = useLandingT();
+
+  const rows = [
+    {
+      roomKey: "mockups.property.row.1.room" as const,
+      status: "occupied" as const,
+      tenantKey: "mockups.property.row.1.tenant" as const,
+      untilKey: "mockups.property.row.1.until" as const,
+    },
+    {
+      roomKey: "mockups.property.row.2.room" as const,
+      status: "vacant" as const,
+      tenantKey: "mockups.property.row.2.tenant" as const,
+      untilKey: "mockups.property.row.2.until" as const,
+    },
+    {
+      roomKey: "mockups.property.row.3.room" as const,
+      status: "occupied" as const,
+      tenantKey: "mockups.property.row.3.tenant" as const,
+      untilKey: "mockups.property.row.3.until" as const,
+    },
+  ];
+
   return (
-    <WindowChrome title="Mulklar · LWN">
+    <WindowChrome title={t("mockups.property.windowTitle")}>
       <div className="space-y-3 p-4">
-        {[
-          ["305", "Band", "Karimov a.", "30.11.2026"],
-          ["307", "Bo‘sh", "—", "—"],
-          ["412", "Band", "Saidova N.", "01.03.2027"],
-        ].map(([room, status, tenant, until]) => (
+        {rows.map((row) => (
           <div
-            key={room}
+            key={row.roomKey}
             className="grid grid-cols-4 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5 text-xs"
           >
-            <span className="font-semibold text-white">{room}-xona</span>
-            <span className={status === "Band" ? "text-blue-300" : "text-emerald-300"}>
-              {status}
+            <span className="font-semibold text-white">
+              {formatLandingMessage(t("mockups.property.roomSuffix"), {
+                n: t(row.roomKey),
+              })}
             </span>
-            <span className="truncate text-slate-400">{tenant}</span>
-            <span className="text-right text-slate-500">{until}</span>
+            <span
+              className={
+                row.status === "occupied" ? "text-blue-300" : "text-emerald-300"
+              }
+            >
+              {t(
+                row.status === "occupied"
+                  ? "mockups.property.status.occupied"
+                  : "mockups.property.status.vacant"
+              )}
+            </span>
+            <span className="truncate text-slate-400">{t(row.tenantKey)}</span>
+            <span className="text-right text-slate-500">{t(row.untilKey)}</span>
           </div>
         ))}
       </div>
@@ -198,27 +279,41 @@ export function PropertyPreview() {
 }
 
 export function FinancePreview() {
+  const t = useLandingT();
+
   return (
-    <WindowChrome title="Moliya · oylararo">
+    <WindowChrome title={t("mockups.finance.windowTitle")}>
       <div className="p-4">
         <div className="grid grid-cols-2 gap-2">
-          <Stat label="Kirim" value="186.4 mln" hint="Avgust" tone="good" />
-          <Stat label="Chiqim" value="41.2 mln" hint="Iyul: 36.5" tone="warn" />
+          <Stat
+            label={t("mockups.finance.income.label")}
+            value={t("mockups.finance.income.value")}
+            hint={t("mockups.finance.income.hint")}
+            tone="good"
+          />
+          <Stat
+            label={t("mockups.finance.expense.label")}
+            value={t("mockups.finance.expense.value")}
+            hint={t("mockups.finance.expense.hint")}
+            tone="warn"
+          />
         </div>
         <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] p-3">
-          <p className="text-[11px] text-slate-400">Takroriy xarajatlar</p>
+          <p className="text-[11px] text-slate-400">
+            {t("mockups.finance.recurringTitle")}
+          </p>
           <ul className="mt-2 space-y-1.5 text-xs text-slate-300">
             <li className="flex justify-between">
-              <span>Elektr</span>
-              <span>8.4 mln</span>
+              <span>{t("mockups.finance.item.electric")}</span>
+              <span>{t("mockups.finance.item.electricValue")}</span>
             </li>
             <li className="flex justify-between">
-              <span>Suv</span>
-              <span>2.1 mln</span>
+              <span>{t("mockups.finance.item.water")}</span>
+              <span>{t("mockups.finance.item.waterValue")}</span>
             </li>
             <li className="flex justify-between">
-              <span>Maosh</span>
-              <span>18.0 mln</span>
+              <span>{t("mockups.finance.item.salary")}</span>
+              <span>{t("mockups.finance.item.salaryValue")}</span>
             </li>
           </ul>
         </div>
@@ -228,31 +323,47 @@ export function FinancePreview() {
 }
 
 export function TeamPreview() {
+  const t = useLandingT();
+
+  const tasks = [
+    {
+      taskKey: "mockups.team.task.1" as const,
+      statusKey: "mockups.team.status.done" as const,
+      tone: "good" as const,
+    },
+    {
+      taskKey: "mockups.team.task.2" as const,
+      statusKey: "mockups.team.status.inProgress" as const,
+      tone: "warn" as const,
+    },
+    {
+      taskKey: "mockups.team.task.3" as const,
+      statusKey: "mockups.team.status.waiting" as const,
+      tone: "neutral" as const,
+    },
+  ];
+
   return (
-    <WindowChrome title="Vazifalar · jamoa">
+    <WindowChrome title={t("mockups.team.windowTitle")}>
       <div className="space-y-2.5 p-4">
-        {[
-          ["305-xonani tekshiring", "Bajarildi", "good"],
-          ["412 PIN yangilash", "Jarayonda", "warn"],
-          ["Qarzdorlarga eslatma", "Kutilmoqda", "neutral"],
-        ].map(([task, status, tone]) => (
+        {tasks.map((item) => (
           <div
-            key={task}
+            key={item.taskKey}
             className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5"
           >
             <div className="flex items-center gap-2">
               <ClipboardList className="size-3.5 text-blue-300" />
-              <span className="text-xs text-white">{task}</span>
+              <span className="text-xs text-white">{t(item.taskKey)}</span>
             </div>
             <span
               className={cn(
                 "shrink-0 text-[11px]",
-                tone === "good" && "text-emerald-300",
-                tone === "warn" && "text-amber-300",
-                tone === "neutral" && "text-slate-400"
+                item.tone === "good" && "text-emerald-300",
+                item.tone === "warn" && "text-amber-300",
+                item.tone === "neutral" && "text-slate-400"
               )}
             >
-              {status}
+              {t(item.statusKey)}
             </span>
           </div>
         ))}
@@ -262,26 +373,38 @@ export function TeamPreview() {
 }
 
 export function AccessPreview() {
+  const t = useLandingT();
+
   return (
-    <WindowChrome title="TTLock · kirish">
+    <WindowChrome title={t("mockups.access.windowTitle")}>
       <div className="p-4">
         <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white">305 · Demo PIN (namuna)</p>
+            <p className="text-sm font-medium text-white">
+              {t("mockups.access.pinTitle")}
+            </p>
             <KeyRound className="size-4 text-blue-300" />
           </div>
-          <p className="mt-2 font-mono text-2xl tracking-[0.3em] text-white">4821</p>
-          <p className="mt-1 text-[11px] text-slate-500">Marketing ko‘rinishi — haqiqiy PIN emas</p>
-          <p className="mt-2 text-xs text-slate-400">15.09.2026 09:00 — 15.10.2026 18:00</p>
+          <p className="mt-2 font-mono text-2xl tracking-[0.3em] text-white">
+            {t("mockups.access.pinValue")}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            {t("mockups.access.pinDisclaimer")}
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            {t("mockups.access.pinWindow")}
+          </p>
         </div>
         <div className="mt-3 space-y-2 text-xs text-slate-400">
           <div className="flex justify-between rounded-lg bg-white/[0.03] px-3 py-2">
-            <span>Huquq</span>
-            <span className="text-amber-300">API&apos;ga yuborilgan</span>
+            <span>{t("mockups.access.rightsLabel")}</span>
+            <span className="text-amber-300">{t("mockups.access.rightsValue")}</span>
           </div>
           <div className="flex justify-between rounded-lg bg-white/[0.03] px-3 py-2">
-            <span>Oxirgi kirish</span>
-            <span className="text-slate-300">bugun 08:14</span>
+            <span>{t("mockups.access.lastEntryLabel")}</span>
+            <span className="text-slate-300">
+              {t("mockups.access.lastEntryValue")}
+            </span>
           </div>
         </div>
       </div>
@@ -290,40 +413,52 @@ export function AccessPreview() {
 }
 
 export function AnalyticsPreview() {
+  const t = useLandingT();
+
   return (
-    <WindowChrome title="AI tahlil · Avgust / Iyul">
+    <WindowChrome title={t("mockups.analytics.windowTitle")}>
       <div className="p-4 sm:p-5">
-        <p className="text-sm text-slate-300">Avgust xarajatlari iyulga nisbatan</p>
-        <p className="mt-1 text-4xl font-semibold tracking-tight text-white">+12.8%</p>
+        <p className="text-sm text-slate-300">{t("mockups.analytics.summary")}</p>
+        <p className="mt-1 text-4xl font-semibold tracking-tight text-white">
+          {t("mockups.analytics.delta")}
+        </p>
         <div className="mt-5 rounded-xl border border-white/8 bg-white/[0.03] p-3">
           <p className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-            Elektr
+            {t("mockups.analytics.electricLabel")}
           </p>
           <dl className="mt-2 space-y-1.5 text-sm text-slate-200">
             <div className="flex justify-between gap-3">
-              <dt className="text-slate-400">Iyul</dt>
-              <dd>1 250 000 so‘m</dd>
+              <dt className="text-slate-400">{t("mockups.analytics.julyLabel")}</dt>
+              <dd>{t("mockups.analytics.julyValue")}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-slate-400">Avgust</dt>
-              <dd>1 550 000 so‘m</dd>
+              <dt className="text-slate-400">{t("mockups.analytics.augustLabel")}</dt>
+              <dd>{t("mockups.analytics.augustValue")}</dd>
             </div>
             <div className="flex justify-between gap-3 border-t border-white/10 pt-1.5 font-medium text-rose-300">
-              <dt>Farq</dt>
-              <dd>+300 000 so‘m (+24%)</dd>
+              <dt>{t("mockups.analytics.diffLabel")}</dt>
+              <dd>{t("mockups.analytics.diffValue")}</dd>
             </div>
           </dl>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border border-rose-400/20 bg-rose-400/10 p-3">
-            <p className="text-[11px] text-rose-200">Eng katta o‘sish</p>
-            <p className="mt-1 text-sm text-white">Elektr +24%</p>
-            <p className="text-sm text-white/80">Ofis jihozlari +11%</p>
+            <p className="text-[11px] text-rose-200">
+              {t("mockups.analytics.growthLabel")}
+            </p>
+            <p className="mt-1 text-sm text-white">
+              {t("mockups.analytics.growth.electric")}
+            </p>
+            <p className="text-sm text-white/80">
+              {t("mockups.analytics.growth.office")}
+            </p>
           </div>
           <div className="rounded-xl border border-blue-400/20 bg-blue-500/10 p-3">
-            <p className="text-[11px] text-blue-200">Tavsiya</p>
+            <p className="text-[11px] text-blue-200">
+              {t("mockups.analytics.recoLabel")}
+            </p>
             <p className="mt-1 text-sm leading-snug text-white">
-              Elektr sarfini 305 va 307-xonalarda tekshiring.
+              {t("mockups.analytics.recoText")}
             </p>
           </div>
         </div>
@@ -333,15 +468,50 @@ export function AnalyticsPreview() {
 }
 
 export function InspectionPreview() {
+  const t = useLandingT();
+
+  const shots = [
+    {
+      id: "checkIn",
+      labelKey: "mockups.inspection.shot.checkIn" as const,
+      tone: "from-slate-300 to-slate-500",
+      showScan: false,
+    },
+    {
+      id: "checkOut",
+      labelKey: "mockups.inspection.shot.checkOut" as const,
+      tone: "from-slate-400 to-blue-900",
+      showScan: true,
+    },
+  ];
+
+  const findings = [
+    {
+      itemKey: "mockups.inspection.item.wall" as const,
+      resultKey: "mockups.inspection.result.wall" as const,
+      Icon: CheckCircle2,
+      color: "text-emerald-600",
+    },
+    {
+      itemKey: "mockups.inspection.item.furniture" as const,
+      resultKey: "mockups.inspection.result.furniture" as const,
+      Icon: CheckCircle2,
+      color: "text-emerald-600",
+    },
+    {
+      itemKey: "mockups.inspection.item.table" as const,
+      resultKey: "mockups.inspection.result.table" as const,
+      Icon: AlertTriangle,
+      color: "text-amber-600",
+    },
+  ];
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="grid grid-cols-2 gap-3">
-        {[
-          { label: "Kirishda", tone: "from-slate-300 to-slate-500" },
-          { label: "Chiqishda", tone: "from-slate-400 to-blue-900" },
-        ].map((shot) => (
+        {shots.map((shot) => (
           <div
-            key={shot.label}
+            key={shot.id}
             className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
           >
             <div className={cn("aspect-[4/5] bg-gradient-to-br", shot.tone)}>
@@ -349,53 +519,32 @@ export function InspectionPreview() {
               <div className="absolute inset-x-8 top-16 h-24 rounded bg-white/15" />
               <div className="absolute right-8 bottom-10 h-16 w-20 rounded bg-white/20" />
             </div>
-            {shot.label === "Chiqishda" ? (
+            {shot.showScan ? (
               <div className="landing-scan pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-blue-400/0 via-blue-300/50 to-blue-400/0" />
             ) : null}
             <p className="absolute top-3 left-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium text-white">
-              {shot.label}
+              {t(shot.labelKey)}
             </p>
           </div>
         ))}
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold tracking-wide text-blue-700 uppercase">
-          305-xona · AI natija
+          {t("mockups.inspection.resultTitle")}
         </p>
         <ul className="mt-4 space-y-3">
-          {(
-            [
-              {
-                item: "Devor",
-                result: "O‘zgarish yo‘q",
-                Icon: CheckCircle2,
-                color: "text-emerald-600",
-              },
-              {
-                item: "Mebel",
-                result: "Normal",
-                Icon: CheckCircle2,
-                color: "text-emerald-600",
-              },
-              {
-                item: "Stol",
-                result: "Tirnalish aniqlandi",
-                Icon: AlertTriangle,
-                color: "text-amber-600",
-              },
-            ] as const
-          ).map(({ item, result, Icon, color }) => (
-            <li key={item} className="flex items-start justify-between gap-3 text-sm">
-              <span className="text-slate-600">{item}</span>
+          {findings.map(({ itemKey, resultKey, Icon, color }) => (
+            <li key={itemKey} className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-slate-600">{t(itemKey)}</span>
               <span className={cn("inline-flex items-center gap-1.5 font-medium", color)}>
                 <Icon className="size-3.5" aria-hidden />
-                {result}
+                {t(resultKey)}
               </span>
             </li>
           ))}
         </ul>
         <div className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Umumiy holat: qo‘shimcha tekshiruv tavsiya etiladi
+          {t("mockups.inspection.overall")}
         </div>
       </div>
     </div>
@@ -403,29 +552,33 @@ export function InspectionPreview() {
 }
 
 export function TelegramPreview() {
+  const t = useLandingT();
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <WindowChrome title="Dashboard · vazifa" dark={false}>
+      <WindowChrome title={t("mockups.telegram.dashWindowTitle")} dark={false}>
         <div className="space-y-3 p-4 text-sm">
-          <p className="font-medium text-slate-900">Menejer</p>
+          <p className="font-medium text-slate-900">{t("mockups.telegram.manager")}</p>
           <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-slate-700">
-            305-xonani tekshiring
+            {t("mockups.telegram.taskText")}
           </div>
-          <p className="text-xs text-slate-500">Status: yuborildi · Telegramga yetkazildi</p>
+          <p className="text-xs text-slate-500">{t("mockups.telegram.dashStatus")}</p>
         </div>
       </WindowChrome>
-      <WindowChrome title="Telegram · xodim">
+      <WindowChrome title={t("mockups.telegram.tgWindowTitle")}>
         <div className="space-y-3 p-4 text-sm">
           <div className="max-w-[90%] rounded-2xl rounded-tl-md bg-white/10 px-3 py-2 text-slate-100">
-            305-xonani tekshiring
+            {t("mockups.telegram.taskText")}
           </div>
           <div className="ml-auto max-w-[90%] rounded-2xl rounded-tr-md bg-blue-600 px-3 py-2 text-white">
-            Bajarildi
+            {t("mockups.telegram.reply")}
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs text-slate-300">
-            <p className="font-medium text-slate-100">Hisobot</p>
-            <p className="mt-1.5">Izoh: Koridor toza, lampa almashtirildi.</p>
-            <p className="mt-1">Rasm · 14:22 · Status: bajarildi</p>
+            <p className="font-medium text-slate-100">
+              {t("mockups.telegram.reportTitle")}
+            </p>
+            <p className="mt-1.5">{t("mockups.telegram.reportNote")}</p>
+            <p className="mt-1">{t("mockups.telegram.reportMeta")}</p>
           </div>
         </div>
       </WindowChrome>

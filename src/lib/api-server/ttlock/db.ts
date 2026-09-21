@@ -18,6 +18,7 @@ import {
   type TtlockAccessCredentialType,
   type TtlockAccessSyncStatus,
   type TtlockDeviceOnlineStatus,
+  type TtlockTransport,
 } from "@/lib/api-server/ttlock/persistence";
 import type { TtlockConnectionStatus as PublicStatus } from "@/lib/api-server/ttlock/types";
 
@@ -108,6 +109,7 @@ export type TtlockAccessCredentialRow = {
   ttlockCachedLockId: string;
   accessType: TtlockAccessCredentialType;
   syncStatus: TtlockAccessSyncStatus;
+  transport?: TtlockTransport;
   externalAccessId: string | null;
   credentialEncrypted: string | null;
   sentAt: Date | null;

@@ -1,3 +1,5 @@
+"use client";
+
 import { TelegramPreview } from "@/components/landing/landing-mockups";
 import { Reveal } from "@/components/landing/landing-reveal";
 import {
@@ -7,21 +9,30 @@ import {
   LandingSection,
   LandingTitle,
 } from "@/components/landing/landing-shell";
+import { useLandingT } from "@/hooks/use-landing-t";
+import type { LandingMessageKey } from "@/lib/i18n/landing";
+
+const CARD_KEYS = [
+  { labelKey: "telegram.card.1.label", valueKey: "telegram.card.1.value" },
+  { labelKey: "telegram.card.2.label", valueKey: "telegram.card.2.value" },
+  { labelKey: "telegram.card.3.label", valueKey: "telegram.card.3.value" },
+  { labelKey: "telegram.card.4.label", valueKey: "telegram.card.4.value" },
+] as const satisfies ReadonlyArray<{
+  labelKey: LandingMessageKey;
+  valueKey: LandingMessageKey;
+}>;
 
 export function LandingTelegram() {
+  const t = useLandingT();
+
   return (
     <LandingSection id="vazifalar" tone="muted">
       <LandingContainer>
         <Reveal>
           <div className="max-w-3xl">
-            <LandingEyebrow>Telegram + Tasks</LandingEyebrow>
-            <LandingTitle className="mt-3">
-              Jamoani sayt va Telegram’dan boshqaring.
-            </LandingTitle>
-            <LandingLead>
-              Menejer vazifa beradi, xodim Telegramda qabul qiladi, hisobot esa
-              platformaga qaytadi. Status, izoh, rasm va vaqt — bitta ish jarayoni.
-            </LandingLead>
+            <LandingEyebrow>{t("telegram.eyebrow")}</LandingEyebrow>
+            <LandingTitle className="mt-3">{t("telegram.title")}</LandingTitle>
+            <LandingLead>{t("telegram.lead")}</LandingLead>
           </div>
         </Reveal>
 
@@ -32,20 +43,17 @@ export function LandingTelegram() {
         </Reveal>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          {[
-          ["Topshiriq", "305-xonani tekshiring"],
-          ["Javob", "Bajarildi"],
-          ["Hisobot", "Rasm · izoh · vaqt"],
-          ["Status", "Sayt va Telegramda bir xil"],
-        ].map(([label, value]) => (
+          {CARD_KEYS.map((card) => (
             <div
-              key={label}
+              key={card.labelKey}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-4"
             >
               <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                {label}
+                {t(card.labelKey)}
               </p>
-              <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
+              <p className="mt-2 text-sm font-medium text-slate-900">
+                {t(card.valueKey)}
+              </p>
             </div>
           ))}
         </div>

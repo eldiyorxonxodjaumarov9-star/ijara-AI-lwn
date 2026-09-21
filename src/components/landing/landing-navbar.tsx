@@ -5,15 +5,41 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
 import { BrandMark } from "@/components/brand-mark";
-import { LANDING_BRAND, LANDING_NAV, PORTAL_NAV } from "@/lib/landing-content";
+import { LandingLanguageSwitcher } from "@/components/landing/landing-language-switcher";
+import { useLandingT } from "@/hooks/use-landing-t";
+import { LANDING_BRAND } from "@/lib/landing-content";
 import { cn } from "@/lib/utils";
 
+const LANDING_NAV_KEYS = [
+  { href: "#platforma", labelKey: "navbar.nav.platform" as const },
+  { href: "#imkoniyatlar", labelKey: "navbar.nav.features" as const },
+  { href: "#ai", labelKey: "navbar.nav.ai" as const },
+  { href: "#kimlar-uchun", labelKey: "navbar.nav.audience" as const },
+  { href: "#biz-haqimizda", labelKey: "navbar.nav.about" as const },
+];
+
+const PORTAL_NAV_KEYS = [
+  { href: "/", path: "/", labelKey: "portal.nav.home" as const },
+  {
+    href: "/ijara-qidiruv",
+    path: "/ijara-qidiruv",
+    labelKey: "portal.nav.search" as const,
+  },
+  {
+    href: "/ijara-egalari",
+    path: "/ijara-egalari",
+    labelKey: "portal.nav.landlords" as const,
+  },
+];
+
 export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
+  const t = useLandingT();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const menuId = useId();
   const isPortal = Boolean(activePath);
   const onDarkHero = !isPortal && !scrolled;
+  const switcherTone = isPortal || onDarkHero ? "dark" : "light";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -73,8 +99,11 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
         </Link>
 
         {isPortal ? (
-          <nav className="hidden items-center gap-6 lg:flex" aria-label="Asosiy navigatsiya">
-            {PORTAL_NAV.map((link) => (
+          <nav
+            className="hidden items-center gap-6 lg:flex"
+            aria-label={t("navbar.aria.main")}
+          >
+            {PORTAL_NAV_KEYS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -83,25 +112,29 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                   activePath === link.path ? "text-cyan-400" : "text-slate-300"
                 )}
               >
-                {link.label}
+                {t(link.labelKey)}
               </Link>
             ))}
+            <LandingLanguageSwitcher tone="dark" />
             <Link
               href="/login"
               className="text-sm font-medium text-slate-300 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
             >
-              Kirish
+              {t("navbar.cta.login")}
             </Link>
             <Link
               href="/dashboard"
               className="rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
             >
-              Dashboard
+              {t("navbar.cta.dashboard")}
             </Link>
           </nav>
         ) : (
-          <nav className="hidden items-center gap-7 lg:flex" aria-label="Asosiy navigatsiya">
-            {LANDING_NAV.map((link) => (
+          <nav
+            className="hidden items-center gap-7 lg:flex"
+            aria-label={t("navbar.aria.main")}
+          >
+            {LANDING_NAV_KEYS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -112,7 +145,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                {link.label}
+                {t(link.labelKey)}
               </a>
             ))}
           </nav>
@@ -120,6 +153,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
 
         {!isPortal ? (
           <div className="hidden items-center gap-2 lg:flex">
+            <LandingLanguageSwitcher tone={switcherTone} />
             <Link
               href="/login"
               className={cn(
@@ -129,7 +163,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                   : "text-slate-700 hover:bg-slate-100"
               )}
             >
-              Kirish
+              {t("navbar.cta.login")}
             </Link>
             <Link
               href="/login"
@@ -140,7 +174,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                   : "bg-[#0b1f3b] text-white hover:bg-[#132848]"
               )}
             >
-              Dashboard
+              {t("navbar.cta.dashboard")}
             </Link>
           </div>
         ) : null}
@@ -154,7 +188,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           aria-controls={menuId}
-          aria-label={open ? "Menyuni yopish" : "Menyuni ochish"}
+          aria-label={open ? t("navbar.aria.close") : t("navbar.aria.open")}
         >
           {open ? <X className="size-6" aria-hidden /> : <Menu className="size-6" aria-hidden />}
         </button>
@@ -164,7 +198,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
         <button
           type="button"
           className="fixed inset-0 top-16 z-40 bg-black/40 lg:hidden"
-          aria-label="Menyuni yopish"
+          aria-label={t("navbar.aria.close")}
           onClick={closeMenu}
         />
       ) : null}
@@ -181,8 +215,11 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
               : "border-t border-slate-200 bg-white"
         )}
       >
-        <nav className="flex flex-col gap-1 px-4 py-4" aria-label="Mobil navigatsiya">
-          {(isPortal ? PORTAL_NAV : LANDING_NAV).map((link) => {
+        <nav
+          className="flex flex-col gap-1 px-4 py-4"
+          aria-label={t("navbar.aria.mobile")}
+        >
+          {(isPortal ? PORTAL_NAV_KEYS : LANDING_NAV_KEYS).map((link) => {
             const className = cn(
               "rounded-lg px-3 py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none",
               isPortal || onDarkHero
@@ -197,16 +234,35 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                   onClick={closeMenu}
                   className={className}
                 >
-                  {link.label}
+                  {t(link.labelKey)}
                 </Link>
               );
             }
             return (
               <a key={link.href} href={link.href} onClick={closeMenu} className={className}>
-                {link.label}
+                {t(link.labelKey)}
               </a>
             );
           })}
+          <div
+            className={cn(
+              "mt-1 flex items-center justify-between rounded-lg px-3 py-2",
+              isPortal || onDarkHero ? "bg-white/5" : "bg-slate-50"
+            )}
+          >
+            <span
+              className={cn(
+                "text-sm font-medium",
+                isPortal || onDarkHero ? "text-slate-200" : "text-slate-700"
+              )}
+            >
+              {t("lang.aria")}
+            </span>
+            <LandingLanguageSwitcher
+              tone={switcherTone}
+              align="right"
+            />
+          </div>
           <Link
             href="/login"
             onClick={closeMenu}
@@ -217,7 +273,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                 : "text-slate-800 hover:bg-slate-50"
             )}
           >
-            Kirish
+            {t("navbar.cta.login")}
           </Link>
           <Link
             href="/login"
@@ -231,7 +287,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                   : "bg-[#0b1f3b] text-white"
             )}
           >
-            Dashboard
+            {t("navbar.cta.dashboard")}
           </Link>
         </nav>
       </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   cancelRoomAccessGrant,
+  createBluetoothSyncSession,
   createRoomAccessGrant,
   fetchRemoteControlStatus,
   fetchRoomAccessGrants,
@@ -195,6 +196,17 @@ export function useLwnRoomLockData(propertyId: string | null) {
     }
   };
 
+  const prepareBluetoothSync = async () => {
+    if (!propertyId) return null;
+    try {
+      return await createBluetoothSyncSession(propertyId);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Bluetooth session yaratib bo'lmadi";
+      setError(message);
+      throw err;
+    }
+  };
+
   const refreshLog = async (filters?: AccessLogFilters) => {
     if (!propertyId || !apiAvailable) return;
     const next = filters ?? logFilters;
@@ -282,6 +294,7 @@ export function useLwnRoomLockData(propertyId: string | null) {
     addGrant,
     cancelGrant,
     syncGrant,
+    prepareBluetoothSync,
     refreshLog,
     runRemoteUnlock,
     runRemoteLock,

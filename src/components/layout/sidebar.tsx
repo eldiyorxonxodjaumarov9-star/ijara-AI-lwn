@@ -11,6 +11,7 @@ import { WorkspaceStatusBadge } from "@/components/subscription/workspace-status
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useLiveDebtCount } from "@/hooks/use-live-debt-count";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 
 function isNavActive(
   href: string,
@@ -39,6 +40,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { user, workspace } = useAuth();
   const { t } = useLanguage();
   const liveDebtCount = useLiveDebtCount();
+  const { hasFeature } = usePlanFeatures();
 
   return (
     <div className="app-sidebar flex h-full flex-col">
@@ -76,10 +78,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {navigation.map((section) => {
-          const items = section.items.filter(
-            (item) =>
-              !item.roles || (user?.role && item.roles.includes(user.role))
-          );
+          const items = section.items.filter((item) => {
+            if (item.roles && !(user?.role && item.roles.includes(user.role))) {
+              return false;
+            }
+            if (item.feature && !hasFeature(item.feature)) {
+              return false;
+            }
+            return true;
+          });
           if (items.length === 0) return null;
           return (
             <div key={section.labelKey}>

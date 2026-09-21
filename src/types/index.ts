@@ -1,3 +1,4 @@
+import type { PlanDefinition } from "@/lib/api-server/plans";
 export type Role = "admin" | "manager" | "employee" | "tenant";
 
 export type WorkspaceSubscriptionView = {
@@ -11,6 +12,8 @@ export type WorkspaceSubscriptionView = {
   workspaceId: string;
   workspaceName: string;
   trialDays: number;
+  currentPeriodStart?: string | null;
+  entitlements?: PlanDefinition;
 };
 
 export type Language = "uz" | "ru" | "en" | "kk";

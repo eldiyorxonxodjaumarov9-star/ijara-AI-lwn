@@ -80,10 +80,18 @@ export async function requireUser(req: NextRequest) {
   try {
     const token = header.slice(7);
     const payload = jwt.verify(token, secret("access")) as JwtPayload;
+    const scoped = payload as JwtPayload & { purpose?: string; aud?: string };
+    if (scoped.purpose === "bluetooth-bridge" &&
+        !["context", "credential", "result"].some((action) => req.nextUrl.pathname === `/api/ttlock/bluetooth-sync/${action}`)) {
+      return { error: fail("Bluetooth token faqat scoped bridge amallari uchun", 403) };
+    }
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || !user.isActive) {
       return { error: fail("Foydalanuvchi topilmadi", 401) };
     }
+    const { checkRequestFeature } = await import("./plan-service");
+    const featureError = await checkRequestFeature(user, req.nextUrl.pathname);
+    if (featureError) return { error: featureError };
     return { user };
   } catch {
     return { error: fail("Token yaroqsiz", 401) };

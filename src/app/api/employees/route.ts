@@ -1,3 +1,4 @@
+import { createWithinPlanLimit, planErrorResponse } from "@/lib/api-server/plan-service";
 import { NextRequest } from "next/server";
 
 import { sanitizeEmployeesForRole } from "@/lib/api-server/employees/sanitize";
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
         ? startedAtRaw
         : new Date();
 
-    const created = await prisma.employee.create({
+    const created = await createWithinPlanLimit(wsCtx, "employees", db => db.employee.create({
       data: {
         workspaceId,
         fullName,
@@ -143,9 +144,11 @@ export async function POST(req: NextRequest) {
         startedAt,
       },
       include: { company: true },
-    });
+    }));
     return ok(created, 201);
   } catch (err) {
+    const planError = planErrorResponse(err);
+    if (planError) return planError;
     if (
       err &&
       typeof err === "object" &&

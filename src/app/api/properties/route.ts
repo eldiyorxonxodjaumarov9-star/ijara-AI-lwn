@@ -1,3 +1,4 @@
+import { createWithinPlanLimit, planErrorResponse } from "@/lib/api-server/plan-service";
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as Record<string, unknown>;
-    const created = await prisma.property.create({
+    const created = await createWithinPlanLimit(wsCtx, "properties", db => db.property.create({
       data: {
         workspaceId: wsCtx.workspace.id,
         title: String(body.title ?? body.name ?? ""),
@@ -80,9 +81,11 @@ export async function POST(req: NextRequest) {
         status: (body.status as Prisma.PropertyCreateInput["status"]) ?? "AVAILABLE",
         images: (body.images as string[]) ?? [],
       },
-    });
+    }));
     return ok(created, 201);
-  } catch {
+  } catch (error) {
+    const planError = planErrorResponse(error);
+    if (planError) return planError;
     return fail("Saqlash xatosi", 500);
   }
 }

@@ -1,3 +1,4 @@
+import { createWithinPlanLimit, planErrorResponse } from "@/lib/api-server/plan-service";
 import { NextRequest } from "next/server";
 
 import { mapTenantCreate, stripTenantSecret } from "@/lib/api-server/tenants";
@@ -165,9 +166,9 @@ export async function POST(
   try {
     switch (name) {
       case "tenants": {
-        const created = await prisma.tenant.create({
+        const created = await createWithinPlanLimit(wsCtx, "tenants", async db => db.tenant.create({
           data: { ...(await mapTenantCreate(body)), workspaceId },
-        });
+        }));
         await ensureTenantClientNumber(created.id);
         const fresh = await prisma.tenant.findUnique({ where: { id: created.id } });
         await upsertClientFromTenant(fresh ?? created);
@@ -327,7 +328,9 @@ export async function POST(
       default:
         return fail("Topilmadi", 404);
     }
-  } catch {
+  } catch (error) {
+    const planError = planErrorResponse(error);
+    if (planError) return planError;
     return fail("Saqlash xatosi", 500);
   }
 }

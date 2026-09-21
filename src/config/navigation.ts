@@ -23,12 +23,15 @@ import {
 import type { Role } from "@/types";
 
 import type { TranslationKey } from "@/lib/i18n/translations";
+import type { PaidFeature } from "@/lib/plan-features";
 
 export interface NavItem {
   titleKey: TranslationKey;
   href: string;
   icon: LucideIcon;
   roles?: Role[];
+  /** If set, item is hidden unless workspace has this paid feature. */
+  feature?: PaidFeature;
 }
 
 export interface NavSection {
@@ -49,6 +52,7 @@ export const navigation: NavSection[] = [
         href: "/ai-employees",
         icon: Bot,
         roles: ["admin"],
+        feature: "aiEmployees",
       },
       { titleKey: "nav.contracts", href: "/contracts", icon: FileText },
       { titleKey: "nav.contractDrafts", href: "/contract-drafts", icon: FileText, roles: ["admin", "manager"] },

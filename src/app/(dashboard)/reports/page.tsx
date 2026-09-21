@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCollection } from "@/hooks/use-collection";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 import {
   buildPaymentReportRows,
   buildRevenueSeries,
@@ -56,6 +57,8 @@ function ReportsContent() {
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
   const { data: expenses, loading: le } = useCollection<Expense>("expenses");
   const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
+  const { hasFeature } = usePlanFeatures();
+  const canAiFinance = hasFeature("aiFinanceOptimization");
   const now = new Date();
   const [month, setMonth] = useState(String(now.getMonth()));
   const [year, setYear] = useState(String(now.getFullYear()));
@@ -162,7 +165,9 @@ function ReportsContent() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:w-auto">
           <TabsTrigger value="overview">Oylik hisobot</TabsTrigger>
-          <TabsTrigger value="compare">Oylarni solishtirish</TabsTrigger>
+          {canAiFinance ? (
+            <TabsTrigger value="compare">Oylarni solishtirish</TabsTrigger>
+          ) : null}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -300,11 +305,13 @@ function ReportsContent() {
         </TabsContent>
 
         <TabsContent value="compare">
-          <MonthlyComparisonSection
-            payments={payments}
-            expenses={expenses}
-            collectionLoading={loading}
-          />
+          {canAiFinance ? (
+            <MonthlyComparisonSection
+              payments={payments}
+              expenses={expenses}
+              collectionLoading={loading}
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>

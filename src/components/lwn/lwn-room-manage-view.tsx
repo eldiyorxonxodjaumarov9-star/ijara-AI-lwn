@@ -32,6 +32,7 @@ import {
   resolveLwnRoomById,
 } from "@/lib/lwn-room-detail";
 import { PROPERTY_STATUS_MAP } from "@/lib/constants";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 
 import type { Contract, Property, Tenant } from "@/types";
 
@@ -42,6 +43,8 @@ export function LwnRoomManageView({ roomId }: { roomId: string }) {
     useCollection<Contract>("contracts");
   const { data: tenants, loading: tenantsLoading } =
     useCollection<Tenant>("tenants");
+  const { hasFeature } = usePlanFeatures();
+  const canSmartLock = hasFeature("smartLocks");
 
   const [tab, setTab] = useState("general");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -74,7 +77,7 @@ export function LwnRoomManageView({ roomId }: { roomId: string }) {
     runRemoteUnlock,
     runRemoteLock,
     runSyncHistory,
-  } = useLwnRoomLockData(room?.id ?? null);
+  } = useLwnRoomLockData(canSmartLock ? room?.id ?? null : null);
 
   const roomTenants = useMemo(
     () =>
@@ -138,23 +141,27 @@ export function LwnRoomManageView({ roomId }: { roomId: string }) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={status?.variant}>{status?.label}</Badge>
-            <Badge variant="outline">
-              Aqlli qulf:{" "}
-              {lockSettings?.ttlockCachedLockId
-                ? "TTLock biriktirilgan"
-                : settingsSaved
-                  ? "Sozlamalar saqlangan"
-                  : "Ulanmagan"}
-            </Badge>
-            <Badge
-              variant={
-                lockSettings?.ttlockCachedLockId ? "success" : "warning"
-              }
-            >
-              {lockSettings?.ttlockCachedLockId
-                ? "TTLock/Sciener"
-                : "API ulanmagan"}
-            </Badge>
+            {canSmartLock ? (
+              <>
+                <Badge variant="outline">
+                  Aqlli qulf:{" "}
+                  {lockSettings?.ttlockCachedLockId
+                    ? "TTLock biriktirilgan"
+                    : settingsSaved
+                      ? "Sozlamalar saqlangan"
+                      : "Ulanmagan"}
+                </Badge>
+                <Badge
+                  variant={
+                    lockSettings?.ttlockCachedLockId ? "success" : "warning"
+                  }
+                >
+                  {lockSettings?.ttlockCachedLockId
+                    ? "TTLock/Sciener"
+                    : "API ulanmagan"}
+                </Badge>
+              </>
+            ) : null}
           </div>
         </div>
         <Button variant="outline" onClick={() => setEditOpen(true)}>
@@ -162,138 +169,156 @@ export function LwnRoomManageView({ roomId }: { roomId: string }) {
         </Button>
       </div>
 
-      {lockError && (
+      {canSmartLock && lockError ? (
         <div
           role="alert"
           className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
           {lockError}
         </div>
-      )}
+      ) : null}
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
+      <Tabs
+        value={tab === "general" || canSmartLock ? tab : "general"}
+        onValueChange={setTab}
+        className="w-full"
+      >
         <TabsList className="flex h-auto w-full flex-wrap gap-1">
           <TabsTrigger value="general">Umumiy ma&apos;lumot</TabsTrigger>
-          <TabsTrigger value="smart-lock">Aqlli qulf</TabsTrigger>
-          <TabsTrigger value="access-log">Kirish-chiqish jurnali</TabsTrigger>
-          <TabsTrigger value="access-rights">Kirish huquqlari</TabsTrigger>
+          {canSmartLock ? (
+            <>
+              <TabsTrigger value="smart-lock">Aqlli qulf</TabsTrigger>
+              <TabsTrigger value="access-log">
+                Kirish-chiqish jurnali
+              </TabsTrigger>
+              <TabsTrigger value="access-rights">Kirish huquqlari</TabsTrigger>
+            </>
+          ) : null}
         </TabsList>
 
         <TabsContent value="general" className="mt-6">
           <LwnRoomGeneralTab room={room} tenants={roomTenants} />
         </TabsContent>
 
-        <TabsContent value="smart-lock" className="mt-6">
-          {lockLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : (
-            <LwnRoomSmartLockTab
-              room={room}
-              settings={lockSettings}
-              saving={saving}
-              apiAvailable={apiAvailable}
-              remoteStatus={remoteStatus}
-              remoteStatusLoading={remoteStatusLoading}
-              remoteBusy={remoteBusy}
-              onSaveSettings={async (input) => {
-                return await saveSettings(input);
-              }}
-              onAfterLockMutation={async () => {
-                await reload();
-              }}
-              onRefreshRemoteStatus={reloadRemoteStatus}
-              onRemoteUnlock={async () => {
-                const res = await runRemoteUnlock();
-                toast.success(
-                  res?.userMessage ??
-                    "Qulfni ochish buyrug‘i muvaffaqiyatli yuborildi."
-                );
-              }}
-              onRemoteLock={async () => {
-                const res = await runRemoteLock();
-                toast.success(
-                  res?.userMessage ??
-                    "Qulfni yopish buyrug‘i muvaffaqiyatli yuborildi."
-                );
-              }}
-              onCreateTimedPasscode={() => {
-                setTab("access-rights");
-                queueMicrotask(() => {
-                  document
-                    .getElementById("timed-passcode-form")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  document.getElementById("custom-pin-input")?.focus();
-                });
-              }}
-              onRevokeAccess={() => setRevokeOpen(true)}
-              onSyncHistory={async () => {
-                try {
-                  const res = await runSyncHistory();
-                  toast.success(res?.userMessage ?? "Kirish tarixi yangilandi.");
-                } catch (err) {
-                  toast.error(
-                    err instanceof ApiError
-                      ? mapTtlockUiError(err.code, err.message)
-                      : "Kirish tarixini yangilab bo‘lmadi"
-                  );
-                  throw err;
-                }
-              }}
-              linkDialogOpen={linkDialogOpen}
-              onLinkDialogOpenChange={setLinkDialogOpen}
-            />
-          )}
-        </TabsContent>
+        {canSmartLock ? (
+          <>
+            <TabsContent value="smart-lock" className="mt-6">
+              {lockLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <LwnRoomSmartLockTab
+                  room={room}
+                  settings={lockSettings}
+                  saving={saving}
+                  apiAvailable={apiAvailable}
+                  remoteStatus={remoteStatus}
+                  remoteStatusLoading={remoteStatusLoading}
+                  remoteBusy={remoteBusy}
+                  onSaveSettings={async (input) => {
+                    return await saveSettings(input);
+                  }}
+                  onAfterLockMutation={async () => {
+                    await reload();
+                  }}
+                  onRefreshRemoteStatus={reloadRemoteStatus}
+                  onRemoteUnlock={async () => {
+                    const res = await runRemoteUnlock();
+                    toast.success(
+                      res?.userMessage ??
+                        "Qulfni ochish buyrug‘i muvaffaqiyatli yuborildi."
+                    );
+                  }}
+                  onRemoteLock={async () => {
+                    const res = await runRemoteLock();
+                    toast.success(
+                      res?.userMessage ??
+                        "Qulfni yopish buyrug‘i muvaffaqiyatli yuborildi."
+                    );
+                  }}
+                  onCreateTimedPasscode={() => {
+                    setTab("access-rights");
+                    queueMicrotask(() => {
+                      document
+                        .getElementById("timed-passcode-form")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      document.getElementById("custom-pin-input")?.focus();
+                    });
+                  }}
+                  onRevokeAccess={() => setRevokeOpen(true)}
+                  onSyncHistory={async () => {
+                    try {
+                      const res = await runSyncHistory();
+                      toast.success(
+                        res?.userMessage ?? "Kirish tarixi yangilandi."
+                      );
+                    } catch (err) {
+                      toast.error(
+                        err instanceof ApiError
+                          ? mapTtlockUiError(err.code, err.message)
+                          : "Kirish tarixini yangilab bo‘lmadi"
+                      );
+                      throw err;
+                    }
+                  }}
+                  linkDialogOpen={linkDialogOpen}
+                  onLinkDialogOpenChange={setLinkDialogOpen}
+                />
+              )}
+            </TabsContent>
 
-        <TabsContent value="access-log" className="mt-6">
-          <LwnRoomAccessLogTab
-            entries={accessLog}
-            hasLockSettings={settingsSaved}
-            loading={lockLoading}
-            onApplyFilters={(filters) => void refreshLog(filters)}
-          />
-        </TabsContent>
+            <TabsContent value="access-log" className="mt-6">
+              <LwnRoomAccessLogTab
+                entries={accessLog}
+                hasLockSettings={settingsSaved}
+                loading={lockLoading}
+                onApplyFilters={(filters) => void refreshLog(filters)}
+              />
+            </TabsContent>
 
-        <TabsContent value="access-rights" className="mt-6">
-          {lockLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : (
-            <LwnRoomAccessRightsTab
-              roomName={room.name}
-              tenants={roomTenants}
-              grants={accessGrants}
-              lockSettings={lockSettings}
-              saving={saving}
-              apiAvailable={apiAvailable}
-              onAddGrant={async (input) => addGrant(input)}
-              onCancelGrant={async (grantId) => {
-                await cancelGrant(grantId);
-              }}
-              onSyncGrant={async (grantId) => syncGrant(grantId)}
-            />
-          )}
-        </TabsContent>
+            <TabsContent value="access-rights" className="mt-6">
+              {lockLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <LwnRoomAccessRightsTab
+                  roomName={room.name}
+                  tenants={roomTenants}
+                  grants={accessGrants}
+                  lockSettings={lockSettings}
+                  saving={saving}
+                  apiAvailable={apiAvailable}
+                  onAddGrant={async (input) => addGrant(input)}
+                  onCancelGrant={async (grantId) => {
+                    await cancelGrant(grantId);
+                  }}
+                  onSyncGrant={async (grantId) => syncGrant(grantId)}
+                />
+              )}
+            </TabsContent>
+          </>
+        ) : null}
       </Tabs>
 
-      <LwnRoomRevokeAccessDialog
-        open={revokeOpen}
-        onOpenChange={setRevokeOpen}
-        grants={accessGrants}
-        saving={saving}
-        onRevoke={async (grantId) => {
-          try {
-            await cancelGrant(grantId);
-            await reloadRemoteStatus();
-          } catch (err) {
-            toast.error(
-              err instanceof ApiError
-                ? mapTtlockUiError(err.code, err.message)
-                : "Bekor qilib bo‘lmadi"
-            );
-            throw err;
-          }
-        }}
-      />
+      {canSmartLock ? (
+        <LwnRoomRevokeAccessDialog
+          open={revokeOpen}
+          onOpenChange={setRevokeOpen}
+          grants={accessGrants}
+          saving={saving}
+          onRevoke={async (grantId) => {
+            try {
+              await cancelGrant(grantId);
+              await reloadRemoteStatus();
+            } catch (err) {
+              toast.error(
+                err instanceof ApiError
+                  ? mapTtlockUiError(err.code, err.message)
+                  : "Bekor qilib bo‘lmadi"
+              );
+              throw err;
+            }
+          }}
+        />
+      ) : null}
 
       <LwnRoomDialog open={editOpen} onOpenChange={setEditOpen} room={room} />
     </div>

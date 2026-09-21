@@ -25,7 +25,7 @@ export function WorkspaceStatusBadge({
         className
       )}
     >
-      {subscriptionStatusLabel(workspace.status)}
+      {workspace.status === "DEMO" ? "DEMO" : workspace.plan?.toUpperCase() ?? subscriptionStatusLabel(workspace.status)}
     </span>
   );
 }

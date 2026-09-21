@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 import { useTableData } from "@/hooks/use-table-data";
 import { PROPERTY_STATUS_MAP } from "@/lib/constants";
 import { filterLwnRooms } from "@/lib/lwn-rooms";
@@ -59,6 +60,8 @@ export default function LwnRoomsPage() {
   const { data, loading } = useCollection<Property>("properties");
   const { data: contracts } = useCollection<Contract>("contracts");
   const { remove } = useCollectionActions<Property>("properties");
+  const { hasFeature } = usePlanFeatures();
+  const canSmartLock = hasFeature("smartLocks");
 
   const { byProperty: tenantByRoom } = useMemo(
     () => getTenantRoomMaps(contracts),
@@ -201,7 +204,9 @@ export default function LwnRoomsPage() {
                   <TableHead className="hidden md:table-cell">Narx</TableHead>
                   <TableHead className="hidden sm:table-cell">Kv (m²)</TableHead>
                   <TableHead>Holat</TableHead>
-                  <TableHead className="hidden md:table-cell">Aqlli qulf</TableHead>
+                  {canSmartLock ? (
+                    <TableHead className="hidden md:table-cell">Aqlli qulf</TableHead>
+                  ) : null}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -240,9 +245,11 @@ export default function LwnRoomsPage() {
                         <p className="text-xs text-muted-foreground lg:hidden">
                           {tenantByRoom.get(room.id) ?? "Bo'sh"}
                         </p>
-                        <p className="text-xs text-muted-foreground md:hidden">
-                          Aqlli qulf: Ulanmagan
-                        </p>
+                        {canSmartLock ? (
+                          <p className="text-xs text-muted-foreground md:hidden">
+                            Aqlli qulf: Ulanmagan
+                          </p>
+                        ) : null}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
                         {tenantByRoom.get(room.id) ?? (
@@ -261,11 +268,13 @@ export default function LwnRoomsPage() {
                       <TableCell>
                         <Badge variant={status?.variant}>{status?.label}</Badge>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <span className="text-sm text-muted-foreground">
-                          Ulanmagan
-                        </span>
-                      </TableCell>
+                      {canSmartLock ? (
+                        <TableCell className="hidden md:table-cell">
+                          <span className="text-sm text-muted-foreground">
+                            Ulanmagan
+                          </span>
+                        </TableCell>
+                      ) : null}
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

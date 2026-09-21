@@ -10,6 +10,8 @@ import type { NextRequest } from "next/server";
 import { fail } from "@/lib/api-server/http";
 import { prisma } from "@/lib/api-server/prisma";
 
+import { planEntitlements } from "./plans";
+
 export const INTERNAL_WORKSPACE_SLUG = "internal-ijara-ai";
 
 export type WorkspaceContext = {
@@ -406,6 +408,8 @@ export type PublicSubscriptionView = {
   workspaceId: string;
   workspaceName: string;
   trialDays: number;
+  currentPeriodStart: string | null;
+  entitlements: ReturnType<typeof planEntitlements>;
 };
 
 export function toPublicSubscriptionView(
@@ -422,5 +426,7 @@ export function toPublicSubscriptionView(
     workspaceId: ctx.workspace.id,
     workspaceName: ctx.workspace.name,
     trialDays: getDemoTrialDays(),
+    currentPeriodStart: ctx.subscription?.currentPeriodStart?.toISOString() ?? null,
+    entitlements: planEntitlements(ctx),
   };
 }

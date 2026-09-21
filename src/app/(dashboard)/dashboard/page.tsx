@@ -38,6 +38,7 @@ import {
   PROPERTY_STATUS_MAP,
 } from "@/lib/constants";
 import { useAuth } from "@/context/auth-context";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 import type {
   Contract,
   Expense,
@@ -48,6 +49,8 @@ import type {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { hasFeature } = usePlanFeatures();
+  const canAiFinance = hasFeature("aiFinanceOptimization");
   const { t } = useLanguage();
   const { data: properties, loading: lp } = useCollection<Property>("properties");
   const { data: tenants, loading: lt } = useCollection<Tenant>("tenants");
@@ -325,7 +328,7 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <DashboardPanel
-            className="xl:col-span-2"
+            className={canAiFinance ? "xl:col-span-2" : "xl:col-span-3"}
             title={t("dashboard.revenueChart")}
             description={t("dashboard.revenueChartDesc")}
             delayMs={120}
@@ -337,30 +340,48 @@ export default function DashboardPage() {
             )}
           </DashboardPanel>
 
-          <DashboardPanel
-            title="AI insight"
-            description="Operatsion signal va tavsiyalar"
-            delayMs={160}
-          >
-            <div className="space-y-3">
-              {insights.map((item) => (
-                <div
-                  key={item.title}
-                  className="app-insight rounded-xl px-3 py-3"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">
-                    {item.title}
+          {canAiFinance ? (
+            <DashboardPanel
+              title="AI insight"
+              description="Operatsion signal va tavsiyalar"
+              delayMs={160}
+            >
+              <div className="space-y-3">
+                {insights.map((item) => (
+                  <div
+                    key={item.title}
+                    className="app-insight rounded-xl px-3 py-3"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">
+                      {item.title}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-200">
+                      {item.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 border-t border-white/10 pt-4">
+                <p className="mb-3 text-sm font-medium text-slate-200">
+                  {t("dashboard.propertyStatus")}
+                </p>
+                {loading ? (
+                  <Skeleton className="mx-auto h-[180px] w-[180px] rounded-full bg-white/10" />
+                ) : statusSeries.length > 0 ? (
+                  <StatusChart data={statusSeries} premium />
+                ) : (
+                  <p className="py-8 text-center text-sm text-slate-400">
+                    {t("dashboard.noData")}
                   </p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-200">
-                    {item.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 border-t border-white/10 pt-4">
-              <p className="mb-3 text-sm font-medium text-slate-200">
-                {t("dashboard.propertyStatus")}
-              </p>
+                )}
+              </div>
+            </DashboardPanel>
+          ) : (
+            <DashboardPanel
+              className="xl:col-span-3"
+              title={t("dashboard.propertyStatus")}
+              delayMs={160}
+            >
               {loading ? (
                 <Skeleton className="mx-auto h-[180px] w-[180px] rounded-full bg-white/10" />
               ) : statusSeries.length > 0 ? (
@@ -370,8 +391,8 @@ export default function DashboardPage() {
                   {t("dashboard.noData")}
                 </p>
               )}
-            </div>
-          </DashboardPanel>
+            </DashboardPanel>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4">

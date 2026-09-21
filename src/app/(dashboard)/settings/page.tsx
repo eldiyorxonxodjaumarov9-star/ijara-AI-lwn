@@ -42,6 +42,7 @@ import { TelegramDistributionPanel } from "@/components/listings/telegram-distri
 import { TtlockSettingsPanel } from "@/components/settings/ttlock-settings-panel";
 import { LessorProfilePanel } from "@/components/settings/lessor-profile-panel";
 import { SubscriptionPanel } from "@/components/settings/subscription-panel";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 
 export default function SettingsPage() {
   return (
@@ -78,6 +79,8 @@ function SettingsPageContent() {
   const { t, setLanguage: setAppLanguage } = useLanguage();
   const { theme, setTheme } = useTheme();
   const mounted = useClientMounted();
+  const { hasFeature } = usePlanFeatures();
+  const canSmartLock = hasFeature("smartLocks");
 
   const [profile, setProfile] = useState(() => profileFromUser(user));
   const [profileUserId, setProfileUserId] = useState(user?.id ?? "");
@@ -337,7 +340,19 @@ function SettingsPageContent() {
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-6">
-          <TtlockSettingsPanel />
+          {canSmartLock ? (
+            <TtlockSettingsPanel />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>TTLock / Smart Lock</CardTitle>
+                <CardDescription>
+                  Smart Lock (TTLock) Pro tarifida mavjud. Telegram va boshqa
+                  bepul kanallar «Posting sozlamalari» bo‘limida ishlayveradi.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="subscription">

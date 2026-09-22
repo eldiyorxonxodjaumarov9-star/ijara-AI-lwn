@@ -14,6 +14,9 @@ import { isApiConfigured } from "@/lib/api/client";
 /**
  * Blocks paid page routes for DEMO workspaces (redirect → /dashboard).
  * Complements API-side plan checks — not a substitute for them.
+ *
+ * While workspace entitlements are loading, paid routes render nothing so
+ * their pages cannot fire premium API fetches that would 401/403 in console.
  */
 export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -24,6 +27,13 @@ export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
   const pageFeature = featureForPagePath(pathname);
   const settingsFeature = settingsTabRequiresFeature(searchParams.get("tab"));
   const required = pageFeature ?? settingsFeature;
+
+  const awaitingEntitlements =
+    isApiConfigured &&
+    Boolean(user) &&
+    user?.role !== "tenant" &&
+    required !== null &&
+    (workspaceLoading || workspace === null);
 
   const blocked =
     isApiConfigured &&
@@ -39,6 +49,6 @@ export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
     router.replace("/dashboard");
   }, [blocked, router]);
 
-  if (blocked) return null;
+  if (awaitingEntitlements || blocked) return null;
   return <>{children}</>;
 }

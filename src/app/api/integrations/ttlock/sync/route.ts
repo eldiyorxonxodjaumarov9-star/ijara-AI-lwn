@@ -5,6 +5,7 @@ import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
   ttlockFail,
   ttlockFailFromUnknown,
+  ttlockFromRequireUserError,
   ttlockOk,
 } from "@/lib/api-server/ttlock/http";
 import { syncTtlockLocks } from "@/lib/api-server/ttlock/service";
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
   const auth = await requireUser(req);
   if (auth.error) {
-    return ttlockFail("TTLOCK_AUTH_REQUIRED", "Autentifikatsiya talab qilinadi", 401);
+    return ttlockFromRequireUserError(auth.error);
   }
 
   try {

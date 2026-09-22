@@ -31,6 +31,22 @@ export function ttlockFail(
   );
 }
 
+/**
+ * Map requireUser failures for TTLock routes.
+ * - True auth failures (401) → TTLOCK_AUTH_REQUIRED
+ * - Plan / other errors (e.g. 403 PLAN_UPGRADE_REQUIRED) pass through unchanged
+ */
+export function ttlockFromRequireUserError(error: NextResponse): NextResponse {
+  if (error.status === 401) {
+    return ttlockFail(
+      "TTLOCK_AUTH_REQUIRED",
+      "Autentifikatsiya talab qilinadi",
+      401
+    );
+  }
+  return error;
+}
+
 export function ttlockFailFromUnknown(err: unknown) {
   const mapped = mapTtlockErrorToUz(err);
   return ttlockFail(mapped.code, mapped.message, mapped.httpStatus);

@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/auth-context";
+import { usePlanFeatures } from "@/hooks/use-plan-features";
 import { apiFetch } from "@/lib/api/client";
 
 type DashboardPayload = {
@@ -72,6 +73,8 @@ type DashboardPayload = {
 
 export default function AiEmployeesPage() {
   const { user } = useAuth();
+  const { hasFeature } = usePlanFeatures();
+  const canAiEmployees = hasFeature("aiEmployees");
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -80,8 +83,9 @@ export default function AiEmployeesPage() {
   const isAdmin = user?.role === "admin";
 
   const load = useCallback(async () => {
-    if (!isAdmin) {
+    if (!isAdmin || !canAiEmployees) {
       setLoading(false);
+      setData(null);
       return;
     }
     setLoading(true);
@@ -94,7 +98,7 @@ export default function AiEmployeesPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, canAiEmployees]);
 
   useEffect(() => {
     void load();
@@ -103,6 +107,7 @@ export default function AiEmployeesPage() {
   const patchSetting = async (
     patch: Partial<DashboardPayload["settings"]>
   ) => {
+    if (!canAiEmployees) return;
     setBusy(true);
     try {
       await apiFetch("/ai-employees", {
@@ -119,7 +124,7 @@ export default function AiEmployeesPage() {
   };
 
   const trigger = async (mode: "test" | "daily") => {
-    if (busy) return;
+    if (busy || !canAiEmployees) return;
     setBusy(true);
     try {
       const body = await apiFetch<{

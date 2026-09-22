@@ -340,19 +340,9 @@ function SettingsPageContent() {
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-6">
-          {canSmartLock ? (
-            <TtlockSettingsPanel />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>TTLock / Smart Lock</CardTitle>
-                <CardDescription>
-                  Smart Lock (TTLock) Pro tarifida mavjud. Telegram va boshqa
-                  bepul kanallar «Posting sozlamalari» bo‘limida ishlayveradi.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          )}
+          {canSmartLock ? <TtlockSettingsPanel /> : null}
+          <TelegramDistributionPanel />
+          <InstagramSettingsPanel />
         </TabsContent>
 
         <TabsContent value="subscription">

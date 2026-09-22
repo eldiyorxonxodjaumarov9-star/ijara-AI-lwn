@@ -114,6 +114,14 @@ export function TtlockSettingsPanel() {
     } catch (err) {
       if (!mountedRef.current) return;
       const code = err instanceof TtlockClientError ? err.code : "";
+      if (code === "PLAN_UPGRADE_REQUIRED") {
+        // Parent should not mount this panel without smartLocks; stop quietly.
+        setStatus(null);
+        setLocks([]);
+        setLoadError(null);
+        setLoading(false);
+        return;
+      }
       if (
         code === "DATABASE_MIGRATION_REQUIRED" ||
         code === "TTLOCK_DB_UNAVAILABLE"

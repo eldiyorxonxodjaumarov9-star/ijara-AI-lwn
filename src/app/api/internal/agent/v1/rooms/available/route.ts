@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   const auth = await authorizeRoomsRead(req);
-  if (auth.error) return auth.error;
+  if ("error" in auth) return auth.error;
 
   const url = new URL(req.url);
   const minArea = parseOptionalNumber(url.searchParams.get("minArea"));

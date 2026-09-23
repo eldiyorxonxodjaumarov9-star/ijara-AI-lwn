@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { writeAgentActionAudit } from "@/lib/api-server/agent-gateway/audit";
-import { requireAgentAuth } from "@/lib/api-server/agent-gateway/require-agent";
-import { timingSafeSecretEqual } from "@/lib/api-server/cron-auth";
+import { authorizeLwnAgentRequest } from "@/lib/api-server/agent-gateway/lwn-agent-auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { LWN_BUILDING } from "@/lib/constants";
@@ -20,7 +19,7 @@ export async function GET(req: NextRequest) {
     return fail("DATABASE_URL sozlanmagan", 501, "DB_NOT_CONFIGURED");
   }
 
-  const auth = await authorizeRoomsRead(req);
+  const auth = await authorizeLwnAgentRequest(req, ["rooms:read"]);
   if ("error" in auth) return auth.error;
 
   const url = new URL(req.url);
@@ -78,33 +77,6 @@ export async function GET(req: NextRequest) {
   });
 
   return ok({ rooms, count: rooms.length, source: "ijara_properties" });
-}
-
-async function authorizeRoomsRead(
-  req: NextRequest
-): Promise<
-  | { error: Response }
-  | { traceId: string; mode: "agent_jwt" | "static_token" }
-> {
-  const staticToken = process.env.LWN_TELEGRAM_AGENT_TOKEN?.trim() || "";
-  const header = req.headers.get("authorization") ?? "";
-  const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-
-  if (staticToken.length > 0 && bearer.length > 0) {
-    if (timingSafeSecretEqual(bearer, staticToken)) {
-      return {
-        traceId:
-          req.headers.get("x-trace-id")?.trim() ||
-          req.headers.get("x-request-id")?.trim() ||
-          "lwn-static",
-        mode: "static_token",
-      };
-    }
-  }
-
-  const auth = await requireAgentAuth(req, ["rooms:read"]);
-  if ("error" in auth) return { error: auth.error };
-  return { traceId: auth.ctx.traceId, mode: "agent_jwt" };
 }
 
 function parseOptionalNumber(raw: string | null): number | null {

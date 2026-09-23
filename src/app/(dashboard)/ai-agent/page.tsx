@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
-/** Removed product module (AI Agent). */
-export default function RemovedAiAgentPage() {
-  notFound();
+/** AI Agent CMS hub → Scripts. */
+export default function AiAgentHubPage() {
+  redirect("/ai-agent/scripts");
 }

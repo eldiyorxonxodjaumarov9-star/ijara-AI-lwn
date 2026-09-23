@@ -101,6 +101,37 @@ enum ContactInterest {
   NOT_INTERESTED
 }
 
+enum TelegramAiLeadStatus {
+  NEW
+  QUALIFYING
+  QUALIFIED
+  VIEWING_REQUESTED
+  HANDOFF
+  CLOSED
+  LOST
+}
+
+enum AiAgentScriptCategory {
+  GREETING
+  PRICE_INFO
+  CONTRACT
+  VIEWING
+  PAYMENT
+  PARKING
+  INTERNET
+  GENERAL
+}
+
+enum AiAgentMediaCategory {
+  ROOM
+  OFFICE
+  BUILDING
+  ENTRANCE
+  PARKING
+  LOCATION
+  OTHER
+}
+
 enum RoomAccessGrantStatus {
   PLANNED
   CANCELLED
@@ -258,6 +289,11 @@ model Workspace {
   partnerCompanies PartnerCompany[]
   clients      Client[]
   contactLeads ContactLead[]
+  telegramAiLeads TelegramAiLead[]
+  aiAgentScripts  AiAgentScript[]
+  aiAgentLocations AiAgentLocation[]
+  aiAgentContacts AiAgentContact[]
+  aiAgentMedia    AiAgentMedia[]
   workTasks    WorkTask[]
   notifications Notification[]
   companyProfile Company?
@@ -358,6 +394,7 @@ model Property {
   roomAccessLogEvents  RoomAccessLogEvent[]
   ttlockRemoteCommands TtlockRemoteCommand[]
   contractRequests     ContractRequest[]
+  aiAgentMedia         AiAgentMedia[]
 
   @@index([workspaceId])
   @@index([status])
@@ -687,6 +724,121 @@ model ContactLead {
   @@index([interest])
   @@index([createdAt])
   @@map("contact_leads")
+}
+
+/**
+ * LWN Telegram AI agent leads (server-to-server upsert by telegramUserId).
+ * Separate from ContactLead CRM phone-book rows.
+ */
+model TelegramAiLead {
+  id                 String               @id @default(uuid())
+  workspaceId        String?
+  source             String               @default("TELEGRAM_AI")
+  telegramUserId     String
+  telegramUsername   String?
+  displayName        String?
+  phone              String?
+  desiredArea        Float?
+  businessType       String?
+  peopleCount        Int?
+  moveInDate         String?
+  budget             Float?
+  interestedRoomIds  String[]             @default([])
+  status             TelegramAiLeadStatus @default(NEW)
+  conversationSummary String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([telegramUserId])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([source])
+  @@index([updatedAt])
+  @@map("telegram_ai_leads")
+}
+
+/** LWN Telegram AI Agent content — admin CMS (scripts / locations / contacts / media). */
+model AiAgentScript {
+  id          String                @id @default(uuid())
+  workspaceId String?
+  title       String
+  category    AiAgentScriptCategory @default(GENERAL)
+  content     String
+  active      Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([category])
+  @@index([active])
+  @@map("ai_agent_scripts")
+}
+
+model AiAgentLocation {
+  id           String   @id @default(uuid())
+  workspaceId  String?
+  title        String
+  address      String
+  landmark     String?
+  mapUrl       String?
+  workingHours String?
+  description  String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([active])
+  @@map("ai_agent_locations")
+}
+
+model AiAgentContact {
+  id               String   @id @default(uuid())
+  workspaceId      String?
+  name             String
+  role             String?
+  phone            String?
+  telegramUsername String?
+  note             String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([active])
+  @@map("ai_agent_contacts")
+}
+
+model AiAgentMedia {
+  id          String               @id @default(uuid())
+  workspaceId String?
+  title       String
+  category    AiAgentMediaCategory @default(OTHER)
+  roomId      String?
+  description String?
+  fileUrl     String
+  active      Boolean              @default(true)
+  sortOrder   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  room      Property?  @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([category])
+  @@index([roomId])
+  @@index([active])
+  @@index([sortOrder])
+  @@map("ai_agent_media")
 }
 
 model TelegramSession {

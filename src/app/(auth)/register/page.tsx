@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Loader2, Lock, Mail, Phone, User } from "lucide-react";
+import { Building2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState<"details" | "industry">("details");
   const [industry, setIndustry] = useState<RentalIndustry | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<DetailsInput>({
     resolver: zodResolver(detailsSchema),
@@ -168,14 +169,26 @@ export default function RegisterPage() {
               icon={<Lock className="size-4" />}
               error={form.formState.errors.password?.message}
               input={
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="Kamida 6 ta belgi"
-                  className={fieldClass}
-                  {...form.register("password")}
-                />
+                <>
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Kamida 6 ta belgi"
+                    className={`${fieldClass} pr-10`}
+                    {...form.register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"}
+                    aria-pressed={showPassword}
+                    aria-controls="password"
+                    className="absolute right-1 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition-colors hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </>
               }
             />
 

@@ -124,6 +124,187 @@ const STATEMENTS = [
        FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id")
        ON DELETE SET NULL ON UPDATE CASCADE;
    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+  `DO $$ BEGIN
+     CREATE TYPE "RentalIndustry" AS ENUM (
+       'OFFICE_RENTAL',
+       'APARTMENT_RENTAL',
+       'HOTEL_HOSTEL',
+       'CAR_RENTAL',
+       'RETAIL_RENTAL',
+       'WAREHOUSE_RENTAL',
+       'VILLA_RENTAL',
+       'COMMERCIAL_RENTAL',
+       'OTHER'
+     );
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "industry" "RentalIndustry" NOT NULL DEFAULT 'OTHER'`,
+
+  `DO $$ BEGIN
+     CREATE TYPE "VehicleStatus" AS ENUM ('AVAILABLE', 'RENTED', 'MAINTENANCE', 'INACTIVE');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `CREATE TABLE IF NOT EXISTS "vehicles" (
+      "id" TEXT PRIMARY KEY,
+      "workspaceId" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "brand" TEXT NOT NULL,
+      "model" TEXT NOT NULL,
+      "year" INTEGER NOT NULL,
+      "plateNumber" TEXT NOT NULL,
+      "status" "VehicleStatus" NOT NULL DEFAULT 'AVAILABLE',
+      "dailyRate" DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "color" TEXT,
+      "vin" TEXT,
+      "mileage" INTEGER NOT NULL DEFAULT 0,
+      "notes" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL
+    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "vehicles_workspaceId_plateNumber_key" ON "vehicles"("workspaceId", "plateNumber")`,
+  `CREATE INDEX IF NOT EXISTS "vehicles_workspaceId_idx" ON "vehicles"("workspaceId")`,
+  `CREATE INDEX IF NOT EXISTS "vehicles_status_idx" ON "vehicles"("status")`,
+  `DO $$ BEGIN
+     ALTER TABLE "vehicles"
+       ADD CONSTRAINT "vehicles_workspaceId_fkey"
+       FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id")
+       ON DELETE CASCADE ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+  `DO $$ BEGIN
+     CREATE TYPE "VehicleRentalStatus" AS ENUM ('PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `CREATE TABLE IF NOT EXISTS "vehicle_rentals" (
+      "id" TEXT PRIMARY KEY,
+      "workspaceId" TEXT NOT NULL,
+      "vehicleId" TEXT NOT NULL,
+      "tenantId" TEXT NOT NULL,
+      "startDate" TIMESTAMP(3) NOT NULL,
+      "endDate" TIMESTAMP(3) NOT NULL,
+      "days" INTEGER NOT NULL,
+      "dailyRate" DOUBLE PRECISION NOT NULL,
+      "totalAmount" DOUBLE PRECISION NOT NULL,
+      "status" "VehicleRentalStatus" NOT NULL DEFAULT 'PLANNED',
+      "notes" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL
+    )`,
+  `CREATE INDEX IF NOT EXISTS "vehicle_rentals_workspaceId_idx" ON "vehicle_rentals"("workspaceId")`,
+  `CREATE INDEX IF NOT EXISTS "vehicle_rentals_vehicleId_status_idx" ON "vehicle_rentals"("vehicleId", "status")`,
+  `CREATE INDEX IF NOT EXISTS "vehicle_rentals_tenantId_idx" ON "vehicle_rentals"("tenantId")`,
+  `DO $$ BEGIN
+     ALTER TABLE "vehicle_rentals"
+       ADD CONSTRAINT "vehicle_rentals_workspaceId_fkey"
+       FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id")
+       ON DELETE CASCADE ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+     ALTER TABLE "vehicle_rentals"
+       ADD CONSTRAINT "vehicle_rentals_vehicleId_fkey"
+       FOREIGN KEY ("vehicleId") REFERENCES "vehicles"("id")
+       ON DELETE NO ACTION ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+     IF EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conname = 'vehicle_rentals_tenantId_fkey' AND confdeltype = 'c'
+     ) THEN
+       ALTER TABLE "vehicle_rentals" DROP CONSTRAINT "vehicle_rentals_tenantId_fkey";
+     END IF;
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehicle_rentals_tenantId_fkey') THEN
+       ALTER TABLE "vehicle_rentals"
+         ADD CONSTRAINT "vehicle_rentals_tenantId_fkey"
+         FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+         ON DELETE NO ACTION ON UPDATE CASCADE;
+     END IF;
+   END $$;`,
+
+  `DO $$ BEGIN
+     CREATE TYPE "BookingStatus" AS ENUM ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `CREATE TABLE IF NOT EXISTS "bookings" (
+      "id" TEXT PRIMARY KEY,
+      "workspaceId" TEXT NOT NULL,
+      "propertyId" TEXT NOT NULL,
+      "tenantId" TEXT NOT NULL,
+      "checkInDate" TIMESTAMP(3) NOT NULL,
+      "checkOutDate" TIMESTAMP(3) NOT NULL,
+      "nights" INTEGER NOT NULL,
+      "nightlyRate" DOUBLE PRECISION NOT NULL,
+      "totalAmount" DOUBLE PRECISION NOT NULL,
+      "status" "BookingStatus" NOT NULL DEFAULT 'CONFIRMED',
+      "guestCount" INTEGER NOT NULL DEFAULT 1,
+      "notes" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "bookings_dates_check" CHECK ("checkOutDate" > "checkInDate"),
+      CONSTRAINT "bookings_nights_check" CHECK ("nights" >= 1),
+      CONSTRAINT "bookings_rate_check" CHECK ("nightlyRate" > 0),
+      CONSTRAINT "bookings_guests_check" CHECK ("guestCount" >= 1)
+    )`,
+  `CREATE INDEX IF NOT EXISTS "bookings_workspaceId_idx" ON "bookings"("workspaceId")`,
+  `CREATE INDEX IF NOT EXISTS "bookings_propertyId_status_idx" ON "bookings"("propertyId", "status")`,
+  `CREATE INDEX IF NOT EXISTS "bookings_tenantId_idx" ON "bookings"("tenantId")`,
+  `DO $$ BEGIN
+     ALTER TABLE "bookings"
+       ADD CONSTRAINT "bookings_workspaceId_fkey"
+       FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id")
+       ON DELETE CASCADE ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+     ALTER TABLE "bookings"
+       ADD CONSTRAINT "bookings_propertyId_fkey"
+       FOREIGN KEY ("propertyId") REFERENCES "properties"("id")
+       ON DELETE NO ACTION ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+     ALTER TABLE "bookings"
+       ADD CONSTRAINT "bookings_tenantId_fkey"
+       FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+       ON DELETE NO ACTION ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+
+  `DO $$ BEGIN
+     CREATE TYPE "PaymentSourceType" AS ENUM ('VEHICLE_RENTAL', 'BOOKING');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `CREATE TABLE IF NOT EXISTS "source_payments" (
+      "id" TEXT PRIMARY KEY,
+      "workspaceId" TEXT NOT NULL,
+      "sourceType" "PaymentSourceType" NOT NULL,
+      "vehicleRentalId" TEXT,
+      "bookingId" TEXT,
+      "amount" DOUBLE PRECISION NOT NULL,
+      "paymentDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CASH',
+      "notes" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "source_payments_amount_check" CHECK ("amount" > 0),
+      CONSTRAINT "source_payments_one_source_check" CHECK (
+        ("sourceType" = 'VEHICLE_RENTAL' AND "vehicleRentalId" IS NOT NULL AND "bookingId" IS NULL)
+        OR ("sourceType" = 'BOOKING' AND "bookingId" IS NOT NULL AND "vehicleRentalId" IS NULL)
+      )
+    )`,
+  `CREATE INDEX IF NOT EXISTS "source_payments_workspaceId_paymentDate_idx" ON "source_payments"("workspaceId", "paymentDate")`,
+  `CREATE INDEX IF NOT EXISTS "source_payments_vehicleRentalId_idx" ON "source_payments"("vehicleRentalId")`,
+  `CREATE INDEX IF NOT EXISTS "source_payments_bookingId_idx" ON "source_payments"("bookingId")`,
+  `DO $$ BEGIN
+     ALTER TABLE "source_payments"
+       ADD CONSTRAINT "source_payments_workspaceId_fkey"
+       FOREIGN KEY ("workspaceId") REFERENCES "workspaces"("id")
+       ON DELETE CASCADE ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+     ALTER TABLE "source_payments"
+       ADD CONSTRAINT "source_payments_vehicleRentalId_fkey"
+       FOREIGN KEY ("vehicleRentalId") REFERENCES "vehicle_rentals"("id")
+       ON DELETE NO ACTION ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+     ALTER TABLE "source_payments"
+       ADD CONSTRAINT "source_payments_bookingId_fkey"
+       FOREIGN KEY ("bookingId") REFERENCES "bookings"("id")
+       ON DELETE NO ACTION ON UPDATE CASCADE;
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 ];
 
 export async function applyWorkspaceSchemaAdditive(db: SqlRunner) {

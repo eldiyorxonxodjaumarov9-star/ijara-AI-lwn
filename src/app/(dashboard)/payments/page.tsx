@@ -17,6 +17,9 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PaymentDialog } from "@/components/payments/payment-dialog";
+import { SourcePaymentsView } from "@/components/payments/source-payments-view";
+import { useAuth } from "@/context/auth-context";
+import { isSourcePaymentIndustry } from "@/lib/source-payments";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +78,14 @@ function methodLabel(row: MonthlyBillingInvoice) {
 }
 
 export default function PaymentsPage() {
+  const { workspace } = useAuth();
+  if (isSourcePaymentIndustry(workspace?.industry)) {
+    return <SourcePaymentsView industry={workspace!.industry!} />;
+  }
+  return <ContractPaymentsPage />;
+}
+
+function ContractPaymentsPage() {
   const { data, loading: loadingPayments } = useCollection<Payment>("payments");
   const { data: contracts, loading: loadingContracts } =
     useCollection<Contract>("contracts");

@@ -163,6 +163,10 @@ export function resolveAccessEffectiveStatus(input: {
   if (input.syncStatus === "SENT") {
     return "API_YUBORILGAN";
   }
+  // Bluetooth bridge: SDK callback confirmed the PIN is on the device.
+  if (input.syncStatus === "INSTALLED_ON_LOCK") {
+    return isWithinAccessWindow(input.validFrom, input.validTo, now) ? "FAOL" : "REJALASHTIRILGAN";
+  }
   if (input.syncStatus === "EXPIRED") {
     return "TUGAGAN";
   }

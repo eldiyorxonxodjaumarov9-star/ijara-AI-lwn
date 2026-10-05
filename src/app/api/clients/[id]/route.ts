@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 
+import { tenantBookingHistoryResponse } from "@/lib/api-server/bookings";
+import { sourcePaymentHistoryResponse } from "@/lib/api-server/source-payments";
+import { tenantRentalHistoryResponse } from "@/lib/api-server/vehicle-rentals";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { mapClientUpdate, deleteTenantAndClientsForClient } from "@/lib/api-server/clients";
 import { syncDepositFromClient } from "@/lib/api-server/deposit-sync";
@@ -72,6 +75,13 @@ export async function DELETE(
     const existing = await prisma.client.findUnique({ where: { id } });
     if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
       return fail("Topilmadi", 404);
+    }
+    if (existing?.tenantId) {
+      const history =
+        (await tenantBookingHistoryResponse(prisma, existing.tenantId)) ??
+        (await tenantRentalHistoryResponse(prisma, existing.tenantId)) ??
+        (await sourcePaymentHistoryResponse(prisma, { tenantId: existing.tenantId }));
+      if (history) return history;
     }
     await deleteTenantAndClientsForClient(id);
     return ok({ ok: true });

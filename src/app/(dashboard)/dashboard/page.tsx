@@ -16,6 +16,7 @@ import {
 
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
+import { IndustryDashboard } from "@/components/dashboard/industry-dashboard";
 import "@/components/dashboard/dashboard.css";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,22 @@ import {
   computeMetrics,
   getOverdueContracts,
 } from "@/lib/analytics";
+import {
+  getIndustryDashboardConfig,
+  resolveIndustryInventory,
+  selectUpcomingContracts,
+  sumPaymentsOnTashkentDay,
+} from "@/lib/dashboard-industry";
+import { useVehicles } from "@/hooks/use-vehicles";
+import { useVehicleRentals } from "@/hooks/use-vehicle-rentals";
+import { useBookings } from "@/hooks/use-bookings";
+import { useSourcePaymentIncome } from "@/hooks/use-source-payments";
+import { isSourcePaymentIndustry, mergeRecentPayments } from "@/lib/source-payments";
+import { tashkentToday } from "@/lib/vehicle-rentals";
+import {
+  selectCanonicalDebts,
+  summarizeCanonicalDebts,
+} from "@/lib/debts/canonical-debts";
 import { getLwnRoomStats } from "@/lib/lwn-rooms";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import {
@@ -48,7 +65,7 @@ import type {
 } from "@/types";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, workspace } = useAuth();
   const { hasFeature } = usePlanFeatures();
   const canAiFinance = hasFeature("aiFinanceOptimization");
   const { t } = useLanguage();
@@ -168,8 +185,70 @@ export default function DashboardPage() {
     return items.slice(0, 3);
   }, [expenseDelta, overdue.length, roomStats.vacant, payments, tashkentNow]);
 
+  const industryConfig = getIndustryDashboardConfig(workspace?.industry);
+  const { vehicles, loading: vehiclesLoading } = useVehicles(
+    industryConfig?.useVehicleInventory === true
+  );
+  const { rentals, loading: rentalsLoading } = useVehicleRentals(
+    industryConfig?.useVehicleInventory === true
+  );
+  const { bookings, loading: bookingsLoading } = useBookings(
+    industryConfig?.useBookingInventory === true
+  );
+  const today = tashkentToday(tashkentNow);
+  const inventory = useMemo(
+    () => resolveIndustryInventory(industryConfig, properties, vehicles, { bookings, today }),
+    [properties, vehicles, industryConfig, bookings, today]
+  );
+  const debtCount = useMemo(
+    () =>
+      summarizeCanonicalDebts(
+        selectCanonicalDebts(contracts, payments, tenants, tashkentNow)
+      ).uniqueDebtorCount,
+    [contracts, payments, tenants, tashkentNow]
+  );
+  const contractTodayIncome = useMemo(
+    () => sumPaymentsOnTashkentDay(payments, tashkentNow),
+    [payments, tashkentNow]
+  );
+  const usesSourcePayments = isSourcePaymentIndustry(workspace?.industry);
+  const sourceIncome = useSourcePaymentIncome(usesSourcePayments);
+  const todayIncome = contractTodayIncome + sourceIncome.today;
+  const industryMonthlyIncome = usesSourcePayments
+    ? metrics.monthlyIncomeActual + sourceIncome.month
+    : metrics.monthlyIncome;
+  const industryPayments = useMemo(
+    () => (usesSourcePayments ? mergeRecentPayments(payments, sourceIncome.recent) : payments),
+    [usesSourcePayments, payments, sourceIncome.recent]
+  );
+  const upcomingContracts = useMemo(
+    () => selectUpcomingContracts(contracts, tashkentNow),
+    [contracts, tashkentNow]
+  );
+
   const firstName =
     user?.displayName?.split(" ")[0] ?? t("dashboard.user");
+
+  if (industryConfig) {
+    return (
+      <IndustryDashboard
+        config={industryConfig}
+        loading={loading || vehiclesLoading || rentalsLoading || bookingsLoading}
+        inventory={inventory}
+        vehicles={vehicles}
+        rentals={rentals}
+        bookings={bookings}
+        today={today}
+        monthlyIncome={industryMonthlyIncome}
+        debtCount={debtCount}
+        todayIncome={todayIncome}
+        properties={properties}
+        payments={industryPayments}
+        contracts={upcomingContracts}
+        tenants={tenants}
+      />
+    );
+  }
 
   return (
     <div className="relative space-y-5 sm:space-y-6">

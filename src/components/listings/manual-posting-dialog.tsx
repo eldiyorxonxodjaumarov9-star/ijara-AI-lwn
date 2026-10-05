@@ -128,7 +128,7 @@ export function ManualPostingDialog({
                   <Button
                     size="sm"
                     variant="secondary"
-                    className="absolute -bottom-2 left-1/2 h-6 -translate-x-1/2 px-2 text-[10px]"
+                    className="absolute -bottom-2 left-1/2 h-6 -translate-x-1/2 px-2 text-[10px] max-lg:min-h-0"
                     onClick={() =>
                       copyText(src.startsWith("data:") ? `Rasm ${i + 1}` : src, "Rasm URL")
                     }

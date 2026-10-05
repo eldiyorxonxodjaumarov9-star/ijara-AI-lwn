@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
 import { zResolver } from "@/lib/form";
 import { getTenantContract } from "@/lib/tenant-room-assign";
 import { contractSchema, type ContractInput } from "@/lib/validations";
@@ -59,6 +60,7 @@ export function ContractDialog({
   const { data: tenants } = useCollection<Tenant>("tenants");
   const { data: contracts } = useCollection<Contract>("contracts");
   const { create, update } = useCollectionActions<Contract>("contracts");
+  const terms = useIndustryTerminology();
   const propertyTouchedRef = useRef(false);
 
   const {
@@ -136,11 +138,9 @@ export function ContractDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {contract ? "Shartnomani tahrirlash" : "Yangi shartnoma"}
+            {contract ? terms.editContractTitle : terms.newContractTitle}
           </DialogTitle>
-          <DialogDescription>
-            Mulk va arendatorni tanlab shartnoma tuzing.
-          </DialogDescription>
+          <DialogDescription>{terms.contractDialogDescription}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

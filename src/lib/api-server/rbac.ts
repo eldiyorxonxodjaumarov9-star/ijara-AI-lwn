@@ -8,7 +8,7 @@
  *   - GET on: tenants, contracts, payments, expenses, maintenance,
  *     notifications, properties, clients, tasks
  *   - Mutate allowed on operational resources: tenants, contracts, maintenance,
- *     notifications, properties, clients (POST/PATCH/PUT/DELETE)
+ *     notifications, properties, clients, vehicles, bookings (POST/PATCH/PUT/DELETE)
  *   - NO finance mutate: payments & expenses — GET only (no POST/PATCH/PUT/DELETE)
  *   - NO employees resource (any method)
  *   - tasks: GET only (managers/admins manage tasks)
@@ -49,7 +49,9 @@ export type RbacResource =
   | "properties"
   | "employees"
   | "clients"
-  | "tasks";
+  | "tasks"
+  | "vehicles"
+  | "bookings";
 
 export type RbacMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
@@ -64,6 +66,8 @@ const ALL_RESOURCES: readonly RbacResource[] = [
   "employees",
   "clients",
   "tasks",
+  "vehicles",
+  "bookings",
 ] as const;
 
 const EMPLOYEE_GET_RESOURCES = new Set<RbacResource>([
@@ -76,6 +80,8 @@ const EMPLOYEE_GET_RESOURCES = new Set<RbacResource>([
   "properties",
   "clients",
   "tasks",
+  "vehicles",
+  "bookings",
 ]);
 
 /** Operational resources EMPLOYEE may mutate (not finance, not employees, not tasks). */
@@ -86,6 +92,8 @@ const EMPLOYEE_MUTATE_RESOURCES = new Set<RbacResource>([
   "notifications",
   "properties",
   "clients",
+  "vehicles",
+  "bookings",
 ]);
 
 const FINANCE_RESOURCES = new Set<RbacResource>(["payments", "expenses"]);

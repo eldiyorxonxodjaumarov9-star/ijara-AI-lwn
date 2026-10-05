@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 
 import { syncDepositForTenant } from "@/lib/api-server/deposit-sync";
 import { mapTenantBody, stripTenantSecret } from "@/lib/api-server/tenants";
+import { tenantBookingHistoryResponse } from "@/lib/api-server/bookings";
+import { sourcePaymentHistoryResponse } from "@/lib/api-server/source-payments";
+import { tenantRentalHistoryResponse } from "@/lib/api-server/vehicle-rentals";
 import { deleteTenantAndLinkedClients } from "@/lib/api-server/clients";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
@@ -313,6 +316,11 @@ export async function DELETE(
         if (!isRecordInWorkspace(existing, ws.workspaceId)) {
           return fail("Topilmadi", 404);
         }
+        const history =
+          (await tenantBookingHistoryResponse(prisma, id)) ??
+          (await tenantRentalHistoryResponse(prisma, id)) ??
+          (await sourcePaymentHistoryResponse(prisma, { tenantId: id }));
+        if (history) return history;
         await deleteTenantAndLinkedClients(id);
         break;
       }

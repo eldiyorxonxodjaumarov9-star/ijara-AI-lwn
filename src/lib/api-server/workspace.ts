@@ -9,6 +9,7 @@ import type { NextRequest } from "next/server";
 
 import { fail } from "@/lib/api-server/http";
 import { prisma } from "@/lib/api-server/prisma";
+import { isRentalIndustry, type RentalIndustry } from "@/lib/rental-industry";
 
 import { planEntitlements } from "./plans";
 
@@ -242,41 +243,58 @@ export async function ensureWorkspaceBootstrap(): Promise<Workspace> {
   return workspace;
 }
 
+/** Public signup workspace. Plan is always DEMO; industry falls back to OTHER. */
+export function buildDemoWorkspaceCreateData(opts: {
+  userId: string;
+  workspaceName: string;
+  industry?: string | null;
+  now?: Date;
+  demoDays?: number;
+}) {
+  const now = opts.now ?? new Date();
+  const days = opts.demoDays ?? getDemoTrialDays();
+  const demoEndsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  const industry: RentalIndustry = isRentalIndustry(opts.industry)
+    ? opts.industry
+    : "OTHER";
+  const name = opts.workspaceName.trim().slice(0, 120) || "Mening workspace";
+
+  return {
+    name,
+    industry,
+    isInternal: false as const,
+    memberships: {
+      create: {
+        userId: opts.userId,
+        role: "OWNER" as const,
+      },
+    },
+    subscription: {
+      create: {
+        status: "DEMO" as const,
+        plan: "demo",
+        startedAt: now,
+        demoStartedAt: now,
+        demoEndsAt,
+        currentPeriodStart: now,
+        currentPeriodEnd: demoEndsAt,
+      },
+    },
+    companyProfile: {
+      create: {
+        name: name || "Ijara AI",
+      },
+    },
+  };
+}
+
 export async function createDemoWorkspaceForUser(opts: {
   userId: string;
   workspaceName: string;
+  industry?: string | null;
 }): Promise<{ workspace: Workspace; subscription: WorkspaceSubscription }> {
-  const days = getDemoTrialDays();
-  const now = new Date();
-  const demoEndsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
   const workspace = await prisma.workspace.create({
-    data: {
-      name: opts.workspaceName.slice(0, 120) || "Mening workspace",
-      isInternal: false,
-      memberships: {
-        create: {
-          userId: opts.userId,
-          role: "OWNER",
-        },
-      },
-      subscription: {
-        create: {
-          status: "DEMO",
-          plan: "demo",
-          startedAt: now,
-          demoStartedAt: now,
-          demoEndsAt,
-          currentPeriodStart: now,
-          currentPeriodEnd: demoEndsAt,
-        },
-      },
-      companyProfile: {
-        create: {
-          name: opts.workspaceName.slice(0, 120) || "Ijara AI",
-        },
-      },
-    },
+    data: buildDemoWorkspaceCreateData(opts),
     include: { subscription: true },
   });
 
@@ -407,6 +425,7 @@ export type PublicSubscriptionView = {
   isInternal: boolean;
   workspaceId: string;
   workspaceName: string;
+  industry: RentalIndustry;
   trialDays: number;
   currentPeriodStart: string | null;
   entitlements: ReturnType<typeof planEntitlements>;
@@ -425,6 +444,9 @@ export function toPublicSubscriptionView(
     isInternal: ctx.isInternal,
     workspaceId: ctx.workspace.id,
     workspaceName: ctx.workspace.name,
+    industry: isRentalIndustry(ctx.workspace.industry)
+      ? ctx.workspace.industry
+      : "OTHER",
     trialDays: getDemoTrialDays(),
     currentPeriodStart: ctx.subscription?.currentPeriodStart?.toISOString() ?? null,
     entitlements: planEntitlements(ctx),

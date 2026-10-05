@@ -21,10 +21,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TashkentClock } from "@/components/layout/tashkent-clock";
 import { SidebarContent } from "@/components/layout/sidebar";
@@ -35,7 +36,7 @@ import { useCollection } from "@/hooks/use-collection";
 import { getInitials } from "@/lib/utils";
 import { ROLE_MAP } from "@/lib/constants";
 import type { AppNotification } from "@/types";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 export function Header() {
   const router = useRouter();
@@ -45,6 +46,15 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const unread = notifications.filter((n) => !n.read).length;
 
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = (e: MediaQueryListEvent) => {
+      if (e.matches) setMobileOpen(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
     toast.success(t("common.logoutSuccess"));
@@ -52,27 +62,37 @@ export function Header() {
   };
 
   return (
-    <header className="app-header sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 lg:px-6">
-      <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DialogTrigger asChild>
+    <header className="app-header sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 max-lg:h-[calc(4rem+env(safe-area-inset-top))] max-lg:gap-2 max-lg:px-3 max-lg:pt-[env(safe-area-inset-top)] lg:px-6">
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            className="text-foreground hover:bg-white/10 lg:hidden"
+            className="shrink-0 text-foreground hover:bg-white/10 lg:hidden"
             aria-label="Menyu"
           >
             <Menu className="size-5" />
           </Button>
-        </DialogTrigger>
-        <DialogContent className="left-0 top-0 h-full max-w-64 translate-x-0 translate-y-0 rounded-none border-r border-white/10 bg-[#071429] p-0 sm:rounded-none">
+        </SheetTrigger>
+        <SheetContent
+          side="left"
+          aria-describedby={undefined}
+          className="gap-0 border-white/10 bg-[#071429] p-0 text-slate-100 lg:hidden"
+          closeClassName="text-slate-200 hover:bg-white/10"
+        >
+          <SheetTitle className="sr-only">Navigatsiya menyusi</SheetTitle>
           <Suspense fallback={null}>
             <SidebarContent onNavigate={() => setMobileOpen(false)} />
           </Suspense>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {workspace && workspace.status === "DEMO" && !workspace.isInternal && (
-        <WorkspaceStatusBadge workspace={workspace} compact className="lg:hidden" />
+        <WorkspaceStatusBadge
+          workspace={workspace}
+          compact
+          className="shrink-0 lg:hidden"
+        />
       )}
 
       <div className="relative hidden max-w-sm flex-1 md:block">
@@ -84,7 +104,7 @@ export function Header() {
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 max-lg:gap-0.5">
         <TashkentClock />
         <ThemeToggle />
 
@@ -108,7 +128,7 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="ml-1 flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
+              className="ml-1 flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 max-lg:ml-0 max-lg:size-11 max-lg:justify-center"
               aria-label="Profil menyusi"
             >
               <Avatar className="border border-white/15">
@@ -121,12 +141,12 @@ export function Header() {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-56 border-white/10 bg-[#0d1c34] text-slate-100"
+            className="w-56 max-w-[calc(100vw-1.5rem)] border-white/10 bg-[#0d1c34] text-slate-100"
           >
             <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="font-semibold">{user?.displayName}</span>
-                <span className="text-xs font-normal text-slate-400">
+              <div className="flex min-w-0 flex-col">
+                <span className="break-words font-semibold">{user?.displayName}</span>
+                <span className="break-all text-xs font-normal text-slate-400">
                   {user?.email}
                 </span>
                 <span className="mt-1 text-xs font-normal text-sky-300">

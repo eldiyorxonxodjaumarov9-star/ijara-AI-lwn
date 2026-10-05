@@ -8,7 +8,7 @@ import {
 } from "@/lib/plan-features";
 
 export type Plan = "FREE" | "PRO" | "PREMIUM";
-export type Quota = "properties" | "tenants" | "employees";
+export type Quota = "properties" | "tenants" | "employees" | "vehicles";
 
 /** Catalog features (quotas UI) + paid gates. */
 export type Feature =
@@ -57,7 +57,7 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     id: "FREE",
     accessPlan: "DEMO",
     price: 0,
-    limits: { properties: 3, tenants: 3, employees: 1 },
+    limits: { properties: 3, tenants: 3, employees: 1, vehicles: 3 },
     features: withPaid("DEMO", {
       // Free integrations (Telegram posting, etc.) stay available on DEMO
       telegram: true,
@@ -80,7 +80,7 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     id: "PRO",
     accessPlan: "PRO",
     price: 149000,
-    limits: { properties: 30, tenants: 300, employees: 10 },
+    limits: { properties: 30, tenants: 300, employees: 10, vehicles: 30 },
     features: withPaid("PRO", {
       telegram: true,
       expenses: true,
@@ -102,7 +102,7 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     id: "PREMIUM",
     accessPlan: "PRO",
     price: 299000,
-    limits: { properties: null, tenants: null, employees: null },
+    limits: { properties: null, tenants: null, employees: null, vehicles: null },
     features: withPaid("PRO", {
       telegram: true,
       expenses: true,
@@ -206,7 +206,7 @@ export function assertPlanLimit(
   }
   const limit = planEntitlements(ctx).limits[resource];
   if (limit === null || count < limit) return;
-  const label = { properties: "xona", tenants: "arendator", employees: "xodim" }[
+  const label = { properties: "xona", tenants: "arendator", employees: "xodim", vehicles: "avtomobil" }[
     resource
   ];
   const plan = normalizePlan(ctx.subscription?.plan) ?? "FREE";

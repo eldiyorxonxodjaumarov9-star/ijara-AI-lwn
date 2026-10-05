@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
 import { usePlanFeatures } from "@/hooks/use-plan-features";
 import { useTableData } from "@/hooks/use-table-data";
 import { PROPERTY_STATUS_MAP } from "@/lib/constants";
@@ -62,6 +63,7 @@ export default function LwnRoomsPage() {
   const { remove } = useCollectionActions<Property>("properties");
   const { hasFeature } = usePlanFeatures();
   const canSmartLock = hasFeature("smartLocks");
+  const terms = useIndustryTerminology();
 
   const { byProperty: tenantByRoom } = useMemo(
     () => getTenantRoomMaps(contracts),
@@ -96,15 +98,15 @@ export default function LwnRoomsPage() {
   const handleDelete = async () => {
     if (!deleteId) return;
     await remove(deleteId);
-    toast.success("Xona o'chirildi");
+    toast.success(terms.unitDeletedToast);
     setDeleteId(null);
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="LWN xonalar"
-        description="Live Work Network xonalarini boshqaring: narx, kv, holat va rasm."
+        title={terms.unitsPageTitle}
+        description={terms.unitsDescription}
         action={
           <Button
             onClick={() => {
@@ -112,21 +114,21 @@ export default function LwnRoomsPage() {
               setDialogOpen(true);
             }}
           >
-            <Plus className="size-4" /> Xona qo&apos;shish
+            <Plus className="size-4" /> {terms.addUnitLabel}
           </Button>
         }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
-          title="Jami xonalar"
+          title={terms.totalUnitsLabel}
           value={String(lwnRooms.length)}
           icon={DoorOpen}
           tone="primary"
           loading={loading}
         />
         <StatCard
-          title="Bo'sh xonalar"
+          title={terms.vacantUnitsLabel}
           value={String(vacant)}
           icon={DoorOpen}
           tone="blue"
@@ -134,7 +136,7 @@ export default function LwnRoomsPage() {
           index={1}
         />
         <StatCard
-          title="Band xonalar"
+          title={terms.occupiedUnitsLabel}
           value={String(rented)}
           icon={DoorOpen}
           tone="amber"
@@ -147,7 +149,7 @@ export default function LwnRoomsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Xona raqami bo'yicha qidirish..."
+            placeholder={terms.unitSearchPlaceholder}
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -180,8 +182,8 @@ export default function LwnRoomsPage() {
             <div className="p-6">
               <EmptyState
                 icon={DoorOpen}
-                title="Xonalar yo'q"
-                description="Birinchi LWN xonasini qo'shing."
+                title={terms.emptyUnitsTitle}
+                description={terms.emptyUnitsText}
                 action={
                   <Button
                     onClick={() => {
@@ -189,7 +191,7 @@ export default function LwnRoomsPage() {
                       setDialogOpen(true);
                     }}
                   >
-                    <Plus className="size-4" /> Xona qo&apos;shish
+                    <Plus className="size-4" /> {terms.addUnitLabel}
                   </Button>
                 }
               />
@@ -199,8 +201,8 @@ export default function LwnRoomsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Rasm</TableHead>
-                  <TableHead>Xona</TableHead>
-                  <TableHead className="hidden lg:table-cell">Arendator</TableHead>
+                  <TableHead>{terms.unitSingular}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{terms.customerSingular}</TableHead>
                   <TableHead className="hidden md:table-cell">Narx</TableHead>
                   <TableHead className="hidden sm:table-cell">Kv (m²)</TableHead>
                   <TableHead>Holat</TableHead>
@@ -323,7 +325,7 @@ export default function LwnRoomsPage() {
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
-        title="Xonani o'chirish"
+        title={terms.deleteUnitTitle}
         onConfirm={handleDelete}
       />
     </div>

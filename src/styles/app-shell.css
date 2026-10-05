@@ -45,6 +45,7 @@
   background: var(--app-bg);
   color: var(--app-text);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .dark .app-shell {
@@ -212,6 +213,7 @@
 
 .app-auth-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   min-width: 100%;
   background:

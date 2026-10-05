@@ -393,10 +393,10 @@ function LoginPageContent() {
         <p className="mt-6 text-center text-sm text-slate-400">
           Hisobingiz yo&apos;qmi?{" "}
           <Link
-            href="/login"
+            href="/register"
             className="font-medium text-sky-300 hover:text-sky-200 hover:underline"
           >
-            Email orqali ro&apos;yxatdan o&apos;ting
+            Ro&apos;yxatdan o&apos;tish
           </Link>
         </p>
       )}

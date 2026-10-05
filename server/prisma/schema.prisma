@@ -34,6 +34,18 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+enum RentalIndustry {
+  OFFICE_RENTAL
+  APARTMENT_RENTAL
+  HOTEL_HOSTEL
+  CAR_RENTAL
+  RETAIL_RENTAL
+  WAREHOUSE_RENTAL
+  VILLA_RENTAL
+  COMMERCIAL_RENTAL
+  OTHER
+}
+
 enum PropertyStatus {
   AVAILABLE
   RENTED
@@ -270,12 +282,14 @@ model EmailOtpVerification {
 
 /** SaaS workspace (company/organization). Existing production data → one internal workspace. */
 model Workspace {
-  id         String   @id @default(uuid())
+  id         String          @id @default(uuid())
   name       String
-  slug       String?  @unique
-  isInternal Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  slug       String?         @unique
+  isInternal Boolean         @default(false)
+  /** Legacy rows stay OTHER until a new signup picks an industry. */
+  industry   RentalIndustry  @default(OTHER)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 
   memberships  WorkspaceMembership[]
   subscription WorkspaceSubscription?
@@ -297,9 +311,156 @@ model Workspace {
   workTasks    WorkTask[]
   notifications Notification[]
   companyProfile Company?
+  vehicles      Vehicle[]
+  vehicleRentals VehicleRental[]
+  bookings      Booking[]
+  sourcePayments SourcePayment[]
 
   @@index([isInternal])
   @@map("workspaces")
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+  INACTIVE
+}
+
+/// CAR_RENTAL fleet. Not linked to contracts/payments yet.
+model Vehicle {
+  id          String        @id @default(uuid())
+  workspaceId String
+  name        String
+  brand       String
+  model       String
+  year        Int
+  plateNumber String
+  status      VehicleStatus @default(AVAILABLE)
+  dailyRate   Float         @default(0)
+  color       String?
+  vin         String?
+  mileage     Int           @default(0)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rentals   VehicleRental[]
+
+  @@unique([workspaceId, plateNumber])
+  @@index([workspaceId])
+  @@index([status])
+  @@map("vehicles")
+}
+
+enum VehicleRentalStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+/// CAR_RENTAL rental. Separate from Contract (propertyId is required there).
+/// Not linked to payments yet: totalAmount is the agreed price, not income.
+model VehicleRental {
+  id          String              @id @default(uuid())
+  workspaceId String
+  vehicleId   String
+  tenantId    String
+  /// Calendar dates (Asia/Tashkent midnight); both days are inclusive.
+  startDate   DateTime
+  endDate     DateTime
+  days        Int
+  dailyRate   Float
+  totalAmount Float
+  status      VehicleRentalStatus @default(PLANNED)
+  notes       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// NoAction: a vehicle with rental history cannot be deleted directly, but a
+  /// workspace delete still cascades through both tables in one statement.
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: NoAction)
+  /// NoAction: deleting a customer must not erase rental history.
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: NoAction)
+  payments  SourcePayment[]
+
+  @@index([workspaceId])
+  @@index([vehicleId, status])
+  @@index([tenantId])
+  @@map("vehicle_rentals")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+/// HOTEL_HOSTEL / VILLA_RENTAL short stays. Separate from Contract (monthly leases).
+/// Not linked to payments: totalAmount is the agreed price, not income.
+model Booking {
+  id           String        @id @default(uuid())
+  workspaceId  String
+  propertyId   String
+  tenantId     String
+  /// Asia/Tashkent midnight. Nights = checkOut - checkIn; checkOut day is free for the next guest.
+  checkInDate  DateTime
+  checkOutDate DateTime
+  nights       Int
+  nightlyRate  Float
+  totalAmount  Float
+  status       BookingStatus @default(CONFIRMED)
+  guestCount   Int           @default(1)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// NoAction on both: deleting a room or guest must never erase booking history.
+  property  Property  @relation(fields: [propertyId], references: [id], onDelete: NoAction)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: NoAction)
+  payments  SourcePayment[]
+
+  @@index([workspaceId])
+  @@index([propertyId, status])
+  @@index([tenantId])
+  @@map("bookings")
+}
+
+enum PaymentSourceType {
+  VEHICLE_RENTAL
+  BOOKING
+}
+
+/// Payments for CAR rentals and HOTEL/VILLA bookings. Contract payments stay in `payments`.
+/// Exactly one source id is set and it must match sourceType (DB CHECK).
+model SourcePayment {
+  id              String            @id @default(uuid())
+  workspaceId     String
+  sourceType      PaymentSourceType
+  vehicleRentalId String?
+  bookingId       String?
+  amount          Float
+  paymentDate     DateTime          @default(now())
+  paymentMethod   PaymentMethod     @default(CASH)
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// NoAction: a rental/booking with payments cannot be hard-deleted.
+  vehicleRental VehicleRental? @relation(fields: [vehicleRentalId], references: [id], onDelete: NoAction)
+  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: NoAction)
+
+  @@index([workspaceId, paymentDate])
+  @@index([vehicleRentalId])
+  @@index([bookingId])
+  @@map("source_payments")
 }
 
 model WorkspaceMembership {
@@ -395,6 +556,7 @@ model Property {
   ttlockRemoteCommands TtlockRemoteCommand[]
   contractRequests     ContractRequest[]
   aiAgentMedia         AiAgentMedia[]
+  bookings             Booking[]
 
   @@index([workspaceId])
   @@index([status])
@@ -433,6 +595,8 @@ model Tenant {
   telegramBotUsers TelegramBotUser[]
   roomAccessGrants RoomAccessGrant[]
   contractRequests ContractRequest[]
+  vehicleRentals   VehicleRental[]
+  bookings         Booking[]
 
   @@index([workspaceId])
   @@map("tenants")

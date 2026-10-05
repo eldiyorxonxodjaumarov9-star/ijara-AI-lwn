@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { ApiError, isApiConfigured } from "@/lib/api/client";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
 import { filterLwnRooms } from "@/lib/lwn-rooms";
 import { upsertLocalClientFromTenant } from "@/lib/tenant-client-sync";
 import {
@@ -85,6 +86,7 @@ export function TenantDialog({
   const { data: properties } = useCollection<Property>("properties");
   const { data: contracts } = useCollection<Contract>("contracts");
   const { create, update } = useCollectionActions<Tenant>("tenants");
+  const terms = useIndustryTerminology();
 
   const [roomId, setRoomId] = useState("");
   const [paymentStatus, setPaymentStatus] =
@@ -240,11 +242,9 @@ export function TenantDialog({
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {tenant ? "Arendatorni tahrirlash" : "Yangi arendator"}
+            {tenant ? terms.editCustomerTitle : terms.newCustomerTitle}
           </DialogTitle>
-          <DialogDescription>
-            Arendator ma&apos;lumotlari, login/parol va LWN xonasini kiriting.
-          </DialogDescription>
+          <DialogDescription>{terms.customerDialogDescription}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

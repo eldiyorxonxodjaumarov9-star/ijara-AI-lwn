@@ -44,6 +44,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
 import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
 import { refreshCollection } from "@/lib/data/store";
@@ -62,6 +63,7 @@ export default function TenantsPage() {
   const { data, loading, api } = useCollection<Tenant>("tenants");
   const { data: contracts } = useCollection<Contract>("contracts");
   const { remove } = useCollectionActions<Tenant>("tenants");
+  const terms = useIndustryTerminology();
 
   const { byTenant: roomByTenant } = useMemo(
     () => getTenantRoomMaps(contracts),
@@ -105,7 +107,7 @@ export default function TenantsPage() {
     } else {
       await deleteTenantWithLinkedClients(deleteId);
     }
-    toast.success("Arendator o'chirildi");
+    toast.success(terms.customerDeletedToast);
     setDeleteId(null);
   };
 
@@ -143,8 +145,8 @@ export default function TenantsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Arendatorlar"
-        description="Faol ijarachilar. Chiqish — xona bo'shadi, ma'lumotlar Klient bazasida qoladi."
+        title={terms.customerPlural}
+        description={terms.customersDescription}
         action={
           <div className="flex flex-wrap gap-2">
             <SendPaymentRemindersButton variant="outline" />
@@ -154,7 +156,7 @@ export default function TenantsPage() {
                 setDialogOpen(true);
               }}
             >
-              <Plus className="size-4" /> Arendator qo&apos;shish
+              <Plus className="size-4" /> {terms.addCustomerLabel}
             </Button>
           </div>
         }
@@ -182,8 +184,8 @@ export default function TenantsPage() {
             <div className="p-6">
               <EmptyState
                 icon={Users}
-                title="Arendatorlar yo'q"
-                description="Birinchi arendatorni qo'shing."
+                title={terms.emptyCustomersTitle}
+                description={terms.emptyCustomersText}
               />
             </div>
           ) : (
@@ -192,11 +194,11 @@ export default function TenantsPage() {
                 <TableRow>
                   <TableHead>№</TableHead>
                   <TableHead>F.I.O</TableHead>
-                  <TableHead>Xona</TableHead>
+                  <TableHead>{terms.unitSingular}</TableHead>
                   <TableHead className="hidden md:table-cell">Telefon</TableHead>
                   <TableHead className="hidden lg:table-cell">Arenda kirish</TableHead>
                   <TableHead className="hidden lg:table-cell">To&apos;lov muddati</TableHead>
-                  <TableHead className="hidden xl:table-cell">Shartnoma</TableHead>
+                  <TableHead className="hidden xl:table-cell">{terms.contractSingular}</TableHead>
                   <TableHead>Ijara</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
@@ -341,7 +343,7 @@ export default function TenantsPage() {
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
-        title="Arendatorni butunlay o'chirish"
+        title={terms.deleteCustomerTitle}
         description="Diqqat: shartnoma va barcha to'lovlar ham o'chadi. Tarixni saqlash uchun «Xonadan chiqish»ni tanlang."
         onConfirm={handleDelete}
       />

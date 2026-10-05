@@ -19,10 +19,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <TashkentTimeProvider>
               <div className="app-shell flex min-h-screen">
                 <DesktopSidebar />
-                <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
                   <Header />
                   <DemoModeBanner />
-                  <main className="app-shell-main flex-1 p-4 lg:p-6">
+                  <main className="app-shell-main w-full min-w-0 max-w-full flex-1 break-words p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:p-6">
                     {children}
                   </main>
                 </div>

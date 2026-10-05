@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { RENTAL_INDUSTRIES } from "@/lib/rental-industry";
+
 export const loginSchema = z
   .object({
     identifier: z.string().min(3, "Email yoki telefon kiriting").optional(),
@@ -18,24 +20,15 @@ export const loginSchema = z
     }
   );
 
-export const registerSchema = z
-  .object({
-    displayName: z.string().min(2, "Ism kiriting").optional(),
-    fullName: z.string().min(2, "Ism kiriting").optional(),
-    company: z.string().optional(),
-    email: z.string().email("To'g'ri email kiriting"),
-    phone: z.string().optional(),
-    password: z.string().min(6, "Parol kamida 6 ta belgi"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Parollar mos kelmadi",
-    path: ["confirmPassword"],
-  })
-  .refine((data) => Boolean(data.displayName?.trim() || data.fullName?.trim()), {
-    message: "Ism kiriting",
-    path: ["displayName"],
-  });
+export const registerSchema = z.object({
+  firstName: z.string().trim().min(1, "Ism kiriting").max(60),
+  lastName: z.string().trim().min(1, "Familiya kiriting").max(60),
+  phone: z.string().trim().min(1, "Telefon kiriting").max(32),
+  email: z.string().trim().email("To'g'ri email kiriting"),
+  password: z.string().min(6, "Parol kamida 6 ta belgi"),
+  company: z.string().trim().min(1, "Biznes nomini kiriting").max(120),
+  industry: z.enum(RENTAL_INDUSTRIES, { error: "Ijara sohasini tanlang" }),
+});
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email("To'g'ri email kiriting"),

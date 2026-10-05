@@ -37,6 +37,7 @@ import {
 } from "@/lib/cloud/sync-client";
 import { getCollectionApi } from "@/lib/data/store";
 import { clearDemoStorage } from "@/lib/demo-storage";
+import type { RentalIndustry } from "@/lib/rental-industry";
 import type { AppUser, Role, Tenant, WorkspaceSubscriptionView } from "@/types";
 
 function mapApiRole(role?: string): Role {
@@ -85,11 +86,13 @@ function mapApiUser(u: ApiUser): AppUser {
 }
 
 interface RegisterPayload {
-  displayName: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
   email: string;
   password: string;
-  role?: Role;
-  company?: string;
+  company: string;
+  industry: RentalIndustry;
 }
 
 interface AuthContextValue {
@@ -435,13 +438,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (payload: RegisterPayload) => {
+      const displayName = `${payload.firstName} ${payload.lastName}`.trim();
       if (apiMode) {
-        const roleToApi: Record<Role, string> = {
-          admin: "ADMIN",
-          manager: "MANAGER",
-          employee: "EMPLOYEE",
-          tenant: "TENANT",
-        };
         const res = await apiFetch<{
           user: ApiUser;
           workspace: WorkspaceSubscriptionView;
@@ -451,15 +449,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           method: "POST",
           auth: false,
           body: {
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            phone: payload.phone,
             email: payload.email,
             password: payload.password,
-            fullName: payload.displayName,
-            role: roleToApi[payload.role ?? "manager"],
+            company: payload.company,
+            industry: payload.industry,
           },
         });
         tokenStore.set(res.accessToken, res.refreshToken);
         clearDemoStorage();
-        setUser(mapApiUser(res.user));
+        setUser(mapApiUser({ ...res.user, company: payload.company }));
         setWorkspace(res.workspace);
         await refreshWorkspace();
         return;
@@ -470,13 +471,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           payload.email,
           payload.password
         );
-        await updateProfile(cred.user, { displayName: payload.displayName });
+        await updateProfile(cred.user, { displayName });
         const profile: AppUser = {
           id: cred.user.uid,
           uid: cred.user.uid,
           email: payload.email,
-          displayName: payload.displayName,
-          role: payload.role ?? "manager",
+          displayName,
+          phone: payload.phone,
+          role: "manager",
           company: payload.company,
           language: "uz",
           createdAt: new Date().toISOString(),
@@ -494,8 +496,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         uid: crypto.randomUUID(),
         email: payload.email,
         password: payload.password,
-        displayName: payload.displayName,
-        role: payload.role ?? "manager",
+        displayName,
+        phone: payload.phone,
+        role: "manager",
         company: payload.company,
         language: "uz",
         createdAt: new Date().toISOString(),

@@ -5,7 +5,10 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { cn } from "@/lib/utils";
-import { navigation } from "@/config/navigation";
+import {
+  getIndustryNavigation,
+  INTEGRATIONS_HREF,
+} from "@/config/industry-navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { WorkspaceStatusBadge } from "@/components/subscription/workspace-status-badge";
 import { useAuth } from "@/context/auth-context";
@@ -16,13 +19,21 @@ import { usePlanFeatures } from "@/hooks/use-plan-features";
 function isNavActive(
   href: string,
   pathname: string,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
+  hasIntegrationsItem = false
 ) {
   const [path, query = ""] = href.split("?");
   if (!path) return false;
   if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
   if (!query) {
     if (path === "/settings" && searchParams.get("section") === "lessor") {
+      return false;
+    }
+    if (
+      path === "/settings" &&
+      hasIntegrationsItem &&
+      searchParams.get("tab") === "integrations"
+    ) {
       return false;
     }
     return pathname === path || pathname.startsWith(`${path}/`);
@@ -41,10 +52,14 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useLanguage();
   const liveDebtCount = useLiveDebtCount();
   const { hasFeature } = usePlanFeatures();
+  const navigation = getIndustryNavigation(workspace?.industry);
+  const hasIntegrationsItem = navigation.some((section) =>
+    section.items.some((item) => item.href === INTEGRATIONS_HREF)
+  );
 
   return (
     <div className="app-sidebar flex h-full flex-col">
-      <div className="border-b border-white/10 px-6 py-4">
+      <div className="border-b border-white/10 px-6 py-4 max-lg:pr-14">
         <Link href="/" onClick={onNavigate} title="Asosiy sayt">
           <BrandLogo className="[&_span]:text-slate-50 [&_.text-primary]:text-sky-400 [&_>div]:bg-sky-500 [&_>div]:text-white [&_>div]:shadow-none" />
         </Link>
@@ -76,7 +91,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 py-5">
         {navigation.map((section) => {
           const items = section.items.filter((item) => {
             if (item.roles && !(user?.role && item.roles.includes(user.role))) {
@@ -95,8 +110,30 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               </p>
               <ul className="space-y-1">
                 {items.map((item) => {
-                  const active = isNavActive(item.href, pathname, searchParams);
-                  const title = t(item.titleKey);
+                  const title = item.label ?? t(item.titleKey);
+                  if (item.comingSoon) {
+                    return (
+                      <li key={`soon-${title}`}>
+                        <span
+                          aria-disabled="true"
+                          title={`${title} — tez orada`}
+                          className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 max-lg:min-h-11"
+                        >
+                          <item.icon className="size-4 shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{title}</span>
+                          <span className="ml-auto shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
+                            Tez orada
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  }
+                  const active = isNavActive(
+                    item.href,
+                    pathname,
+                    searchParams,
+                    hasIntegrationsItem
+                  );
                   const debtsLabel =
                     item.href === "/debts" && liveDebtCount > 0
                       ? `${title}, ${liveDebtCount} ta`
@@ -109,7 +146,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                         aria-label={debtsLabel}
                         title={debtsLabel}
                         className={cn(
-                          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                          "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 max-lg:min-h-11",
                           active
                             ? "bg-sky-500/15 text-sky-100 shadow-[0_0_24px_rgb(56_189_248_/_0.12)] ring-1 ring-sky-400/30"
                             : "text-slate-400 hover:bg-white/5 hover:text-slate-100"

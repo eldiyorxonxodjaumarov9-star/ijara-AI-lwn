@@ -7,6 +7,7 @@ import {
   sanitizeUser,
   signTokens,
 } from "@/lib/api-server/auth";
+import { seedDemoWorkspace } from "@/lib/api-server/demo-seed";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import {
@@ -50,12 +51,9 @@ export async function POST(req: NextRequest) {
       return fail(first ?? "Ma'lumotlar noto'g'ri", 400);
     }
 
-    const { email, password, company, phone } = parsed.data;
-    const fullName = (
-      parsed.data.displayName?.trim() ||
-      parsed.data.fullName?.trim() ||
-      ""
-    ).slice(0, 120);
+    const { email, password, company, phone, firstName, lastName, industry } =
+      parsed.data;
+    const fullName = `${firstName} ${lastName}`.trim().slice(0, 120);
 
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -71,15 +69,26 @@ export async function POST(req: NextRequest) {
         email: normalizedEmail,
         password: await bcrypt.hash(password, 10),
         fullName,
-        phone: phone?.trim() || undefined,
+        phone: phone.trim(),
         role: Role.ADMIN,
       },
     });
 
-    await createDemoWorkspaceForUser({
+    const { workspace } = await createDemoWorkspaceForUser({
       userId: user.id,
-      workspaceName: company?.trim() || fullName,
+      workspaceName: company.trim(),
+      industry,
     });
+
+    try {
+      await seedDemoWorkspace({ workspaceId: workspace.id });
+    } catch (seedErr) {
+      // Registration still succeeds with an empty DEMO workspace; the seed transaction rolled back.
+      console.error(
+        "[auth/register] demo seed failed",
+        seedErr instanceof Error ? seedErr.name : "unknown"
+      );
+    }
 
     const ctx = await resolveUserWorkspaceContext(user);
 

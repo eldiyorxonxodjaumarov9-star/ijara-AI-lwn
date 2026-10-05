@@ -1,4 +1,5 @@
 import type { PlanDefinition } from "@/lib/api-server/plans";
+import type { RentalIndustry } from "@/lib/rental-industry";
 export type Role = "admin" | "manager" | "employee" | "tenant";
 
 export type WorkspaceSubscriptionView = {
@@ -12,6 +13,7 @@ export type WorkspaceSubscriptionView = {
   workspaceId: string;
   workspaceName: string;
   trialDays: number;
+  industry?: RentalIndustry;
   currentPeriodStart?: string | null;
   entitlements?: PlanDefinition;
 };

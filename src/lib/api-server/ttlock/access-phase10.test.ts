@@ -173,6 +173,7 @@ describe("TTLock phase10 release audit", () => {
       "20260831140000_ttlock_remote_phase8",
       "20260831150000_ttlock_callback_phase9",
       "20260831160000_ttlock_callback_hardening",
+      "20260918100000_ttlock_bluetooth_sync",
     ];
     assert.equal(
       files.filter((f) => f.includes("ttlock") || f.includes("lwn_room_lock")).length,

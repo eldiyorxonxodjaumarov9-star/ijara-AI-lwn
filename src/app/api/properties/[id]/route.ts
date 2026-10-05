@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import { propertyBookingHistoryResponse } from "@/lib/api-server/bookings";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -97,6 +98,8 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     if (!isRecordInWorkspace(existing, wsCtx.workspace.id)) {
       return fail("Mulk topilmadi", 404);
     }
+    const history = await propertyBookingHistoryResponse(prisma, id);
+    if (history) return history;
     await prisma.property.delete({ where: { id } });
     return ok({ message: "Mulk o'chirildi" });
   } catch {

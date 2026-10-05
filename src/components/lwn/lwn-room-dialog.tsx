@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCollectionActions } from "@/hooks/use-collection";
+import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
 import { PROPERTY_STATUS_MAP } from "@/lib/constants";
 import { zResolver } from "@/lib/form";
 import { lwnRoomToProperty, propertyToLwnForm } from "@/lib/lwn-rooms";
@@ -52,6 +53,7 @@ export function LwnRoomDialog({
   room?: Property | null;
 }) {
   const { create, update } = useCollectionActions<Property>("properties");
+  const terms = useIndustryTerminology();
   const {
     register,
     handleSubmit,
@@ -89,7 +91,7 @@ export function LwnRoomDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{room ? "Xonani tahrirlash" : "Yangi xona"}</DialogTitle>
+          <DialogTitle>{room ? terms.editUnitTitle : terms.newUnitTitle}</DialogTitle>
           <DialogDescription>
             LWN xona ma&apos;lumotlari: raqam, narx, kv va holat.
           </DialogDescription>

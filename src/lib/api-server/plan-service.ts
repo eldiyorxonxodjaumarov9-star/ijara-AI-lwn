@@ -18,10 +18,10 @@ export async function checkRequestFeature(user: User, pathname: string) {
 
 export async function getPlanUsage(workspaceId: string, db: Prisma.TransactionClient = prisma) {
   const where = { workspaceId };
-  const [properties, tenants, employees] = await Promise.all([
-    db.property.count({ where }), db.tenant.count({ where }), db.employee.count({ where }),
+  const [properties, tenants, employees, vehicles] = await Promise.all([
+    db.property.count({ where }), db.tenant.count({ where }), db.employee.count({ where }), db.vehicle.count({ where }),
   ]);
-  return { properties, tenants, employees };
+  return { properties, tenants, employees, vehicles };
 }
 
 async function lockSubscription(db: Prisma.TransactionClient, workspaceId: string) {

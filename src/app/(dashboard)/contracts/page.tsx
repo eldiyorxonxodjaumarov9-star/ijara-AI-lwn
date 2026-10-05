@@ -19,6 +19,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ContractDialog } from "@/components/contracts/contract-dialog";
+import { CarRentalsView } from "@/components/vehicle-rentals/car-rentals-view";
+import { useAuth } from "@/context/auth-context";
 import { ClientDepositDialog } from "@/components/clients/client-deposit-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
+import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
 import { useTableData } from "@/hooks/use-table-data";
 import { isApiConfigured } from "@/lib/api/client";
 import { syncContractsFromTenantsApi } from "@/lib/contract-sync";
@@ -50,7 +53,14 @@ import { generateContractPdf } from "@/lib/pdf";
 import type { Client, Contract, Property } from "@/types";
 
 export default function ContractsPage() {
+  const { workspace } = useAuth();
+  if (workspace?.industry === "CAR_RENTAL") return <CarRentalsView />;
+  return <PropertyContractsPage />;
+}
+
+function PropertyContractsPage() {
   const tashkentNow = useTashkentNow();
+  const terms = useIndustryTerminology();
   const { data, loading, api } = useCollection<Contract>("contracts");
   const { data: clients, loading: loadingClients } = useCollection<Client>("clients");
   const { data: properties } = useCollection<Property>("properties");
@@ -138,8 +148,8 @@ export default function ContractsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Shartnomalar"
-        description="Ijara shartnomalarini boshqaring va PDF yarating."
+        title={terms.contractsLabel}
+        description={terms.contractsDescription}
         action={
           <div className="flex flex-wrap gap-2">
             {isApiConfigured && (
@@ -151,7 +161,7 @@ export default function ContractsPage() {
                 <RefreshCw
                   className={`mr-1.5 size-4 ${syncing ? "animate-spin" : ""}`}
                 />
-                Arendatorlardan yuklash
+                {terms.customerPlural}dan yuklash
               </Button>
             )}
             <Button
@@ -160,7 +170,7 @@ export default function ContractsPage() {
                 setDialogOpen(true);
               }}
             >
-              <Plus className="size-4" /> Shartnoma
+              <Plus className="size-4" /> {terms.addContractLabel}
             </Button>
           </div>
         }
@@ -169,7 +179,7 @@ export default function ContractsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Mulk yoki arendator bo'yicha..."
+          placeholder={`Mulk yoki ${terms.customerSingular.toLowerCase()} bo'yicha...`}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -188,8 +198,8 @@ export default function ContractsPage() {
             <div className="p-6">
               <EmptyState
                 icon={FileText}
-                title="Shartnomalar yo'q"
-                description="Birinchi shartnomangizni yarating."
+                title={terms.emptyContractsTitle}
+                description={terms.emptyContractsText}
               />
             </div>
           ) : (
@@ -197,7 +207,7 @@ export default function ContractsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Mulk</TableHead>
-                  <TableHead>Arendator</TableHead>
+                  <TableHead>{terms.customerSingular}</TableHead>
                   <TableHead className="hidden md:table-cell">Muddat</TableHead>
                   <TableHead>Oylik</TableHead>
                   <TableHead className="hidden lg:table-cell">Depozit</TableHead>

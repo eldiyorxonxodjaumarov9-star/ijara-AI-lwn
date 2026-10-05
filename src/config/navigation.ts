@@ -33,6 +33,10 @@ export interface NavItem {
   roles?: Role[];
   /** If set, item is hidden unless workspace has this paid feature. */
   feature?: PaidFeature;
+  /** Industry label override; wins over titleKey. */
+  label?: string;
+  /** Rendered as a disabled "Tez orada" row, never a link. */
+  comingSoon?: boolean;
 }
 
 export interface NavSection {

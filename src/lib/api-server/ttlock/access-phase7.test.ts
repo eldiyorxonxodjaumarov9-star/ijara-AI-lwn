@@ -113,6 +113,7 @@ function fakeGrantBase(
 describe("TTLock phase7 access grants", () => {
   it("req1+2+3: qulf yo‘q → grant planned; API yo‘q; Rejalashtirilgan + hint", () => {
     const pub = mapGrantToPublic(fakeGrantBase(), {
+      now: new Date("2026-09-01T00:00:00Z"),
       syncOutcome: "planned_only",
       userMessage:
         "Reja saqlandi. Qulf biriktirilmagani sababli qurilmaga yuborilmadi.",

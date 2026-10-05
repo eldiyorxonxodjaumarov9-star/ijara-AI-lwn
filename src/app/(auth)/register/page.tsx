@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type Ref } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import { toast } from "sonner";
@@ -18,9 +19,20 @@ import {
   RENTAL_INDUSTRY_LABELS,
   type RentalIndustry,
 } from "@/lib/rental-industry";
+import {
+  caretAfterDigits,
+  formatUzLocal,
+  toUzCanonical,
+  UZ_PHONE_PATTERN,
+  UZ_PHONE_PREFIX,
+  uzLocalDigits,
+  uzLocalFromCanonical,
+} from "@/lib/uz-phone";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
 
-const detailsSchema = registerSchema.omit({ industry: true });
+const detailsSchema = registerSchema.omit({ industry: true }).extend({
+  phone: z.string().regex(UZ_PHONE_PATTERN, "Telefon raqamini to‘liq kiriting"),
+});
 type DetailsInput = Omit<RegisterInput, "industry">;
 
 const fieldClass =
@@ -135,13 +147,18 @@ export default function RegisterPage() {
               icon={<Phone className="size-4" />}
               error={form.formState.errors.phone?.message}
               input={
-                <Input
-                  id="phone"
-                  type="tel"
-                  autoComplete="tel"
-                  placeholder="+998 90 123 45 67"
-                  className={fieldClass}
-                  {...form.register("phone")}
+                <Controller
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <UzPhoneInput
+                      id="phone"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      inputRef={field.ref}
+                    />
+                  )}
                 />
               }
             />
@@ -292,6 +309,59 @@ export default function RegisterPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+function UzPhoneInput({
+  id,
+  value,
+  onChange,
+  onBlur,
+  inputRef,
+}: {
+  id: string;
+  value: string;
+  onChange: (canonical: string) => void;
+  onBlur: () => void;
+  inputRef: Ref<HTMLInputElement>;
+}) {
+  const display = formatUzLocal(uzLocalFromCanonical(value ?? ""));
+
+  const commit = (el: HTMLInputElement, digits: string, digitsBeforeCaret: number) => {
+    onChange(toUzCanonical(digits));
+    const caret = caretAfterDigits(formatUzLocal(digits), Math.min(digitsBeforeCaret, digits.length));
+    requestAnimationFrame(() => {
+      if (document.activeElement === el) el.setSelectionRange(caret, caret);
+    });
+  };
+
+  return (
+    <>
+      <span className="pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 text-sm text-slate-300">
+        {UZ_PHONE_PREFIX}
+      </span>
+      <Input
+        id={id}
+        ref={inputRef}
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel-national"
+        placeholder="90 123 45 67"
+        className={`${fieldClass} pl-[4.5rem]`}
+        value={display}
+        onBlur={onBlur}
+        onChange={(e) => {
+          const el = e.target;
+          const before = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/\D/g, "").length;
+          commit(el, uzLocalDigits(el.value), before);
+        }}
+        onPaste={(e) => {
+          e.preventDefault();
+          const digits = uzLocalDigits(e.clipboardData.getData("text"), { pasted: true });
+          commit(e.currentTarget, digits, digits.length);
+        }}
+      />
+    </>
   );
 }
 

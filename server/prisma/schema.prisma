@@ -2022,3 +2022,17 @@ model AgentSettings {
 
   @@map("agent_settings")
 }
+
+/// Platform owner accounts. Fully separate from `User`, workspace roles and memberships.
+model PlatformAdmin {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("platform_admins")
+}

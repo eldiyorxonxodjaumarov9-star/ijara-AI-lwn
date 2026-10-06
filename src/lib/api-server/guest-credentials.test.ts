@@ -10,6 +10,7 @@ import { POST as createRoute } from "@/app/api/[resource]/route";
 import { PATCH as patchRoute } from "@/app/api/[resource]/[id]/route";
 import { withoutGuestCredentials } from "@/lib/api-server/tenants";
 import { prisma } from "@/lib/api-server/prisma";
+import { getIndustryTerminology } from "@/lib/industry-terminology";
 import { tenantUsesPortalCredentials } from "@/lib/tenant-credentials";
 import { tenantSchema } from "@/lib/validations";
 
@@ -238,6 +239,13 @@ describe("guest credentials — helpers and form", () => {
     assert.deepEqual(withoutGuestCredentials(body, "HOTEL_HOSTEL"), { fullName: "A" });
     assert.deepEqual(withoutGuestCredentials(body, "VILLA_RENTAL"), { fullName: "A" });
     assert.equal(withoutGuestCredentials(body, "OFFICE_RENTAL"), body);
+  });
+
+  it("dialog description mentions login/parol only where credentials exist", () => {
+    for (const industry of ["HOTEL_HOSTEL", "VILLA_RENTAL"]) {
+      assert.doesNotMatch(getIndustryTerminology(industry).customerDialogDescription, /login|parol/i, industry);
+    }
+    assert.match(getIndustryTerminology("OFFICE_RENTAL").customerDialogDescription, /login\/parol/);
   });
 
   it("tenant form schema accepts a guest without login/password", () => {

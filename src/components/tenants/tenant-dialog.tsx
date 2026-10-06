@@ -241,13 +241,15 @@ export function TenantDialog({
       }
 
       if (tenant) {
-        toast.success(withCredentials ? "Arendator yangilandi" : "Mehmon yangilandi");
+        toast.success(
+          withCredentials ? "Arendator yangilandi" : `${terms.customerSingular} yangilandi`
+        );
       } else if (withCredentials) {
         toast.success(
           `Arendator qo'shildi. Login: ${values.login}, Parol: ${values.password}`
         );
       } else {
-        toast.success("Mehmon qo'shildi");
+        toast.success(`${terms.customerSingular} qo'shildi`);
       }
       onOpenChange(false);
     } catch (err) {

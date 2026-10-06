@@ -156,6 +156,7 @@ const OVERRIDES: Record<Exclude<RentalIndustry, "OTHER">, Partial<IndustryTermin
   HOTEL_HOSTEL: {
     ...units({ one: "Xona", many: "Xonalar", acc: "xonani" }),
     ...customers("Mehmon", "Mehmonlar", "mehmonni"),
+    customerDialogDescription: "Mehmon ma'lumotlari, xona va to'lov holatini kiriting.",
     ...NEUTRAL_RECORDS,
   },
   CAR_RENTAL: {
@@ -183,6 +184,7 @@ const OVERRIDES: Record<Exclude<RentalIndustry, "OTHER">, Partial<IndustryTermin
   VILLA_RENTAL: {
     ...units({ one: "Dacha / Villa", many: "Dacha / Villalar", acc: "dacha / villani" }),
     ...customers("Mijoz", "Mijozlar", "mijozni"),
+    customerDialogDescription: "Mijoz ma'lumotlari, joy va to'lov holatini kiriting.",
     ...NEUTRAL_RECORDS,
   },
   COMMERCIAL_RENTAL: {

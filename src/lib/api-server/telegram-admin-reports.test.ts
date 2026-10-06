@@ -293,12 +293,10 @@ describe("Agent daily snapshot (internal LWN agent)", () => {
     assert.ok(scopedWheres.every((w) => w.where.workspaceId === "ws-internal"));
   });
 
-  it("unauthenticated agent call is rejected", async () => {
-    const res = await agentDailySnapshot(
-      new NextRequest("https://example.invalid/api/internal/agent/v1/daily-snapshot")
-    );
-    // 401 without token; 503 when the gateway is fail-closed (not configured).
-    assert.ok([401, 503].includes(res.status), String(res.status));
+  it("the retired Hermes snapshot endpoint reads nothing", async () => {
+    const res = await agentDailySnapshot();
+    // AI Employees read data inside the app now.
+    assert.equal(res.status, 410);
     assert.equal(tenantWheres.length, 0);
     assert.equal(scopedWheres.length, 0);
   });

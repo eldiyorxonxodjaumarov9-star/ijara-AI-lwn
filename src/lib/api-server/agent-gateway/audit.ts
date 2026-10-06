@@ -11,6 +11,7 @@ import { prisma } from "@/lib/api-server/prisma";
 import { summarizeForAudit } from "@/lib/api-server/agent-gateway/redact";
 
 export async function createAgentRun(input: {
+  workspaceId?: string;
   agentType: AgentType;
   triggerType: AgentTriggerType;
   triggerRef?: string;
@@ -30,6 +31,7 @@ export async function createAgentRun(input: {
   try {
     const run = await prisma.agentRun.create({
       data: {
+        workspaceId: input.workspaceId,
         agentType: input.agentType,
         triggerType: input.triggerType,
         triggerRef: input.triggerRef,
@@ -84,6 +86,7 @@ export async function patchAgentRun(
 }
 
 export async function writeAgentActionAudit(input: {
+  workspaceId?: string;
   runId?: string;
   agentType: AgentType;
   action: string;
@@ -110,6 +113,7 @@ export async function writeAgentActionAudit(input: {
   try {
     const audit = await prisma.agentActionAudit.create({
       data: {
+        workspaceId: input.workspaceId,
         runId: input.runId,
         agentType: input.agentType,
         action: input.action,

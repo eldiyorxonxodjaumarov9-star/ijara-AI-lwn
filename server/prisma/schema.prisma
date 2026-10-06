@@ -349,6 +349,9 @@ model Workspace {
   manualDebts        ManualDebt[]
   manualDebtPayments ManualDebtPayment[]
   activityEvents     WorkspaceActivityEvent[]
+  agentRuns          AgentRun[]
+  agentActionAudits  AgentActionAudit[]
+  agentSettings      AgentSettings?
 
   @@index([isInternal])
   @@map("workspaces")
@@ -2112,6 +2115,8 @@ enum AgentRiskLevel {
 
 model AgentRun {
   id             String           @id @default(uuid())
+  /// Null only for legacy gateway runs created before workspace scoping.
+  workspaceId    String?
   agentType      AgentType
   triggerType    AgentTriggerType
   triggerRef     String?
@@ -2132,8 +2137,11 @@ model AgentRun {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  actions AgentActionAudit[]
+  actions   AgentActionAudit[]
+  workspace Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, agentType, createdAt])
   @@index([status, createdAt])
   @@index([agentType, createdAt])
   @@index([traceId])
@@ -2142,6 +2150,7 @@ model AgentRun {
 
 model AgentActionAudit {
   id             String            @id @default(uuid())
+  workspaceId    String?
   runId          String?
   agentType      AgentType
   action         String
@@ -2157,15 +2166,19 @@ model AgentActionAudit {
   durationMs     Int?
   createdAt      DateTime          @default(now())
 
-  run AgentRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  run       AgentRun?  @relation(fields: [runId], references: [id], onDelete: SetNull)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId, createdAt])
   @@index([runId, createdAt])
   @@index([action, createdAt])
   @@map("agent_action_audits")
 }
 
+/// Row "default" (workspaceId null) is the Agent Gateway kill switch; AI Employees use one row per workspace.
 model AgentSettings {
   id                     String   @id @default("default")
+  workspaceId            String?  @unique
   masterEnabled          Boolean  @default(false)
   managerEnabled         Boolean  @default(true)
   paymentEnabled         Boolean  @default(true)
@@ -2177,6 +2190,8 @@ model AgentSettings {
   updatedBy              String?
   updatedAt              DateTime @updatedAt
   createdAt              DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("agent_settings")
 }

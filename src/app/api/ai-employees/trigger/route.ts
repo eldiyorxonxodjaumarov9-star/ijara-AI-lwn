@@ -1,178 +1,111 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/api-server/auth";
-import {
-  createAgentRun,
-  patchAgentRun,
-  writeAgentActionAudit,
-} from "@/lib/api-server/agent-gateway/audit";
-import {
-  buildDailySnapshot,
-  dailyReportIdempotencyKey,
-} from "@/lib/api-server/agent-gateway/daily-snapshot";
-import { buildDefaultRecommendations } from "@/lib/api-server/agent-gateway/report-format";
-import { getOrCreateAgentSettings } from "@/lib/api-server/agent-gateway/settings";
-import { deliverDailyManagerTelegram } from "@/lib/api-server/agent-gateway/telegram-notify";
-import {
-  isAiEmployeesEnvEnabled,
-  isGatewayConfigured,
-} from "@/lib/api-server/agent-gateway/config";
+import { requireAiEmployeesAccess, usageLoaderFor } from "@/lib/api-server/ai-agents/access";
+import { AI_AGENT_KINDS, AI_AGENTS } from "@/lib/api-server/ai-agents/agents";
+import { readDeepSeekConfig } from "@/lib/api-server/ai-agents/deepseek";
+import { runAiAgent, runDailyReport, type AgentRunOutcome } from "@/lib/api-server/ai-agents/run-agent";
+import { getWorkspaceAgentSettings } from "@/lib/api-server/agent-gateway/settings";
 import { checkAgentRateLimit } from "@/lib/api-server/agent-gateway/rate-limit";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 
-function assertAdmin(role: string) {
-  return role === "SUPER_ADMIN" || role === "ADMIN";
+export const maxDuration = 120;
+
+const bodySchema = z
+  .object({
+    mode: z.enum(["agent", "test", "daily"]).default("test"),
+    agent: z.enum(AI_AGENT_KINDS).optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict();
+
+function agentResponse(outcome: AgentRunOutcome) {
+  if (outcome.ok) {
+    return {
+      agent: outcome.agent,
+      status: "completed" as const,
+      runId: outcome.runId,
+      report: outcome.report,
+      dataAsOf: outcome.dataAsOf,
+      toolsUsed: outcome.toolsUsed,
+      model: outcome.model,
+      usage: outcome.usage,
+      countedAsAiWork: outcome.countedAsAiWork,
+    };
+  }
+  return { agent: outcome.agent, status: "failed" as const, runId: outcome.runId, errorCode: outcome.errorCode, message: outcome.message };
 }
 
-const bodySchema = z.object({
-  mode: z.enum(["test", "daily"]).default("test"),
-  dryRun: z.boolean().optional(),
-});
-
 /**
- * POST /api/ai-employees/trigger
- * Admin manual trigger — default dry-run, audited, rate-limited.
+ * POST /api/ai-employees/trigger — DeepSeek agents on the caller's workspace.
+ * The workspace always comes from the session; the body cannot name one.
  */
 export async function POST(req: NextRequest) {
-  if (!isDatabaseConfigured()) {
-    return fail("DATABASE_URL sozlanmagan", 501);
-  }
-  const auth = await requireUser(req);
-  if (auth.error) return auth.error;
-  if (!assertAdmin(auth.user.role)) {
-    return fail("Faqat admin", 403);
-  }
+  if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
+  const access = await requireAiEmployeesAccess(req, "run");
+  if (access.error) return access.error;
+  const { workspaceId, wsCtx, user } = access;
 
-  if (!isAiEmployeesEnvEnabled()) {
-    return fail("AI Employees o‘chirilgan (env)", 503, "AI_EMPLOYEES_DISABLED");
-  }
-  if (!isGatewayConfigured()) {
-    return fail("Agent Gateway sozlanmagan", 503, "GATEWAY_NOT_CONFIGURED");
-  }
-
-  const limited = checkAgentRateLimit(`admin-trigger:${auth.user.id}`);
-  if (!limited.ok) {
-    return fail("Rate limit", 429, "RATE_LIMITED");
-  }
+  if (!checkAgentRateLimit(`ai-employees:${user.id}`).ok) return fail("Rate limit", 429, "RATE_LIMITED");
 
   let json: unknown = {};
   try {
-    if (req.headers.get("content-type")?.includes("application/json")) {
-      json = await req.json();
-    }
+    const text = await req.text();
+    if (text.trim()) json = JSON.parse(text);
   } catch {
     return fail("JSON body yaroqsiz", 400);
   }
+  const parsed = bodySchema.safeParse(json);
+  if (!parsed.success) return fail("Validation xatosi", 400, "VALIDATION_ERROR");
+  const { mode } = parsed.data;
 
-  const parsed = bodySchema.safeParse(json ?? {});
-  if (!parsed.success) {
-    return fail("Validation xatosi", 400);
-  }
+  if (!readDeepSeekConfig()) return fail("DeepSeek ulanmagan", 503, "DEEPSEEK_NOT_CONFIGURED");
 
-  const settings = await getOrCreateAgentSettings();
-  if (!settings.masterEnabled && parsed.data.mode === "daily") {
-    return fail("Master o‘chirilgan", 503, "MASTER_DISABLED");
-  }
+  const settings = await getWorkspaceAgentSettings(workspaceId);
+  const loadUsageAnalytics = usageLoaderFor(wsCtx);
 
-  const dryRun =
-    parsed.data.dryRun ??
-    settings.dryRunDefault ??
-    true;
-
-  const snapshot = await buildDailySnapshot();
-  const idempotencyKey =
-    parsed.data.mode === "daily"
-      ? dailyReportIdempotencyKey(snapshot.date)
-      : `test-manager-report:${snapshot.date}:${auth.user.id}:${Date.now()}`;
-
-  const { run, duplicate } = await createAgentRun({
-    agentType: "MANAGER",
-    triggerType: parsed.data.mode === "test" ? "TEST" : "MANUAL",
-    triggerRef: `admin:${auth.user.id}`,
-    idempotencyKey:
-      parsed.data.mode === "daily" ? idempotencyKey : undefined,
-    metadata: { dryRun, mode: parsed.data.mode },
-  });
-
-  if (duplicate && parsed.data.mode === "daily") {
-    return ok({
-      status: "already_processed",
-      run,
-      dryRun: true,
-      snapshotSummary: {
-        date: snapshot.date,
-        dueTodayCount: snapshot.payments.dueTodayCount,
-        overdueCount: snapshot.payments.overdueCount,
-        totalDebt: snapshot.payments.totalDebt,
-      },
+  if (mode === "agent") {
+    const agent = parsed.data.agent;
+    if (!agent) return fail("Agent tanlanmagan", 400, "AGENT_REQUIRED");
+    if (!settings.masterEnabled) return fail("Master o‘chirilgan", 409, "MASTER_DISABLED");
+    if (!settings[AI_AGENTS[agent].settingKey]) return fail(`${AI_AGENTS[agent].label} o‘chirilgan`, 409, "AGENT_DISABLED");
+    const outcome = await runAiAgent({
+      workspaceId,
+      agent,
+      trigger: "MANUAL",
+      dryRun: parsed.data.dryRun ?? settings.dryRunDefault,
+      userId: user.id,
+      loadUsageAnalytics,
     });
+    if (!outcome.ok) return fail(outcome.message, 503, outcome.errorCode);
+    return ok({ mode, dryRun: parsed.data.dryRun ?? settings.dryRunDefault, ...agentResponse(outcome) });
   }
 
-  await patchAgentRun(run.id, {
-    status: "RUNNING",
-    startedAt: new Date(),
-  });
+  if (mode === "daily" && !settings.masterEnabled) return fail("Master o‘chirilgan", 409, "MASTER_DISABLED");
 
-  const recommendations = buildDefaultRecommendations(snapshot);
-  const delivery = await deliverDailyManagerTelegram(
-    {
-      type: "DAILY_MANAGER_REPORT",
-      reportDate: snapshot.date,
-      runId: run.id,
-      idempotencyKey:
-        parsed.data.mode === "daily"
-          ? idempotencyKey
-          : `${idempotencyKey}:tg`,
-      dryRun,
-      recommendations,
-      report: {
-        dueTodayCount: snapshot.payments.dueTodayCount,
-        overdueCount: snapshot.payments.overdueCount,
-        totalDebt: snapshot.payments.totalDebt,
-        vacantRooms: snapshot.occupancy.vacant,
-        recommendations,
-      },
-    },
-    snapshot
-  );
-
-  await writeAgentActionAudit({
-    runId: run.id,
-    agentType: "MANAGER",
-    action: "admin.trigger",
-    riskLevel: "LOW",
-    input: { mode: parsed.data.mode, dryRun, userId: auth.user.id },
-    output: { deliveryStatus: delivery.status },
-    status: "SUCCEEDED",
-  });
-
-  await patchAgentRun(run.id, {
-    status: "COMPLETED",
-    completedAt: new Date(),
-    metadata: {
-      dryRun,
-      mode: parsed.data.mode,
-      deliveryStatus: delivery.status,
-    },
-  });
-
-  return ok({
-    status: "completed",
-    runId: run.id,
+  const dryRun = mode === "test" ? true : (parsed.data.dryRun ?? settings.dryRunDefault);
+  const outcome = await runDailyReport({
+    workspaceId,
+    trigger: mode === "test" ? "TEST" : "MANUAL",
     dryRun,
-    delivery,
-    snapshotSummary: {
-      date: snapshot.date,
-      dueTodayCount: snapshot.payments.dueTodayCount,
-      overdueCount: snapshot.payments.overdueCount,
-      totalDebt: snapshot.payments.totalDebt,
-      vacantRooms: snapshot.occupancy.vacant,
-      comparison: snapshot.comparison,
-      expenseHighlights: snapshot.expenseHighlights.slice(0, 3),
-    },
-    recommendations,
-    preview: "preview" in delivery ? delivery.preview : undefined,
+    userId: user.id,
+    settings,
+    loadUsageAnalytics,
+  });
+  if (outcome.status === "already_processed") return ok({ mode, status: outcome.status, runId: outcome.runId });
+  if (outcome.status === "failed") {
+    const first = outcome.agents.find((a) => !a.ok);
+    return fail(first && !first.ok ? first.message : "Agentlar yoqilmagan", 503, first && !first.ok ? first.errorCode : "NO_AGENTS_ENABLED");
+  }
+  return ok({
+    mode,
+    status: outcome.status,
+    dryRun,
+    runId: outcome.runId,
+    report: outcome.report,
+    dataAsOf: outcome.dataAsOf,
+    delivery: outcome.delivery,
+    agents: outcome.agents.map(agentResponse),
   });
 }

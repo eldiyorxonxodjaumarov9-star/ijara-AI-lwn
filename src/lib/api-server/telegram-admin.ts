@@ -362,6 +362,36 @@ export async function getAdminRowsForOwner(user: User) {
 }
 
 /**
+ * Linked admin chats of one workspace: the owner must be a member and their
+ * report scope (same rule as admin reports) must resolve to this workspace.
+ */
+export async function workspaceAdminTelegramChats(workspaceId: string): Promise<string[]> {
+  const devices = await prisma.telegramAdminDevice.findMany({
+    where: {
+      user: {
+        isActive: true,
+        role: { in: OWNER_ROLES },
+        workspaceMemberships: { some: { workspaceId } },
+      },
+    },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    select: { chatId: true, user: true },
+  });
+  const scopeByUser = new Map<string, string | null>();
+  const chats: string[] = [];
+  for (const { chatId, user } of devices) {
+    if (!scopeByUser.has(user.id)) {
+      scopeByUser.set(
+        user.id,
+        await resolveOwnerReportScope(user).then((s) => s.workspaceId).catch(() => null)
+      );
+    }
+    if (scopeByUser.get(user.id) === workspaceId && !chats.includes(chatId)) chats.push(chatId);
+  }
+  return chats;
+}
+
+/**
  * Cron: har bir admin chatga faqat o'z workspace hisobotini yuboradi.
  * Workspace har bir recipient foydalanuvchining a'zoligidan resolve qilinadi;
  * bitta chatga bir ishga tushishda bitta hisobot.

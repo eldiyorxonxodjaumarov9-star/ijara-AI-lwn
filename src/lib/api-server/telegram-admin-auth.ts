@@ -4,7 +4,7 @@ import { prisma } from "@/lib/api-server/prisma";
 import { sendTelegramMessage } from "@/lib/api-server/telegram-bot";
 import {
   buildAdminSummaryMessage,
-  getAdminDashboardRows,
+  getAdminRowsForOwner,
   ADMIN_MENU_KEYBOARD,
 } from "@/lib/api-server/telegram-admin";
 
@@ -213,7 +213,7 @@ export async function verifyNewDeviceOtp(chatId: string, code: string) {
 }
 
 export async function openAdminPanel(chatId: string, user: User) {
-  const rows = await getAdminDashboardRows();
+  const rows = await getAdminRowsForOwner(user);
   await sendTelegramMessage(
     chatId,
     `✅ <b>Xush kelibsiz, ${user.fullName}!</b>\n\n` +

@@ -3,7 +3,7 @@ import {
   buildAdminDueSoonMessage,
   buildAdminSummaryMessage,
   buildAdminTenantsMessage,
-  getAdminDashboardRows,
+  getAdminRowsForOwner,
   sendAdminMessage,
   verifyOwnerCredentials,
   ADMIN_MENU_KEYBOARD,
@@ -185,7 +185,7 @@ async function handleOwnerMenu(chatId: string, text: string) {
     return;
   }
 
-  const rows = await getAdminDashboardRows();
+  const rows = await getAdminRowsForOwner(owner);
 
   if (text === "📋 Arendatorlar") {
     await sendAdminMessage(chatId, buildAdminTenantsMessage(rows));

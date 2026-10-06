@@ -1,6 +1,7 @@
 import { MAPPERS } from "@/lib/api/mappers";
 import { getAdminDashboardRows } from "@/lib/api-server/telegram-admin";
 import { prisma } from "@/lib/api-server/prisma";
+import { ensureWorkspaceBootstrap } from "@/lib/api-server/workspace";
 import {
   buildMonthlyComparison,
   parseYearMonth,
@@ -75,24 +76,39 @@ function percentOrNull(previous: number, difference: number): number | null {
   return Math.round((difference / previous) * 10000) / 100;
 }
 
+/**
+ * Agent Gateway (LWN ichki agent) faqat ichki workspace ma'lumotini ko'radi —
+ * SaaS mijoz workspace'lari uning hisobotiga tushmaydi.
+ */
+export async function resolveAgentWorkspaceId(): Promise<string> {
+  const internal = await prisma.workspace.findFirst({
+    where: { isInternal: true },
+    select: { id: true },
+  });
+  if (internal) return internal.id;
+  return (await ensureWorkspaceBootstrap()).id;
+}
+
 export async function buildDailySnapshot(
-  now = new Date()
+  now = new Date(),
+  workspaceId?: string
 ): Promise<DailySnapshot> {
+  const ws = workspaceId ?? (await resolveAgentWorkspaceId());
   const parts = getTashkentDateParts(now);
   const date = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
   const currentMonth: YearMonth = { year: parts.year, month: parts.month };
   const previousMonth = shiftMonth(currentMonth, -1);
 
-  const rows = await getAdminDashboardRows();
+  const rows = await getAdminDashboardRows({ workspaceId: ws });
   const overdue = rows.filter((r) => r.hasDebt && r.overdueDays > 0);
   const dueTodayCount = rows.filter((r) => r.daysLeft === 0 && !r.hasDebt).length;
   const overdueCount = overdue.length;
   const totalDebt = rows.reduce((s, r) => s + (r.hasDebt ? r.debtAmount : 0), 0);
 
   const [occupied, vacant, totalRooms] = await Promise.all([
-    prisma.property.count({ where: { status: "RENTED" } }),
-    prisma.property.count({ where: { status: "AVAILABLE" } }),
-    prisma.property.count(),
+    prisma.property.count({ where: { workspaceId: ws, status: "RENTED" } }),
+    prisma.property.count({ where: { workspaceId: ws, status: "AVAILABLE" } }),
+    prisma.property.count({ where: { workspaceId: ws } }),
   ]);
 
   const baseRaw = ymKey(previousMonth);
@@ -113,6 +129,7 @@ export async function buildDailySnapshot(
   const [paymentRows, expenseRows] = await Promise.all([
     prisma.payment.findMany({
       where: {
+        workspaceId: ws,
         OR: [
           {
             AND: [
@@ -143,6 +160,7 @@ export async function buildDailySnapshot(
     }),
     prisma.expense.findMany({
       where: {
+        workspaceId: ws,
         date: {
           gte: new Date(rangeStart),
           lt: new Date(rangeEnd),

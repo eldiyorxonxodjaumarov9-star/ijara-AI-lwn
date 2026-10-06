@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
-import type { Role } from "@prisma/client";
+import type { Role, User } from "@prisma/client";
 
 import { prisma } from "@/lib/api-server/prisma";
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 import { computeContractDebt } from "@/lib/debt-calculator";
 import { sendTelegramMessage } from "@/lib/api-server/telegram-bot";
 import {
@@ -81,18 +82,33 @@ export type AdminTenantRow = {
   isDueSoon: boolean;
 };
 
+export type AdminReportScope = {
+  /** Server tomonda resolve qilingan workspace — client qiymati emas. */
+  workspaceId: string;
+};
+
 /**
  * Saytdagi Qarzdorliklar / Arendatorlar bilan bir xil hisob:
  * to'lovlar bo'yicha computeContractDebt + Toshkent vaqti.
+ * Faqat bitta workspace ma'lumoti qaytadi.
  */
-export async function getAdminDashboardRows(): Promise<AdminTenantRow[]> {
+export async function getAdminDashboardRows(
+  scope: AdminReportScope
+): Promise<AdminTenantRow[]> {
+  if (!scope?.workspaceId) {
+    throw new Error("Admin report uchun workspaceId talab qilinadi");
+  }
+  const { workspaceId } = scope;
   const now = new Date();
   const tenants = await prisma.tenant.findMany({
-    where: { leftAt: null },
+    where: { leftAt: null, workspaceId },
     orderBy: { fullName: "asc" },
     include: {
       contracts: {
-        where: { status: { in: ["ACTIVE", "PENDING", "EXPIRED"] } },
+        where: {
+          workspaceId,
+          status: { in: ["ACTIVE", "PENDING", "EXPIRED"] },
+        },
         include: {
           property: true,
           payments: true,
@@ -332,54 +348,95 @@ export const ADMIN_MENU_KEYBOARD = {
   resize_keyboard: true,
 };
 
+/** Bog'langan egasi (Telegram admin) uchun — uning a'zoligi bo'yicha workspace. */
+export async function resolveOwnerReportScope(user: User): Promise<AdminReportScope> {
+  const ctx = await resolveUserWorkspaceContext(user);
+  return { workspaceId: ctx.workspace.id };
+}
+
+export async function getAdminRowsForOwner(user: User) {
+  return getAdminDashboardRows(await resolveOwnerReportScope(user));
+}
+
+/**
+ * Cron: har bir admin chatga faqat o'z workspace hisobotini yuboradi.
+ * Workspace har bir recipient foydalanuvchining a'zoligidan resolve qilinadi;
+ * bitta chatga bir ishga tushishda bitta hisobot.
+ */
 export async function sendAdminReportsToAll(slotLabel?: string) {
   const devices = await prisma.telegramAdminDevice.findMany({
     where: {
       user: { isActive: true, role: { in: OWNER_ROLES } },
     },
-    select: { chatId: true },
+    select: { chatId: true, user: true },
   });
 
-  const chatIds = [...new Set(devices.map((d) => d.chatId))];
+  const recipients: { chatId: string; user: User }[] = devices.map((d) => ({
+    chatId: d.chatId,
+    user: d.user,
+  }));
 
-  if (chatIds.length === 0) {
+  if (recipients.length === 0) {
     const legacyOwners = await prisma.user.findMany({
       where: {
         telegramAdminChatId: { not: null },
         isActive: true,
         role: { in: OWNER_ROLES },
       },
-      select: { telegramAdminChatId: true },
     });
     for (const o of legacyOwners) {
-      if (o.telegramAdminChatId) chatIds.push(o.telegramAdminChatId);
+      if (o.telegramAdminChatId) {
+        recipients.push({ chatId: o.telegramAdminChatId, user: o });
+      }
     }
   }
 
-  if (chatIds.length === 0) {
-    return { sent: 0, skipped: 0 };
+  if (recipients.length === 0) {
+    return { sent: 0, skipped: 0, workspaces: 0 };
   }
 
-  const rows = await getAdminDashboardRows();
   const prefix = slotLabel ? `${slotLabel}\n\n` : "";
-  const text = prefix + buildAdminSummaryMessage(rows);
+  const scopeByUser = new Map<string, AdminReportScope | null>();
+  const textByWorkspace = new Map<string, string>();
+  const sentChats = new Set<string>();
 
   let sent = 0;
   let skipped = 0;
-  for (const chatId of chatIds) {
+  for (const { chatId, user } of recipients) {
+    if (sentChats.has(chatId)) continue;
+    sentChats.add(chatId);
+
     try {
+      if (!scopeByUser.has(user.id)) {
+        scopeByUser.set(
+          user.id,
+          await resolveOwnerReportScope(user).catch(() => null)
+        );
+      }
+      const scope = scopeByUser.get(user.id);
+      if (!scope) {
+        skipped += 1;
+        continue;
+      }
+      let text = textByWorkspace.get(scope.workspaceId);
+      if (text === undefined) {
+        text = prefix + buildAdminSummaryMessage(await getAdminDashboardRows(scope));
+        textByWorkspace.set(scope.workspaceId, text);
+      }
       await sendAdminMessage(chatId, text);
       sent += 1;
     } catch {
       skipped += 1;
     }
   }
-  return { sent, skipped };
+  return { sent, skipped, workspaces: textByWorkspace.size };
 }
 
 /** Eslatma uchun — sayt qarzdorlari bilan bir xil */
-export async function getAdminDebtReminderRows(): Promise<DebtReminderInput[]> {
-  const rows = await getAdminDashboardRows();
+export async function getAdminDebtReminderRows(
+  scope: AdminReportScope
+): Promise<DebtReminderInput[]> {
+  const rows = await getAdminDashboardRows(scope);
   return rows
     .filter((r) => r.hasDebt)
     .map((r) => ({

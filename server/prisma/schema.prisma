@@ -303,6 +303,10 @@ model Workspace {
   isInternal Boolean         @default(false)
   /** Legacy rows stay OTHER until a new signup picks an industry. */
   industry   RentalIndustry  @default(OTHER)
+  /** Set by the signup demo seed; anchors which records count as seeded demo data. */
+  demoSeededAt      DateTime?
+  /** Once set, demo data was cleared and the seed must never run again. Independent of plan. */
+  demoDataClearedAt DateTime?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 

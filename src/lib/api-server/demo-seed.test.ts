@@ -216,7 +216,14 @@ test("invalid industry falls back to OTHER", () => {
 });
 
 type Row = Record<string, unknown> & { workspaceId?: string };
-type Ws = { id: string; industry: string; isInternal: boolean; subscription: { status: string; plan: string } | null };
+type Ws = {
+  id: string;
+  industry: string;
+  isInternal: boolean;
+  subscription: { status: string; plan: string } | null;
+  demoSeededAt?: Date | null;
+  demoDataClearedAt?: Date | null;
+};
 
 function fakeClient(workspaces: Ws[]) {
   const tables: Record<string, Row[]> = {
@@ -235,6 +242,8 @@ function fakeClient(workspaces: Ws[]) {
     $queryRaw: async () => [],
     workspace: {
       findUnique: async ({ where }: { where: { id: string } }) => workspaces.find((w) => w.id === where.id) ?? null,
+      update: async ({ where, data }: { where: { id: string }; data: Partial<Ws> }) =>
+        Object.assign(workspaces.find((w) => w.id === where.id)!, data),
     },
     property: model("property"),
     tenant: model("tenant"),
@@ -255,6 +264,18 @@ const demoWs = (id: string, industry = "OFFICE_RENTAL"): Ws => ({
   industry,
   isInternal: false,
   subscription: { status: "DEMO", plan: "demo" },
+});
+
+test("seed records demoSeededAt and never runs once demo data was cleared", async () => {
+  const seededWs = demoWs("s1");
+  const { client } = fakeClient([seededWs]);
+  assert.equal((await seedDemoWorkspace({ workspaceId: "s1", now: NOW }, client)).seeded, true);
+  assert.equal(seededWs.demoSeededAt?.getTime(), NOW.getTime());
+
+  const cleared = { ...demoWs("c1"), demoDataClearedAt: NOW };
+  const { client: c2, tables } = fakeClient([cleared]);
+  assert.deepEqual(await seedDemoWorkspace({ workspaceId: "c1", now: NOW }, c2), { seeded: false, reason: "CLEARED" });
+  assert.ok(Object.values(tables).every((rows) => rows.length === 0));
 });
 
 test("seed is idempotent: second run does not add records", async () => {

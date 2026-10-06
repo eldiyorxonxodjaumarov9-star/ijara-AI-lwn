@@ -223,6 +223,14 @@ const SEEDS: Record<RentalIndustry, IndustrySeed> = {
   },
 };
 
+/** Every customer name the seed can write (seeded tenants carry no note column). */
+export const DEMO_SEED_CUSTOMER_NAMES: readonly string[] = [
+  ...new Set(Object.values(SEEDS).flatMap((s) => s.customers)),
+];
+
+/** Seeded tenant phones are "+99890000" + 4-digit index; only meaningful together with name and seed time. */
+export const DEMO_SEED_TENANT_PHONE = /^\+99890000\d{4}$/;
+
 export type DemoSeedPlan = {
   industry: RentalIndustry;
   properties: {

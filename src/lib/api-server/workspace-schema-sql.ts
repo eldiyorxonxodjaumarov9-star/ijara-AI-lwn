@@ -139,6 +139,8 @@ const STATEMENTS = [
      );
    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "industry" "RentalIndustry" NOT NULL DEFAULT 'OTHER'`,
+  `ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "demoSeededAt" TIMESTAMP(3)`,
+  `ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "demoDataClearedAt" TIMESTAMP(3)`,
 
   `DO $$ BEGIN
      CREATE TYPE "VehicleStatus" AS ENUM ('AVAILABLE', 'RENTED', 'MAINTENANCE', 'INACTIVE');

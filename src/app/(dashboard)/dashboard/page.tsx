@@ -14,6 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { ClearDemoDataBanner } from "@/components/dashboard/clear-demo-data-banner";
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { IndustryDashboard } from "@/components/dashboard/industry-dashboard";
@@ -231,22 +232,25 @@ export default function DashboardPage() {
 
   if (industryConfig) {
     return (
-      <IndustryDashboard
-        config={industryConfig}
-        loading={loading || vehiclesLoading || rentalsLoading || bookingsLoading}
-        inventory={inventory}
-        vehicles={vehicles}
-        rentals={rentals}
-        bookings={bookings}
-        today={today}
-        monthlyIncome={industryMonthlyIncome}
-        debtCount={debtCount}
-        todayIncome={todayIncome}
-        properties={properties}
-        payments={industryPayments}
-        contracts={upcomingContracts}
-        tenants={tenants}
-      />
+      <div className="space-y-4">
+        <ClearDemoDataBanner />
+        <IndustryDashboard
+          config={industryConfig}
+          loading={loading || vehiclesLoading || rentalsLoading || bookingsLoading}
+          inventory={inventory}
+          vehicles={vehicles}
+          rentals={rentals}
+          bookings={bookings}
+          today={today}
+          monthlyIncome={industryMonthlyIncome}
+          debtCount={debtCount}
+          todayIncome={todayIncome}
+          properties={properties}
+          payments={industryPayments}
+          contracts={upcomingContracts}
+          tenants={tenants}
+        />
+      </div>
     );
   }
 
@@ -255,6 +259,7 @@ export default function DashboardPage() {
       <div className="dash-grid-fade pointer-events-none absolute inset-x-0 -top-4 h-64 opacity-60" aria-hidden />
 
       <div className="relative space-y-5 sm:space-y-6">
+        <ClearDemoDataBanner />
         <header className="app-panel app-reveal overflow-hidden p-5 sm:p-6">
           <div
             className="pointer-events-none absolute -right-10 -top-16 size-56 rounded-full bg-sky-500/20 blur-3xl"

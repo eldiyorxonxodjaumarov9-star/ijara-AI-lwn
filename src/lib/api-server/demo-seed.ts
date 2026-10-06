@@ -9,7 +9,7 @@ import { prisma } from "./prisma";
 
 export type DemoSeedResult =
   | { seeded: true; industry: DemoSeedPlan["industry"]; counts: Record<string, number> }
-  | { seeded: false; reason: "NOT_FOUND" | "NOT_DEMO" | "NOT_EMPTY" };
+  | { seeded: false; reason: "NOT_FOUND" | "NOT_DEMO" | "NOT_EMPTY" | "CLEARED" };
 
 type SeedClient = Pick<PrismaClient, "$transaction">;
 
@@ -27,9 +27,16 @@ export async function seedDemoWorkspace(
       await db.$queryRaw`SELECT id FROM workspace_subscriptions WHERE "workspaceId" = ${workspaceId} FOR UPDATE`;
       const workspace = await db.workspace.findUnique({
         where: { id: workspaceId },
-        select: { id: true, industry: true, isInternal: true, subscription: { select: { status: true, plan: true } } },
+        select: {
+          id: true,
+          industry: true,
+          isInternal: true,
+          demoDataClearedAt: true,
+          subscription: { select: { status: true, plan: true } },
+        },
       });
       if (!workspace) return { seeded: false, reason: "NOT_FOUND" };
+      if (workspace.demoDataClearedAt) return { seeded: false, reason: "CLEARED" };
 
       const sub = workspace.subscription;
       const isDemo =
@@ -42,6 +49,7 @@ export async function seedDemoWorkspace(
 
       const plan = buildDemoSeedPlan(workspace.industry, now, getPlanLimits("FREE"), randomInt(1_000_000));
       const counts = await writePlan(db, workspaceId, plan);
+      await db.workspace.update({ where: { id: workspaceId }, data: { demoSeededAt: now } });
       return { seeded: true, industry: plan.industry, counts };
     },
     { timeout: 20_000 }

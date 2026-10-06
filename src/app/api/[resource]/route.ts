@@ -1,6 +1,7 @@
 import { createWithinPlanLimit, planErrorResponse } from "@/lib/api-server/plan-service";
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import {
   mapTenantCreate,
   stripTenantSecret,
@@ -181,27 +182,40 @@ export async function POST(
         const fresh = await prisma.tenant.findUnique({ where: { id: created.id } });
         await upsertClientFromTenant(fresh ?? created);
         await upsertContractFromTenant(fresh ?? created);
+        await recordActivity({
+          workspaceId,
+          userId: auth.user.id,
+          action: "TENANT_CREATE",
+          entityType: "Tenant",
+          entityId: created.id,
+        });
         return ok(stripTenantSecret(fresh ?? created), 201);
       }
-      case "contracts":
-        return ok(
-          await prisma.contract.create({
-            data: {
-              workspaceId,
-              propertyId: String(body.propertyId),
-              tenantId: String(body.tenantId),
-              startDate: new Date(String(body.startDate)),
-              endDate: new Date(String(body.endDate)),
-              monthlyRent: Number(body.monthlyRent ?? body.monthlyPayment ?? 0),
-              deposit: Number(body.deposit ?? 0),
-              depositPaid: Boolean(body.depositPaid ?? false),
-              status: (body.status as never) ?? "ACTIVE",
-              notes: body.notes ? String(body.notes) : undefined,
-            },
-            include: { property: true, tenant: true },
-          }),
-          201
-        );
+      case "contracts": {
+        const contract = await prisma.contract.create({
+          data: {
+            workspaceId,
+            propertyId: String(body.propertyId),
+            tenantId: String(body.tenantId),
+            startDate: new Date(String(body.startDate)),
+            endDate: new Date(String(body.endDate)),
+            monthlyRent: Number(body.monthlyRent ?? body.monthlyPayment ?? 0),
+            deposit: Number(body.deposit ?? 0),
+            depositPaid: Boolean(body.depositPaid ?? false),
+            status: (body.status as never) ?? "ACTIVE",
+            notes: body.notes ? String(body.notes) : undefined,
+          },
+          include: { property: true, tenant: true },
+        });
+        await recordActivity({
+          workspaceId,
+          userId: auth.user.id,
+          action: "CONTRACT_CREATE",
+          entityType: "Contract",
+          entityId: contract.id,
+        });
+        return ok(contract, 201);
+      }
       case "payments": {
         const periodYear =
           body.periodYear != null ? Number(body.periodYear) : undefined;
@@ -258,6 +272,13 @@ export async function POST(
         });
         // Javobni kutib qolmasin — to'lov darhol qabul qilinsin
         void notifyTenantPaymentReceived(created).catch(() => {});
+        await recordActivity({
+          workspaceId,
+          userId: auth.user.id,
+          action: "PAYMENT_CREATE",
+          entityType: "Payment",
+          entityId: created.id,
+        });
         return ok(created, 201);
       }
       case "expenses": {
@@ -290,6 +311,13 @@ export async function POST(
             monthlyTypeCustom: monthlyTypeCustom || undefined,
           },
           include: { employee: { include: { company: true } } },
+        });
+        await recordActivity({
+          workspaceId,
+          userId: auth.user.id,
+          action: "EXPENSE_CREATE",
+          entityType: "Expense",
+          entityId: created.id,
         });
         return ok(
           {

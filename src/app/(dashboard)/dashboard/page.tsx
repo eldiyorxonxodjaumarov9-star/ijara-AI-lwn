@@ -18,6 +18,7 @@ import { ClearDemoDataBanner } from "@/components/dashboard/clear-demo-data-bann
 import { DashboardKpiCard } from "@/components/dashboard/dashboard-kpi-card";
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { IndustryDashboard } from "@/components/dashboard/industry-dashboard";
+import { PlatformUsageSection } from "@/components/dashboard/platform-usage-section";
 import "@/components/dashboard/dashboard.css";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -250,6 +251,7 @@ export default function DashboardPage() {
           contracts={upcomingContracts}
           tenants={tenants}
         />
+        <PlatformUsageSection />
       </div>
     );
   }
@@ -409,6 +411,8 @@ export default function DashboardPage() {
             }
           />
         </div>
+
+        <PlatformUsageSection />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <DashboardPanel

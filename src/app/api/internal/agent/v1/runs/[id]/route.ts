@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
+import { completedAiRunAction } from "@/lib/api-server/agent-gateway/ai-activity";
 import { patchAgentRun } from "@/lib/api-server/agent-gateway/audit";
+import { resolveAgentWorkspaceId } from "@/lib/api-server/agent-gateway/daily-snapshot";
 import { requireAgentAuth } from "@/lib/api-server/agent-gateway/require-agent";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -79,6 +82,17 @@ export async function PATCH(req: NextRequest, context: Ctx) {
       ? (parsed.data.metadata as object)
       : undefined,
   });
+
+  const aiAction = completedAiRunAction(existing, parsed.data);
+  if (aiAction) {
+    await recordActivity({
+      workspaceId: await resolveAgentWorkspaceId(),
+      action: aiAction,
+      entityType: "AgentRun",
+      entityId: id,
+      metadata: { agentType: existing.agentType, model: parsed.data.model ?? existing.model ?? undefined },
+    });
+  }
 
   return ok({ run });
 }

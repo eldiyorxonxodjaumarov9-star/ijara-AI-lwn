@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { fail, ok } from "@/lib/api-server/http";
 import { createWithinPlanLimit } from "@/lib/api-server/plan-service";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -42,6 +43,13 @@ export async function POST(req: NextRequest) {
     const created = await createWithinPlanLimit(guard.ctx, "vehicles", (db) =>
       createVehicle(db, workspaceId, input)
     );
+    await recordActivity({
+      workspaceId,
+      userId: guard.user.id,
+      action: "VEHICLE_CREATE",
+      entityType: "Vehicle",
+      entityId: created.id,
+    });
     return ok(created, 201);
   } catch (err) {
     return vehicleErrorResponse(err) ?? fail("Saqlash xatosi", 500);

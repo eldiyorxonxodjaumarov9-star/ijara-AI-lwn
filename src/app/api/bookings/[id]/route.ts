@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import {
   bookingErrorResponse,
   deleteBooking,
@@ -47,6 +48,12 @@ async function update(req: NextRequest, ctx: Ctx, method: "PATCH" | "PUT") {
     const updated = await prisma.$transaction((tx) => updateBooking(tx, workspaceId, id, input), {
       timeout: 15_000,
     });
+    // updateBooking rejects closed bookings, so a successful status write is a real transition.
+    const action =
+      input.status === "CHECKED_OUT" ? "BOOKING_CHECKOUT" : input.status === "CHECKED_IN" ? "BOOKING_ARRIVAL" : null;
+    if (action) {
+      await recordActivity({ workspaceId, userId: guard.user.id, action, entityType: "Booking", entityId: id });
+    }
     return ok(updated);
   } catch (err) {
     return bookingErrorResponse(err) ?? fail("Yangilash xatosi", 500);

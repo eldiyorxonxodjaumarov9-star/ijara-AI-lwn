@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { propertyBookingHistoryResponse } from "@/lib/api-server/bookings";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
@@ -76,6 +77,13 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       ...(body.images != null ? { images: body.images as string[] } : {}),
     };
     const updated = await prisma.property.update({ where: { id }, data });
+    await recordActivity({
+      workspaceId: wsCtx.workspace.id,
+      userId: auth.user.id,
+      action: "PROPERTY_UPDATE",
+      entityType: "Property",
+      entityId: id,
+    });
     return ok(updated);
   } catch {
     return fail("Yangilash xatosi", 500);

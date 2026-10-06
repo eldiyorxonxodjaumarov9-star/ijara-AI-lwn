@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { bookingErrorResponse, createBooking, listBookings, requireBookingWorkspace } from "@/lib/api-server/bookings";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -31,6 +32,13 @@ export async function POST(req: NextRequest) {
   try {
     const created = await prisma.$transaction((tx) => createBooking(tx, workspaceId, input), {
       timeout: 15_000,
+    });
+    await recordActivity({
+      workspaceId,
+      userId: guard.user.id,
+      action: "BOOKING_CREATE",
+      entityType: "Booking",
+      entityId: created.id,
     });
     return ok(created, 201);
   } catch (err) {

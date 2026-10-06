@@ -44,7 +44,9 @@ export async function GET(req: NextRequest) {
   try {
     const debts = await computeServerDebts();
     const manualDebts = await computeManualDebtReminders();
-    const telegram = await sendTelegramPaymentReminders(debts, slot, manualDebts);
+    const telegram = await sendTelegramPaymentReminders(debts, slot, manualDebts, {
+      recordAutomation: true,
+    });
     const adminTelegram = await sendAdminReportsToAll(SLOT_LABEL[slot]);
 
     return ok({

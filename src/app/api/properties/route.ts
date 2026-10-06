@@ -2,6 +2,7 @@ import { createWithinPlanLimit, planErrorResponse } from "@/lib/api-server/plan-
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
@@ -82,6 +83,13 @@ export async function POST(req: NextRequest) {
         images: (body.images as string[]) ?? [],
       },
     }));
+    await recordActivity({
+      workspaceId: wsCtx.workspace.id,
+      userId: auth.user.id,
+      action: "PROPERTY_CREATE",
+      entityType: "Property",
+      entityId: created.id,
+    });
     return ok(created, 201);
   } catch (error) {
     const planError = planErrorResponse(error);

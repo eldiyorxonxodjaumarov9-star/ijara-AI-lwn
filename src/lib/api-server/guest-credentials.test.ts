@@ -132,6 +132,7 @@ before(() => {
       : ((workspaces.get(where.workspaceId)?.subscription as Row | undefined) ?? null)
   );
   mock(prisma, "$queryRaw", async () => []);
+  mock(prisma.workspaceActivityEvent, "createMany", async () => ({ count: 0 }));
   mock(prisma, "$transaction", async (fn: (tx: typeof prisma) => unknown) => fn(prisma));
 });
 

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
@@ -36,6 +37,22 @@ export async function POST(
       debtDecision,
       actorUserId: auth.user.id,
     });
+    await recordActivity([
+      {
+        workspaceId: wsCtx.workspace.id,
+        userId: auth.user.id,
+        action: "TENANT_CHECKOUT",
+        entityType: "Tenant",
+        entityId: id,
+      },
+      ...result.writeOffs.map((writeOff) => ({
+        workspaceId: wsCtx.workspace.id,
+        userId: auth.user.id,
+        action: "DEBT_WRITE_OFF" as const,
+        entityType: "Contract",
+        entityId: writeOff.contractId,
+      })),
+    ]);
     return ok(result);
   } catch (err) {
     if (err instanceof TenantCheckoutError) {

@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import type { TelegramAiLeadStatus } from "@prisma/client";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { writeAgentActionAudit } from "@/lib/api-server/agent-gateway/audit";
+import { resolveAgentWorkspaceId } from "@/lib/api-server/agent-gateway/daily-snapshot";
 import { authorizeLwnAgentRequest } from "@/lib/api-server/agent-gateway/lwn-agent-auth";
 import { upsertTelegramAiLead } from "@/lib/api-server/agent-gateway/telegram-ai-lead";
 import { fail, ok } from "@/lib/api-server/http";
@@ -77,6 +79,14 @@ export async function POST(req: NextRequest) {
       output: { id: lead.id, status: lead.status },
       status: "SUCCEEDED",
       durationMs: Date.now() - started,
+    });
+
+    await recordActivity({
+      workspaceId: lead.workspaceId ?? (await resolveAgentWorkspaceId()),
+      action: "AI_CUSTOMER_RESPONSE",
+      entityType: "TelegramAiLead",
+      entityId: lead.id,
+      metadata: { status: lead.status },
     });
 
     return ok({

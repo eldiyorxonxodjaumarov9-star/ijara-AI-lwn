@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { fail, ok } from "@/lib/api-server/http";
 import {
   createManualDebt,
@@ -29,7 +30,15 @@ export async function POST(req: NextRequest) {
   if (parsed.error !== undefined) return fail(parsed.error, 400, "VALIDATION_ERROR");
 
   try {
-    return ok(await createManualDebt(prisma, guard.workspaceId, guard.user.id, parsed.data), 201);
+    const created = await createManualDebt(prisma, guard.workspaceId, guard.user.id, parsed.data);
+    await recordActivity({
+      workspaceId: guard.workspaceId,
+      userId: guard.user.id,
+      action: "MANUAL_DEBT_CREATE",
+      entityType: "ManualDebt",
+      entityId: created.id,
+    });
+    return ok(created, 201);
   } catch (err) {
     return manualDebtErrorResponse(err) ?? fail("Saqlash xatosi", 500);
   }

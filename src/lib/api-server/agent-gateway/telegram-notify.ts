@@ -1,7 +1,8 @@
 import { z } from "zod";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { writeAgentActionAudit } from "@/lib/api-server/agent-gateway/audit";
-import type { DailySnapshot } from "@/lib/api-server/agent-gateway/daily-snapshot";
+import { resolveAgentWorkspaceId, type DailySnapshot } from "@/lib/api-server/agent-gateway/daily-snapshot";
 import { formatDailyManagerReportUz } from "@/lib/api-server/agent-gateway/report-format";
 import { getOrCreateAgentSettings } from "@/lib/api-server/agent-gateway/settings";
 import { sendTelegramMessage } from "@/lib/api-server/telegram-bot";
@@ -34,7 +35,9 @@ export type TelegramNotifyInput = z.infer<typeof telegramNotifySchema>;
  */
 export async function deliverDailyManagerTelegram(
   input: TelegramNotifyInput,
-  trustedSnapshot?: DailySnapshot
+  trustedSnapshot?: DailySnapshot,
+  /** Only scheduled agent deliveries count as automation; admin manual triggers do not. */
+  opts: { recordAutomation?: boolean } = {}
 ) {
   const settings = await getOrCreateAgentSettings();
   const dryRun =
@@ -147,6 +150,16 @@ export async function deliverDailyManagerTelegram(
     errorCode: sent > 0 ? undefined : "TELEGRAM_SEND_FAILED",
     idempotencyKey: input.idempotencyKey,
   });
+
+  if (sent > 0 && opts.recordAutomation) {
+    await recordActivity({
+      workspaceId: await resolveAgentWorkspaceId(),
+      action: "SCHEDULED_REPORT_SENT",
+      entityType: "AgentActionAudit",
+      entityId: audit.id,
+      metadata: { report: input.type, recipients: sent },
+    });
+  }
 
   return {
     status: sent > 0 ? ("sent" as const) : ("failed" as const),

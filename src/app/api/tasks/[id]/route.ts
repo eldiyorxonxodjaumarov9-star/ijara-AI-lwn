@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
@@ -78,6 +79,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         approve: true,
         comment: parsed.data.comment,
         source: "WEB",
+      });
+      await recordActivity({
+        workspaceId: wsCtx.workspace.id,
+        userId: auth.user.id,
+        action: "TASK_COMPLETE",
+        entityType: "WorkTask",
+        entityId: id,
       });
       return ok(task);
     }

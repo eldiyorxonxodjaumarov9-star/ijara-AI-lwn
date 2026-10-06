@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { createRental, listRentals, promoteDueRentals } from "@/lib/api-server/vehicle-rentals";
@@ -34,6 +35,13 @@ export async function POST(req: NextRequest) {
   try {
     const created = await prisma.$transaction((tx) => createRental(tx, workspaceId, input), {
       timeout: 15_000,
+    });
+    await recordActivity({
+      workspaceId,
+      userId: guard.user.id,
+      action: "VEHICLE_RENTAL_CREATE",
+      entityType: "VehicleRental",
+      entityId: created.id,
     });
     return ok(created, 201);
   } catch (err) {

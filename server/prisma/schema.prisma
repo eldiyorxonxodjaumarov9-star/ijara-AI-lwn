@@ -272,6 +272,7 @@ model User {
   manualDebtsCreated   ManualDebt[]           @relation("ManualDebtCreatedBy")
   manualDebtsCancelled ManualDebt[]           @relation("ManualDebtCancelledBy")
   manualDebtPayments   ManualDebtPayment[]
+  activityEvents       WorkspaceActivityEvent[]
 
   @@index([phone])
   @@index([role])
@@ -337,9 +338,37 @@ model Workspace {
   debtAdjustments DebtAdjustment[]
   manualDebts        ManualDebt[]
   manualDebtPayments ManualDebtPayment[]
+  activityEvents     WorkspaceActivityEvent[]
 
   @@index([isInternal])
   @@map("workspaces")
+}
+
+enum ActivityActorType {
+  HUMAN
+  AI
+  AUTOMATION
+}
+
+/// Successful business actions only. Written server-side; actorType is derived from actionType.
+model WorkspaceActivityEvent {
+  id          String            @id @default(uuid())
+  workspaceId String
+  userId      String?
+  actorType   ActivityActorType
+  actionType  String
+  featureKey  String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, featureKey, actorType])
+  @@map("workspace_activity_events")
 }
 
 enum VehicleStatus {

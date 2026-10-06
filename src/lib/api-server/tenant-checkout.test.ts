@@ -206,6 +206,7 @@ before(() => {
   mock(prisma.user, "findMany", async () => []);
   mock(prisma.workspaceSubscription, "findUnique", async () => ({ status: "ACTIVE" }));
   mock(prisma.company, "findFirst", async () => null);
+  mock(prisma.workspaceActivityEvent, "createMany", async () => ({ count: 0 }));
   for (const model of [prisma.user, prisma.contract, prisma.payment,
     prisma.expense, prisma.maintenance, prisma.employee, prisma.partnerCompany,
     prisma.contactLead, prisma.workTask, prisma.notification]) {

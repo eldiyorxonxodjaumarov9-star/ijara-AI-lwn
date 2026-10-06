@@ -245,6 +245,7 @@ before(() => {
       : ((workspaces.get(where.workspaceId)?.subscription as Row | undefined) ?? null)
   );
   mock(prisma, "$queryRaw", async () => []);
+  mock(prisma.workspaceActivityEvent, "createMany", async () => ({ count: 0 }));
   // Serializes transactions like the FOR UPDATE row locks do for the same booking/room in Postgres.
   let queue: Promise<unknown> = Promise.resolve();
   mock(prisma, "$transaction", (fn: (tx: typeof prisma) => unknown) => {

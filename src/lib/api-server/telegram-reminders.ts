@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { recordActivity, type ActivityInput } from "@/lib/api-server/activity-events";
 import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
 import type { ManualDebtReminderTarget } from "@/lib/api-server/manual-debts";
 import {
@@ -293,7 +294,9 @@ export async function processPhoneForBot(chatId: string, phoneNumber: string) {
 export async function sendTelegramPaymentReminders(
   debts?: DebtReminderInput[],
   slot?: ReminderTimeSlot,
-  manualDebts: ManualDebtReminderTarget[] = []
+  manualDebts: ManualDebtReminderTarget[] = [],
+  /** Only the scheduled cron counts as automation; staff-triggered sends are not. */
+  opts: { recordAutomation?: boolean } = {}
 ) {
   if (!isTelegramBotConfigured()) {
     return { sent: 0, skipped: 0, failed: 0, reason: "bot_not_configured" };
@@ -318,6 +321,7 @@ export async function sendTelegramPaymentReminders(
 
   type Outgoing = {
     chatId: string;
+    workspaceId: string | null;
     contract?: (typeof grouped)[number];
     manual: ManualDebtReminderTarget[];
   };
@@ -335,7 +339,7 @@ export async function sendTelegramPaymentReminders(
       skipped += 1;
       continue;
     }
-    outgoing.set(key, { chatId, contract: debt, manual: [] });
+    outgoing.set(key, { chatId, workspaceId: tenant.workspaceId ?? null, contract: debt, manual: [] });
   }
   for (const m of manualDebts) {
     if (!m.chatId || m.remainingAmount <= 0) {
@@ -343,12 +347,13 @@ export async function sendTelegramPaymentReminders(
       continue;
     }
     const key = `${m.workspaceId}:${m.chatId}`;
-    const entry = outgoing.get(key) ?? { chatId: m.chatId, manual: [] };
+    const entry = outgoing.get(key) ?? { chatId: m.chatId, workspaceId: m.workspaceId, manual: [] };
     entry.manual.push(m);
     outgoing.set(key, entry);
   }
 
   const sentChats = new Set<string>();
+  const activity: ActivityInput[] = [];
   for (const entry of outgoing.values()) {
     if (sentChats.has(entry.chatId)) {
       skipped += 1;
@@ -368,10 +373,20 @@ export async function sendTelegramPaymentReminders(
     try {
       await sendTelegramMessage(entry.chatId, text);
       sent += 1;
+      if (opts.recordAutomation && entry.workspaceId) {
+        activity.push({
+          workspaceId: entry.workspaceId,
+          action: "DEBT_REMINDER_SENT",
+          entityType: entry.contract ? "Tenant" : "ManualDebt",
+          entityId: entry.contract?.tenantId ?? entry.manual[0]?.manualDebtId ?? null,
+          metadata: { slot: slot ?? undefined, manualDebts: entry.manual.length },
+        });
+      }
     } catch {
       failed += 1;
     }
   }
 
+  await recordActivity(activity);
   return { sent, skipped, failed };
 }

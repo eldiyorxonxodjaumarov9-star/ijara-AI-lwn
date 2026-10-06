@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { bookingErrorResponse } from "@/lib/api-server/bookings";
 import { canRecordGuestPayment, recordArrival, requireHotelGuestWorkspace } from "@/lib/api-server/hotel-guests";
 import { fail, ok } from "@/lib/api-server/http";
@@ -28,6 +29,16 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   try {
     const result = await recordArrival(guard.ctx, id, parsed.data, { canPay: canRecordGuestPayment(guard.user) });
+    const base = { workspaceId: guard.ctx.workspace.id, userId: guard.user.id };
+    await recordActivity([
+      { ...base, action: "BOOKING_ARRIVAL", entityType: "Booking", entityId: id },
+      ...(result.guestCreated
+        ? [{ ...base, action: "TENANT_CREATE" as const, entityType: "Tenant", entityId: result.tenantId }]
+        : []),
+      ...(parsed.data.paymentAmount > 0
+        ? [{ ...base, action: "SOURCE_PAYMENT_CREATE" as const, entityType: "Booking", entityId: id }]
+        : []),
+    ]);
     return ok(result);
   } catch (err) {
     return (

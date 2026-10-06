@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { bookingErrorResponse } from "@/lib/api-server/bookings";
 import {
   canRecordGuestPayment,
@@ -36,6 +37,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const created = await createHotelGuest(guard.ctx, parsed.data, { canPay: canRecordGuestPayment(guard.user) });
+    const base = { workspaceId: guard.ctx.workspace.id, userId: guard.user.id };
+    await recordActivity([
+      { ...base, action: "TENANT_CREATE", entityType: "Tenant", entityId: created.tenantId },
+      { ...base, action: "BOOKING_CREATE", entityType: "Booking", entityId: created.booking.id },
+      ...(parsed.data.paymentAmount > 0
+        ? [{ ...base, action: "SOURCE_PAYMENT_CREATE" as const, entityType: "Booking", entityId: created.booking.id }]
+        : []),
+    ]);
     return ok(created, 201);
   } catch (err) {
     return (

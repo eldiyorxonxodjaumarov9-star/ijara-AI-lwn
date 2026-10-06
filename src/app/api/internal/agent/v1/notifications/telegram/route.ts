@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await deliverDailyManagerTelegram(parsed.data, snapshot);
+  const result = await deliverDailyManagerTelegram(parsed.data, snapshot, {
+    recordAutomation: true,
+  });
   return ok(result);
 }

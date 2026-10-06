@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import {
@@ -37,6 +38,13 @@ export async function POST(req: NextRequest) {
       (tx) => createSourcePayment(tx, workspaceId, guard.sourceType, parsed.value),
       { timeout: 15_000 }
     );
+    await recordActivity({
+      workspaceId,
+      userId: guard.user.id,
+      action: "SOURCE_PAYMENT_CREATE",
+      entityType: guard.sourceType === "BOOKING" ? "Booking" : "VehicleRental",
+      entityId: parsed.value.sourceId,
+    });
     return ok(created, 201);
   } catch (err) {
     return sourcePaymentErrorResponse(err) ?? fail("Saqlash xatosi", 500);

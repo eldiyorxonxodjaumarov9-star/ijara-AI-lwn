@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { fail, ok } from "@/lib/api-server/http";
 import {
   addManualDebtPayment,
@@ -27,6 +28,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       (tx) => addManualDebtPayment(tx, guard.workspaceId, id, guard.user.id, parsed.data),
       { timeout: 15_000 }
     );
+    await recordActivity({
+      workspaceId: guard.workspaceId,
+      userId: guard.user.id,
+      action: "DEBT_PAYMENT",
+      entityType: "ManualDebt",
+      entityId: id,
+    });
     return ok(updated, 201);
   } catch (err) {
     return manualDebtErrorResponse(err) ?? fail("To‘lovni saqlash xatosi", 500);

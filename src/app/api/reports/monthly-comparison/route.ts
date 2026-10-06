@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { requireUser } from "@/lib/api-server/auth";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
+import { resolveUserWorkspaceContext, workspaceWhere } from "@/lib/api-server/workspace";
 import { MAPPERS } from "@/lib/api/mappers";
 import {
   buildMonthlyComparison,
@@ -17,7 +19,7 @@ function assertStaffRole(role: string) {
 
 /**
  * GET /api/reports/monthly-comparison?baseMonth=2026-07&compareMonth=2026-08
- * Read-only. Production bazaga yozmaydi.
+ * Read-only for business data; only a REPORT_VIEW activity event is written.
  */
 export async function GET(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
@@ -52,9 +54,13 @@ export async function GET(req: NextRequest) {
       ? baseBounds.endExclusive
       : compareBounds.endExclusive;
 
+  const wsCtx = await resolveUserWorkspaceContext(auth.user);
+  const { workspaceId } = workspaceWhere(wsCtx.workspace.id);
+
   const [paymentRows, expenseRows] = await Promise.all([
     prisma.payment.findMany({
       where: {
+        workspaceId,
         OR: [
           {
             AND: [
@@ -85,6 +91,7 @@ export async function GET(req: NextRequest) {
     }),
     prisma.expense.findMany({
       where: {
+        workspaceId,
         date: {
           gte: new Date(rangeStart),
           lt: new Date(rangeEnd),
@@ -116,5 +123,26 @@ export async function GET(req: NextRequest) {
     compareMonth,
   });
 
+  // Adoption signal only (never work); one row per user per 24h is enough.
+  const seenRecently = await prisma.workspaceActivityEvent
+    .findFirst({
+      where: {
+        workspaceId,
+        userId: auth.user.id,
+        actionType: "REPORT_VIEW",
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      select: { id: true },
+    })
+    .catch(() => null);
+  if (!seenRecently) {
+    await recordActivity({
+      workspaceId,
+      userId: auth.user.id,
+      action: "REPORT_VIEW",
+      entityType: "Report",
+      metadata: { report: "monthly-comparison" },
+    });
+  }
   return ok(result);
 }

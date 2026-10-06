@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { recordActivity } from "@/lib/api-server/activity-events";
 import { syncDepositForTenant } from "@/lib/api-server/deposit-sync";
 import {
   mapTenantBody,
@@ -166,6 +167,13 @@ export async function PATCH(
             Number(body.depositAmount ?? updated.depositAmount)
           );
         }
+        await recordActivity({
+          workspaceId: ws.workspaceId,
+          userId: auth.user.id,
+          action: "TENANT_UPDATE",
+          entityType: "Tenant",
+          entityId: id,
+        });
         return ok(stripTenantSecret(updated));
       }
       case "contracts": {
@@ -176,19 +184,23 @@ export async function PATCH(
         const contractFields = Object.fromEntries(
           Object.entries(body).filter(([key]) => !CONTRACT_PATCH_DENY.has(key))
         );
-        return ok(
-          withWrittenOff(
-            await prisma.contract.update({
-              where: { id },
-              data: {
-                ...contractFields,
-                startDate: body.startDate ? new Date(String(body.startDate)) : undefined,
-                endDate: body.endDate ? new Date(String(body.endDate)) : undefined,
-              } as never,
-              include: { property: true, tenant: true, debtAdjustments: WRITE_OFF_AMOUNTS },
-            })
-          )
-        );
+        const contract = await prisma.contract.update({
+          where: { id },
+          data: {
+            ...contractFields,
+            startDate: body.startDate ? new Date(String(body.startDate)) : undefined,
+            endDate: body.endDate ? new Date(String(body.endDate)) : undefined,
+          } as never,
+          include: { property: true, tenant: true, debtAdjustments: WRITE_OFF_AMOUNTS },
+        });
+        await recordActivity({
+          workspaceId: ws.workspaceId,
+          userId: auth.user.id,
+          action: "CONTRACT_UPDATE",
+          entityType: "Contract",
+          entityId: id,
+        });
+        return ok(withWrittenOff(contract));
       }
       case "payments": {
         const existing = await prisma.payment.findUnique({ where: { id } });

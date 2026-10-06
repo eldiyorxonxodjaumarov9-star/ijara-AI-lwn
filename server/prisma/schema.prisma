@@ -50,6 +50,13 @@ enum DebtAdjustmentType {
   WRITE_OFF
 }
 
+enum ManualDebtStatus {
+  OPEN
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
 enum PropertyStatus {
   AVAILABLE
   RENTED
@@ -262,6 +269,9 @@ model User {
   contractStatusEvents    ContractStatusEvent[] @relation("ContractStatusActor")
   workspaceMemberships WorkspaceMembership[]
   debtAdjustments      DebtAdjustment[]
+  manualDebtsCreated   ManualDebt[]           @relation("ManualDebtCreatedBy")
+  manualDebtsCancelled ManualDebt[]           @relation("ManualDebtCancelledBy")
+  manualDebtPayments   ManualDebtPayment[]
 
   @@index([phone])
   @@index([role])
@@ -321,6 +331,8 @@ model Workspace {
   bookings      Booking[]
   sourcePayments SourcePayment[]
   debtAdjustments DebtAdjustment[]
+  manualDebts        ManualDebt[]
+  manualDebtPayments ManualDebtPayment[]
 
   @@index([isInternal])
   @@map("workspaces")
@@ -563,6 +575,7 @@ model Property {
   contractRequests     ContractRequest[]
   aiAgentMedia         AiAgentMedia[]
   bookings             Booking[]
+  manualDebts          ManualDebt[]
 
   @@index([workspaceId])
   @@index([status])
@@ -662,6 +675,63 @@ model DebtAdjustment {
   @@index([workspaceId])
   @@index([tenantId])
   @@map("debt_adjustments")
+}
+
+/**
+ * Shartnomaga bog'lanmagan, qo'lda kiritilgan qarz. Contract/Payment ledger'iga
+ * aralashmaydi; o'chirilmaydi — bekor qilish CANCELLED + audit maydonlari.
+ */
+model ManualDebt {
+  id               String           @id @default(uuid())
+  workspaceId      String
+  propertyId       String?
+  debtorName       String
+  debtorPhone      String?
+  debtorOccupation String?
+  description      String?
+  originalAmount   Float
+  paidAmount       Float            @default(0)
+  remainingAmount  Float
+  debtDate         DateTime
+  status           ManualDebtStatus @default(OPEN)
+  telegramChatId   String?
+  notes            String?
+  createdById      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  closedAt         DateTime?
+  cancelledAt      DateTime?
+  cancelledById    String?
+  cancelReason     String?
+
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property    Property?           @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  createdBy   User?               @relation("ManualDebtCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  cancelledBy User?               @relation("ManualDebtCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  payments    ManualDebtPayment[]
+
+  @@index([workspaceId, status])
+  @@index([propertyId])
+  @@map("manual_debts")
+}
+
+model ManualDebtPayment {
+  id           String   @id @default(uuid())
+  manualDebtId String
+  workspaceId  String
+  amount       Float
+  paymentDate  DateTime
+  notes        String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  manualDebt ManualDebt @relation(fields: [manualDebtId], references: [id], onDelete: Cascade)
+  workspace  Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([manualDebtId])
+  @@index([workspaceId])
+  @@map("manual_debt_payments")
 }
 
 model Payment {

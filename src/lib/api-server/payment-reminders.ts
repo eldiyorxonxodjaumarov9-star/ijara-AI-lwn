@@ -6,6 +6,8 @@ import {
 } from "@/lib/payment-reminder-utils";
 import { getTenantNotifications } from "@/lib/api-server/tenant-notifications";
 import { sendTelegramPaymentReminders } from "@/lib/api-server/telegram-reminders";
+import type { ManualDebtReminderTarget } from "@/lib/api-server/manual-debts";
+import { buildManualDebtReminderMessage } from "@/lib/manual-debts";
 
 export type { DebtReminderInput };
 export { buildPaymentReminderMessage, groupDebtsByTenant, getTenantNotifications };
@@ -25,9 +27,10 @@ export async function clearPreviousPaymentReminderNotifications(workspaceId: str
 
 export async function sendPaymentReminders(
   debts: DebtReminderInput[],
-  opts: { workspaceId: string; adminUserId?: string }
+  opts: { workspaceId: string; adminUserId?: string; manualDebts?: ManualDebtReminderTarget[] }
 ) {
   const { workspaceId, adminUserId } = opts;
+  const manualDebts = (opts.manualDebts ?? []).filter((m) => m.workspaceId === workspaceId);
   await clearPreviousPaymentReminderNotifications(workspaceId);
 
   const grouped = groupDebtsByTenant(debts);
@@ -58,6 +61,27 @@ export async function sendPaymentReminders(
     results.push(created);
   }
 
+  for (const m of manualDebts) {
+    const created = await prisma.notification.create({
+      data: {
+        workspaceId,
+        userId: adminUserId ?? null,
+        title: "To'lov eslatmasi",
+        message: buildManualDebtReminderMessage([m]),
+        type: "LATE_PAYMENT",
+        meta: {
+          manualDebtId: m.manualDebtId,
+          tenantName: m.debtorName,
+          propertyName: m.propertyName,
+          debt: m.remainingAmount,
+          debtDate: m.debtDate,
+          telegramLinked: !!m.chatId,
+        },
+      },
+    });
+    results.push(created);
+  }
+
   if (results.length > 0 && adminUserId) {
     const summary = await prisma.notification.create({
       data: {
@@ -72,7 +96,7 @@ export async function sendPaymentReminders(
     results.unshift(summary);
   }
 
-  const telegram = await sendTelegramPaymentReminders(debts);
+  const telegram = await sendTelegramPaymentReminders(debts, undefined, manualDebts);
 
   return { notifications: results, telegram };
 }

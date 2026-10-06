@@ -51,12 +51,15 @@ export function SendPaymentRemindersButton({
   className,
   label,
   loadingLabel = "Yuborilmoqda...",
+  extraCount = 0,
 }: {
   variant?: "default" | "outline" | "secondary";
   size?: "default" | "sm" | "lg";
   className?: string;
   label?: string;
   loadingLabel?: string;
+  /** Shartnomadan tashqari faol qarzlar soni (masalan, qo'lda kiritilgan qarzlar). */
+  extraCount?: number;
 }) {
   const { data: contracts, loading: lc } = useCollection<Contract>("contracts");
   const { data: payments, loading: lp } = useCollection<Payment>("payments");
@@ -70,7 +73,7 @@ export function SendPaymentRemindersButton({
   );
 
   const handleSend = async () => {
-    if (payload.length === 0) {
+    if (payload.length + extraCount === 0) {
       toast.info(
         "Qarzdorlar topilmadi. Avval Qarzdorliklar bo'limida ro'yxatni tekshiring."
       );

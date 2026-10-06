@@ -8,6 +8,7 @@ import {
   sendTelegramPaymentReminders,
 } from "@/lib/api-server/telegram-reminders";
 import { sendAdminReportsToAll } from "@/lib/api-server/telegram-admin";
+import { computeManualDebtReminders } from "@/lib/api-server/manual-debts";
 import type { ReminderTimeSlot } from "@/lib/payment-reminder-utils";
 
 const VALID_SLOTS: ReminderTimeSlot[] = ["morning", "lunch", "evening"];
@@ -42,7 +43,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const debts = await computeServerDebts();
-    const telegram = await sendTelegramPaymentReminders(debts, slot);
+    const manualDebts = await computeManualDebtReminders();
+    const telegram = await sendTelegramPaymentReminders(debts, slot, manualDebts);
     const adminTelegram = await sendAdminReportsToAll(SLOT_LABEL[slot]);
 
     return ok({
@@ -50,6 +52,7 @@ export async function GET(req: NextRequest) {
       timeLabel: SLOT_LABEL[slot],
       timezone: "Asia/Tashkent",
       debtors: debts.length,
+      manualDebtors: manualDebts.length,
       telegram,
       adminTelegram,
     });

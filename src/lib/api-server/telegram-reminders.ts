@@ -1,6 +1,11 @@
 import type { Prisma } from "@prisma/client";
 
 import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
+import type { ManualDebtReminderTarget } from "@/lib/api-server/manual-debts";
+import {
+  appendManualDebtsToReminder,
+  buildManualDebtReminderMessage,
+} from "@/lib/manual-debts";
 import { prisma } from "@/lib/api-server/prisma";
 import {
   buildPaymentReminderMessage,
@@ -280,9 +285,15 @@ export async function processPhoneForBot(chatId: string, phoneNumber: string) {
   return { ok: true as const, tenant, message };
 }
 
+/**
+ * Shartnoma qarzlari + qo'lda kiritilgan qarzlar. Bir workspace ichida bir chatga
+ * bitta umumiy xabar; bir run'da har chatga ko'pi bilan bitta xabar.
+ * Chat topilmasa — skip.
+ */
 export async function sendTelegramPaymentReminders(
   debts?: DebtReminderInput[],
-  slot?: ReminderTimeSlot
+  slot?: ReminderTimeSlot,
+  manualDebts: ManualDebtReminderTarget[] = []
 ) {
   if (!isTelegramBotConfigured()) {
     return { sent: 0, skipped: 0, failed: 0, reason: "bot_not_configured" };
@@ -300,23 +311,62 @@ export async function sendTelegramPaymentReminders(
   const tenantRows = tenantIds.length
     ? await prisma.tenant.findMany({
         where: { id: { in: tenantIds } },
-        select: { id: true, telegramChatId: true },
+        select: { id: true, telegramChatId: true, workspaceId: true },
       })
     : [];
-  const chatByTenant = new Map(tenantRows.map((t) => [t.id, t.telegramChatId]));
-  const sentChats = new Set<string>();
+  const tenantById = new Map(tenantRows.map((t) => [t.id, t]));
+
+  type Outgoing = {
+    chatId: string;
+    contract?: (typeof grouped)[number];
+    manual: ManualDebtReminderTarget[];
+  };
+  const outgoing = new Map<string, Outgoing>();
 
   for (const debt of grouped) {
-    const chatId = debt.tenantId ? chatByTenant.get(debt.tenantId) : null;
-    if (!chatId || sentChats.has(chatId)) {
+    const tenant = debt.tenantId ? tenantById.get(debt.tenantId) : undefined;
+    const chatId = tenant?.telegramChatId;
+    if (!chatId) {
       skipped += 1;
       continue;
     }
-    sentChats.add(chatId);
+    const key = `${tenant.workspaceId ?? ""}:${chatId}`;
+    if (outgoing.has(key)) {
+      skipped += 1;
+      continue;
+    }
+    outgoing.set(key, { chatId, contract: debt, manual: [] });
+  }
+  for (const m of manualDebts) {
+    if (!m.chatId || m.remainingAmount <= 0) {
+      skipped += 1;
+      continue;
+    }
+    const key = `${m.workspaceId}:${m.chatId}`;
+    const entry = outgoing.get(key) ?? { chatId: m.chatId, manual: [] };
+    entry.manual.push(m);
+    outgoing.set(key, entry);
+  }
 
-    const text = buildPaymentReminderMessage(debt, slot);
+  const sentChats = new Set<string>();
+  for (const entry of outgoing.values()) {
+    if (sentChats.has(entry.chatId)) {
+      skipped += 1;
+      continue;
+    }
+    sentChats.add(entry.chatId);
+
+    const text = entry.contract
+      ? entry.manual.length > 0
+        ? appendManualDebtsToReminder(
+            buildPaymentReminderMessage(entry.contract, slot),
+            entry.contract.debt,
+            entry.manual
+          )
+        : buildPaymentReminderMessage(entry.contract, slot)
+      : buildManualDebtReminderMessage(entry.manual, slot);
     try {
-      await sendTelegramMessage(chatId, text);
+      await sendTelegramMessage(entry.chatId, text);
       sent += 1;
     } catch {
       failed += 1;

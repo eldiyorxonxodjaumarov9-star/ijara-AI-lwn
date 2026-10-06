@@ -159,6 +159,7 @@ before(() => {
     }
     return [...seen.values()];
   });
+  mock(prisma.manualDebt, "findMany", async () => []);
   mock(prisma.notification, "deleteMany", async ({ where }: { where: Record<string, unknown> }) => {
     deleteWheres.push(where);
     return { count: 0 };

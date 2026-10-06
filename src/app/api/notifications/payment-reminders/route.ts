@@ -8,6 +8,7 @@ import {
   groupDebtsByTenant,
   sendPaymentReminders,
 } from "@/lib/api-server/payment-reminders";
+import { computeManualDebtReminders } from "@/lib/api-server/manual-debts";
 import { computeServerDebts } from "@/lib/api-server/telegram-reminders";
 import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 
@@ -30,19 +31,23 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const debts = await computeServerDebts({ workspaceId });
+    const manualDebts = await computeManualDebtReminders({ workspaceId });
     const recipients = groupDebtsByTenant(debts);
 
     if (body.dryRun === true) {
       return ok({
         dryRun: true,
         debtorContracts: debts.length,
-        recipients: recipients.length,
-        totalDebt: debts.reduce((s, d) => s + d.debt, 0),
+        recipients: recipients.length + manualDebts.length,
+        totalDebt:
+          debts.reduce((s, d) => s + d.debt, 0) +
+          manualDebts.reduce((s, m) => s + m.remainingAmount, 0),
         debts,
+        manualDebts: manualDebts.map(({ chatId, ...m }) => ({ ...m, telegramLinked: !!chatId })),
       });
     }
 
-    if (debts.length === 0) {
+    if (debts.length === 0 && manualDebts.length === 0) {
       return ok({
         sent: 0,
         telegramSent: 0,
@@ -55,6 +60,7 @@ export async function POST(req: NextRequest) {
     const { notifications, telegram } = await sendPaymentReminders(debts, {
       workspaceId,
       adminUserId: auth.user.id,
+      manualDebts,
     });
     const tenantCount = notifications.filter(
       (n) => n.type === "LATE_PAYMENT"

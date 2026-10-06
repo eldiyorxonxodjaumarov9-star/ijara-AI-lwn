@@ -228,7 +228,11 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
               <EmptyState
                 icon={CalendarDays}
                 title="Hali bron yo‘q"
-                description={`${terms.unit} va ${terms.guest.toLowerCase()}ni tanlab birinchi bronni yarating.`}
+                description={
+                  smart
+                    ? `${terms.unit}ni tanlang va ${terms.guest.toLowerCase()} ismini kiritib birinchi bronni yarating.`
+                    : `${terms.unit} va ${terms.guest.toLowerCase()}ni tanlab birinchi bronni yarating.`
+                }
                 action={
                   <Button onClick={openCreate}>
                     <Plus className="size-4" /> Bron yaratish

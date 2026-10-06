@@ -269,9 +269,12 @@ export function HotelGuestsView() {
   );
 
   const paidCell = (row: HotelGuestRow) => <span className="text-emerald-400">{formatCurrency(row.paid)}</span>;
-  const remainingCell = (row: HotelGuestRow) => (
-    <span className={row.remaining > 0 ? "text-amber-400" : "text-muted-foreground"}>{formatCurrency(row.remaining)}</span>
-  );
+  const remainingCell = (row: HotelGuestRow) =>
+    row.status === "CANCELLED" ? (
+      <span className="text-muted-foreground">—</span>
+    ) : (
+      <span className={row.remaining > 0 ? "text-amber-400" : "text-muted-foreground"}>{formatCurrency(row.remaining)}</span>
+    );
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import type { Prisma } from "@prisma/client";
 
+import { isBookingIndustry } from "@/lib/bookings";
+
 function parseDate(value: unknown) {
   if (value == null || String(value).trim() === "") return undefined;
   return new Date(String(value));
@@ -16,6 +18,18 @@ export function stripTenantSecret<
   const { password: _password, passwordHash: _passwordHash, ...rest } = tenant;
   void _password;
   void _passwordHash;
+  return rest;
+}
+
+/** HOTEL/VILLA mehmonlari portalga kirmaydi: login/parol hech qachon saqlanmaydi. */
+export function withoutGuestCredentials(
+  body: Record<string, unknown>,
+  industry: unknown
+): Record<string, unknown> {
+  if (!isBookingIndustry(industry)) return body;
+  const { login: _login, password: _password, ...rest } = body;
+  void _login;
+  void _password;
   return rest;
 }
 

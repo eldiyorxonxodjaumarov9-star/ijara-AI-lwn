@@ -1,7 +1,11 @@
 import { createWithinPlanLimit, planErrorResponse } from "@/lib/api-server/plan-service";
 import { NextRequest } from "next/server";
 
-import { mapTenantCreate, stripTenantSecret } from "@/lib/api-server/tenants";
+import {
+  mapTenantCreate,
+  stripTenantSecret,
+  withoutGuestCredentials,
+} from "@/lib/api-server/tenants";
 import { ensureTenantClientNumber } from "@/lib/api-server/client-number";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
@@ -168,7 +172,10 @@ export async function POST(
     switch (name) {
       case "tenants": {
         const created = await createWithinPlanLimit(wsCtx, "tenants", async db => db.tenant.create({
-          data: { ...(await mapTenantCreate(body)), workspaceId },
+          data: {
+            ...(await mapTenantCreate(withoutGuestCredentials(body, wsCtx.workspace.industry))),
+            workspaceId,
+          },
         }));
         await ensureTenantClientNumber(created.id);
         const fresh = await prisma.tenant.findUnique({ where: { id: created.id } });

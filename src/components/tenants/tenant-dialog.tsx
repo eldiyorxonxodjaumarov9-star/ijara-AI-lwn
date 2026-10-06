@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useAuth } from "@/context/auth-context";
 import { ApiError, isApiConfigured } from "@/lib/api/client";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useIndustryTerminology } from "@/hooks/use-industry-terminology";
@@ -26,6 +27,7 @@ import { upsertLocalClientFromTenant } from "@/lib/tenant-client-sync";
 import {
   generateTenantPassword,
   suggestTenantLogin,
+  tenantUsesPortalCredentials,
 } from "@/lib/tenant-credentials";
 import {
   assignTenantToRoom,
@@ -56,12 +58,20 @@ function toDateInput(value?: string) {
   return value.slice(0, 10);
 }
 
-function buildTenantPayload(values: TenantInput, existing?: Tenant | null) {
+function buildTenantPayload(
+  values: TenantInput,
+  existing: Tenant | null | undefined,
+  withCredentials: boolean
+) {
   return {
     fullName: values.fullName,
     phone: values.phone,
-    login: values.login,
-    password: values.password?.trim() ? values.password : undefined,
+    ...(withCredentials
+      ? {
+          login: values.login,
+          password: values.password?.trim() ? values.password : undefined,
+        }
+      : {}),
     rentAmount: values.rentAmount ?? 0,
     passport: existing?.passport ?? "",
     telegram: existing?.telegram,
@@ -87,6 +97,8 @@ export function TenantDialog({
   const { data: contracts } = useCollection<Contract>("contracts");
   const { create, update } = useCollectionActions<Tenant>("tenants");
   const terms = useIndustryTerminology();
+  const { workspace } = useAuth();
+  const withCredentials = tenantUsesPortalCredentials(workspace?.industry);
 
   const [roomId, setRoomId] = useState("");
   const [paymentStatus, setPaymentStatus] =
@@ -99,6 +111,7 @@ export function TenantDialog({
     register,
     handleSubmit,
     reset,
+    setError,
     setValue,
     watch,
     formState: { errors, isSubmitting },
@@ -142,25 +155,24 @@ export function TenantDialog({
       });
       setRoomId(existingContract?.propertyId ?? "");
     } else {
-      const password = generateTenantPassword();
       reset({
         ...defaults(),
-        password,
+        password: withCredentials ? generateTenantPassword() : "",
       });
       setRoomId(selectableRooms[0]?.id ?? "");
     }
     setPaymentStatus("debt");
     setPaymentMethod("cash");
     setPaymentDate(today());
-  }, [open, tenant, reset, existingContract?.propertyId, selectableRooms]);
+  }, [open, tenant, reset, existingContract?.propertyId, selectableRooms, withCredentials]);
 
   useEffect(() => {
-    if (tenant || !open) return;
+    if (tenant || !open || !withCredentials) return;
     const suggested = suggestTenantLogin(phone);
     if (suggested) {
       setValue("login", suggested, { shouldValidate: true });
     }
-  }, [phone, tenant, open, setValue]);
+  }, [phone, tenant, open, setValue, withCredentials]);
 
   useEffect(() => {
     if (!selectedRoom || selectedRoom.price <= 0) return;
@@ -172,13 +184,19 @@ export function TenantDialog({
       toast.error("LWN xonani tanlang");
       return;
     }
-    if (!tenant && (!values.password || values.password.length < 6)) {
-      toast.error("Parol kamida 6 ta belgi bo'lishi kerak");
-      return;
+    if (withCredentials) {
+      if ((values.login ?? "").trim().length < 3) {
+        setError("login", { message: "Login kamida 3 belgi" });
+        return;
+      }
+      if (!tenant && (!values.password || values.password.length < 6)) {
+        toast.error("Parol kamida 6 ta belgi bo'lishi kerak");
+        return;
+      }
     }
 
     try {
-      const payload = buildTenantPayload(values, tenant);
+      const payload = buildTenantPayload(values, tenant, withCredentials);
       let savedId = tenant?.id;
       if (tenant) {
         await update(tenant.id, payload);
@@ -191,7 +209,7 @@ export function TenantDialog({
         id: savedId!,
         fullName: values.fullName,
         phone: values.phone,
-        login: values.login,
+        login: withCredentials ? values.login : tenant?.login,
         passport: payload.passport,
         rentAmount: values.rentAmount ?? 0,
         entryDate: payload.entryDate,
@@ -222,12 +240,14 @@ export function TenantDialog({
         await upsertLocalClientFromTenant(savedTenant);
       }
 
-      if (!tenant) {
+      if (tenant) {
+        toast.success(withCredentials ? "Arendator yangilandi" : "Mehmon yangilandi");
+      } else if (withCredentials) {
         toast.success(
           `Arendator qo'shildi. Login: ${values.login}, Parol: ${values.password}`
         );
       } else {
-        toast.success("Arendator yangilandi");
+        toast.success("Mehmon qo'shildi");
       }
       onOpenChange(false);
     } catch (err) {
@@ -279,41 +299,45 @@ export function TenantDialog({
                 </p>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label>Login</Label>
-              <Input placeholder="user901234567" {...register("login")} />
-              {errors.login && (
-                <p className="text-xs text-destructive">{errors.login.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>{tenant ? "Yangi parol (ixtiyoriy)" : "Parol"}</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="••••••"
-                  {...register("password")}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title="Yangi parol"
-                  onClick={() =>
-                    setValue("password", generateTenantPassword(), {
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <RefreshCw className="size-4" />
-                </Button>
-              </div>
-              {!tenant && errors.password && (
-                <p className="text-xs text-destructive">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
+            {withCredentials && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Login</Label>
+                  <Input placeholder="user901234567" {...register("login")} />
+                  {errors.login && (
+                    <p className="text-xs text-destructive">{errors.login.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{tenant ? "Yangi parol (ixtiyoriy)" : "Parol"}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="••••••"
+                      {...register("password")}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Yangi parol"
+                      onClick={() =>
+                        setValue("password", generateTenantPassword(), {
+                          shouldValidate: true,
+                        })
+                      }
+                    >
+                      <RefreshCw className="size-4" />
+                    </Button>
+                  </div>
+                  {!tenant && errors.password && (
+                    <p className="text-xs text-destructive">
+                      {errors.password.message}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <Label>Arenda kirish</Label>
               <Input type="date" {...register("entryDate")} />

@@ -82,7 +82,7 @@ export const lwnRoomSchema = z.object({
 export const tenantSchema = z.object({
   fullName: z.string().min(2, "F.I.O kiriting"),
   phone: z.string().min(7, "Telefon raqam kiriting"),
-  login: z.string().min(3, "Login kamida 3 belgi"),
+  login: z.string().optional(),
   password: z.string().optional(),
   rentAmount: z.coerce.number().min(0, "Summani kiriting"),
   entryDate: z.string().min(1, "Arenda kirish sanasini kiriting"),

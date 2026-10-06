@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
 
 import { syncDepositForTenant } from "@/lib/api-server/deposit-sync";
-import { mapTenantBody, stripTenantSecret } from "@/lib/api-server/tenants";
+import {
+  mapTenantBody,
+  stripTenantSecret,
+  withoutGuestCredentials,
+} from "@/lib/api-server/tenants";
 import { tenantBookingHistoryResponse } from "@/lib/api-server/bookings";
 import { sourcePaymentHistoryResponse } from "@/lib/api-server/source-payments";
 import { tenantRentalHistoryResponse } from "@/lib/api-server/vehicle-rentals";
@@ -40,7 +44,7 @@ async function resolveWorkspace(user: Parameters<typeof resolveUserWorkspaceCont
   if (!wsCtx.hasAccess) {
     return { error: fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED") };
   }
-  return { workspaceId: wsCtx.workspace.id };
+  return { workspaceId: wsCtx.workspace.id, industry: wsCtx.workspace.industry };
 }
 
 export async function GET(
@@ -151,7 +155,7 @@ export async function PATCH(
         }
         const updated = await prisma.tenant.update({
           where: { id },
-          data: await mapTenantBody(body),
+          data: await mapTenantBody(withoutGuestCredentials(body, ws.industry)),
         });
         await upsertClientFromTenant(updated);
         await upsertContractFromTenant(updated);

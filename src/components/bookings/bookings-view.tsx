@@ -41,6 +41,8 @@ import { useBookings } from "@/hooks/use-bookings";
 import { useCollection } from "@/hooks/use-collection";
 import { apiFetch } from "@/lib/api/client";
 import {
+  ARRIVAL_STATUS_LABELS,
+  arrivalBadge,
   availableBookingActions,
   BOOKING_ACTION_STATUS,
   BOOKING_STATUS_LABELS,
@@ -48,9 +50,11 @@ import {
   isClosedBooking,
   type Booking,
   type BookingAction,
+  type BookingArrivalStatus,
   type BookingIndustry,
   type BookingStatus,
 } from "@/lib/bookings";
+import { isHotelGuestIndustry } from "@/lib/hotel-guests";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Property, Tenant } from "@/types";
 
@@ -60,6 +64,12 @@ const STATUS_VARIANT: Record<BookingStatus, "success" | "secondary" | "warning" 
   CHECKED_IN: "success",
   CHECKED_OUT: "secondary",
   CANCELLED: "outline",
+};
+
+const ARRIVAL_VARIANT: Record<BookingArrivalStatus, "success" | "warning" | "destructive"> = {
+  EXPECTED: "warning",
+  ARRIVED: "success",
+  NO_SHOW: "destructive",
 };
 
 type ActionKind = BookingAction;
@@ -105,6 +115,7 @@ const ACTIONS: Record<ActionKind, { label: string; icon: LucideIcon; title: stri
 /** HOTEL_HOSTEL and VILLA_RENTAL share this view; only the wording differs. */
 export function BookingsView({ industry }: { industry: BookingIndustry }) {
   const terms = bookingTerms(industry);
+  const smart = isHotelGuestIndustry(industry);
   const { bookings, loading, error, reload } = useBookings(true);
   const { data: properties } = useCollection<Property>("properties");
   const { data: guests } = useCollection<Tenant>("tenants");
@@ -138,7 +149,8 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
   };
 
   const actions = (booking: Booking) => {
-    const kinds = availableBookingActions(booking.status);
+    // A reservation without a guest record is checked in via "Keldi" on the Mehmonlar page.
+    const kinds = availableBookingActions(booking.status).filter((k) => k !== "checkIn" || booking.tenantId);
     const editable = !isClosedBooking(booking.status);
     if (!editable && kinds.length === 0) return null;
     return (
@@ -179,6 +191,11 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
   const statusBadge = (status: BookingStatus) => (
     <Badge variant={STATUS_VARIANT[status]}>{BOOKING_STATUS_LABELS[status]}</Badge>
   );
+
+  const arrival = (booking: Booking) => {
+    const a = arrivalBadge(booking);
+    return a ? <Badge variant={ARRIVAL_VARIANT[a]}>{ARRIVAL_STATUS_LABELS[a]}</Badge> : <span className="text-muted-foreground">—</span>;
+  };
 
   return (
     <div className="space-y-6">
@@ -233,6 +250,7 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
                       <TableHead className="hidden lg:table-cell">Tunlik narx</TableHead>
                       <TableHead>Jami</TableHead>
                       <TableHead>Status</TableHead>
+                      {smart && <TableHead>Kelish holati</TableHead>}
                       <TableHead className="w-12">
                         <span className="sr-only">Amallar</span>
                       </TableHead>
@@ -256,6 +274,7 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
                           {formatCurrency(booking.totalAmount)}
                         </TableCell>
                         <TableCell>{statusBadge(booking.status)}</TableCell>
+                        {smart && <TableCell>{arrival(booking)}</TableCell>}
                         <TableCell>{actions(booking)}</TableCell>
                       </TableRow>
                     ))}
@@ -270,6 +289,7 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-medium">{booking.propertyName}</p>
                         {statusBadge(booking.status)}
+                        {smart && arrivalBadge(booking) && arrival(booking)}
                       </div>
                       <p className="text-sm">
                         {terms.guest}: {booking.guestName} • {booking.guestCount} kishi
@@ -302,6 +322,7 @@ export function BookingsView({ industry }: { industry: BookingIndustry }) {
         properties={properties}
         guests={guests}
         terms={terms}
+        smartGuest={smart}
         onSaved={reload}
       />
       <ConfirmDialog

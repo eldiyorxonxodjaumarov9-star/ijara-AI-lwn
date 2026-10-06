@@ -13,6 +13,7 @@ import {
   tashkentToday,
   toStoredDate,
   type Booking,
+  type BookingArrivalStatus,
   type BookingInput,
   type BookingStatus,
   type BookingUpdateInput,
@@ -82,7 +83,10 @@ const BOOKING_INCLUDE = {
 type BookingRow = {
   id: string;
   propertyId: string;
-  tenantId: string;
+  tenantId: string | null;
+  guestName: string;
+  guestPhone: string | null;
+  arrivalStatus: BookingArrivalStatus;
   checkInDate: Date;
   checkOutDate: Date;
   nights: number;
@@ -110,7 +114,9 @@ export function toBookingView(row: BookingRow): Booking {
     guestCount: row.guestCount,
     notes: row.notes,
     propertyName: row.property?.title ?? "—",
-    guestName: row.tenant?.fullName ?? "—",
+    guestName: row.guestName || row.tenant?.fullName || "—",
+    guestPhone: row.guestPhone,
+    arrivalStatus: row.arrivalStatus,
     createdAt: new Date(row.createdAt).toISOString(),
   };
 }
@@ -127,8 +133,12 @@ async function lockProperty(db: BookingDb, workspaceId: string, propertyId: stri
 }
 
 async function assertGuest(db: BookingDb, workspaceId: string, tenantId: string) {
-  const tenant = await db.tenant.findFirst({ where: { id: tenantId, workspaceId }, select: { id: true } });
+  const tenant = await db.tenant.findFirst({
+    where: { id: tenantId, workspaceId },
+    select: { id: true, fullName: true, phone: true },
+  });
   if (!tenant) throw GUEST_NOT_FOUND();
+  return tenant;
 }
 
 /** Half-open overlap in SQL: existing.checkIn < new.checkOut AND new.checkIn < existing.checkOut. */
@@ -179,7 +189,7 @@ export async function createBooking(db: BookingDb, workspaceId: string, input: B
   if (property.status === "MAINTENANCE") {
     throw new BookingError("Ta’mirdagi joyni bron qilib bo‘lmaydi", 409, "PROPERTY_NOT_BOOKABLE");
   }
-  await assertGuest(db, workspaceId, input.tenantId);
+  const guest = input.tenantId ? await assertGuest(db, workspaceId, input.tenantId) : null;
   await assertAvailable(db, workspaceId, property.id, input);
 
   const nights = bookingNights(input.checkInDate, input.checkOutDate)!;
@@ -187,7 +197,9 @@ export async function createBooking(db: BookingDb, workspaceId: string, input: B
     data: {
       workspaceId,
       propertyId: property.id,
-      tenantId: input.tenantId,
+      tenantId: guest?.id ?? null,
+      guestName: input.guestName || guest?.fullName || "",
+      guestPhone: input.guestPhone ?? (guest?.phone || null),
       checkInDate: toStoredDate(input.checkInDate),
       checkOutDate: toStoredDate(input.checkOutDate),
       nights,
@@ -226,14 +238,28 @@ export async function updateBooking(
     if (input.status === "CHECKED_IN" && fromStoredDate(existing.checkInDate) > tashkentToday(now)) {
       throw new BookingError("Kirish sanasidan oldin check-in qilib bo‘lmaydi", 409, "CHECK_IN_TOO_EARLY");
     }
+    if (input.status === "CHECKED_IN") {
+      if (!existing.tenantId && !input.tenantId) {
+        throw new BookingError(
+          "Mehmon kelganini «Mehmonlar» bo‘limida «Keldi» orqali belgilang",
+          409,
+          "ARRIVAL_REQUIRED"
+        );
+      }
+      data.arrivalStatus = "ARRIVED";
+    }
     data.status = input.status;
   }
 
   if (input.notes !== undefined) data.notes = input.notes;
   if (input.guestCount !== undefined) data.guestCount = input.guestCount;
+  if (input.guestName !== undefined) data.guestName = input.guestName;
+  if (input.guestPhone !== undefined) data.guestPhone = input.guestPhone;
   if (input.tenantId !== undefined && input.tenantId !== existing.tenantId) {
-    await assertGuest(db, workspaceId, input.tenantId);
-    data.tenantId = input.tenantId;
+    const guest = await assertGuest(db, workspaceId, input.tenantId);
+    data.tenantId = guest.id;
+    if (input.guestName === undefined) data.guestName = guest.fullName;
+    if (input.guestPhone === undefined) data.guestPhone = guest.phone || null;
   }
 
   let propertyId = existing.propertyId;

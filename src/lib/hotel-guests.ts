@@ -5,6 +5,7 @@ import {
   parseDates,
   parseGuests,
   parseRate,
+  type BookingArrivalStatus,
   type BookingStatus,
 } from "@/lib/bookings";
 import {
@@ -18,7 +19,9 @@ export const isHotelGuestIndustry = (industry: unknown) => industry === "HOTEL_H
 
 export type HotelGuestRow = {
   bookingId: string;
-  tenantId: string;
+  /** Null for a reservation whose guest has not arrived yet. */
+  tenantId: string | null;
+  arrivalStatus: BookingArrivalStatus;
   fullName: string;
   phone: string;
   clientNumber: string | null;
@@ -171,13 +174,39 @@ export function parseHotelGuestUpdate(body: unknown): Parsed<HotelGuestUpdate> {
 }
 
 /**
- * Placing a guest whose stay has started means they are in the room (CHECKED_IN);
- * a future arrival is a confirmed reservation. A stay that already ended is not a placement.
+ * Placing a guest means they are in the room now (CHECKED_IN). A future arrival is a reservation
+ * (Bronlar) and gets no guest record until "Keldi". A stay that already ended is not a placement.
  */
 export function initialGuestStatus(
   range: { checkInDate: string; checkOutDate: string },
   today: string
-): Parsed<"CONFIRMED" | "CHECKED_IN"> {
+): Parsed<"CHECKED_IN"> {
   if (range.checkOutDate <= today) return { error: "Ketish sanasi bugundan keyin bo‘lishi kerak" };
-  return { data: range.checkInDate <= today ? "CHECKED_IN" : "CONFIRMED" };
+  if (range.checkInDate > today) {
+    return { error: "Kelajakdagi kelish uchun «Bronlar» bo‘limida bron yarating" };
+  }
+  return { data: "CHECKED_IN" };
+}
+
+/** Comparable phone: digits only, local 9-digit UZ numbers get the 998 prefix. Too short → null. */
+export function phoneKey(phone: string | null | undefined): string | null {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (digits.length < 7) return null;
+  return digits.length === 9 ? `998${digits}` : digits;
+}
+
+/** "Keldi" body: whether money was taken at arrival, and how much. */
+export type ArrivalInput = { paymentAmount: number; paymentMethod: SourcePaymentMethod };
+
+export function parseArrivalInput(body: unknown): Parsed<ArrivalInput> {
+  if (!body || typeof body !== "object") return { error: "Ma’lumotlar noto‘g‘ri" };
+  const b = body as Record<string, unknown>;
+  if (b.paymentStatus !== "PAID" && b.paymentStatus !== "UNPAID") return { error: "To‘lov holatini tanlang" };
+  if (b.paymentStatus === "UNPAID") return { data: { paymentAmount: 0, paymentMethod: "CASH" } };
+  const amount = parsePaymentAmount(b.paymentAmount);
+  if (amount.error !== undefined) return amount;
+  if (amount.data <= 0) return { error: "To‘lov summasi 0 dan katta bo‘lishi kerak" };
+  const method = parseMethod(b.paymentMethod);
+  if (method.error !== undefined) return method;
+  return { data: { paymentAmount: amount.data, paymentMethod: method.data } };
 }

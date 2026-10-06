@@ -175,7 +175,7 @@ export async function findDemoRecords(
     for (const r of refs) {
       if (staying.has(r.id)) continue;
       P.delete(r.propertyId);
-      T.delete(r.tenantId);
+      if (r.tenantId) T.delete(r.tenantId);
     }
   }
 

@@ -4,7 +4,7 @@ import { LWN_BUILDING } from "@/lib/constants";
 import { getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { isRentalIndustry, type RentalIndustry } from "@/lib/rental-industry";
 import type { VehicleStatus } from "@/lib/vehicles";
-import { bookingNights, bookingTotal, type BookingStatus } from "@/lib/bookings";
+import { bookingNights, bookingTotal, type BookingArrivalStatus, type BookingStatus } from "@/lib/bookings";
 import {
   addDays,
   initialRentalStatus,
@@ -298,6 +298,9 @@ export type DemoSeedPlan = {
     key: string;
     propertyKey: string;
     tenantKey: string;
+    guestName: string;
+    guestPhone: string | null;
+    arrivalStatus: BookingArrivalStatus;
     checkInDate: Date;
     checkOutDate: Date;
     nights: number;
@@ -525,10 +528,14 @@ export function buildDemoSeedPlan(
         notes: DEMO_SEED_NOTE,
       });
     }
+    const guest = plan.tenants[b.customerIndex];
     plan.bookings.push({
       key,
       propertyKey: `p${b.unitIndex}`,
       tenantKey: `t${b.customerIndex}`,
+      guestName: guest.fullName,
+      guestPhone: guest.phone || null,
+      arrivalStatus: b.status === "CHECKED_IN" || b.status === "CHECKED_OUT" ? "ARRIVED" : "EXPECTED",
       checkInDate: toStoredDate(checkInDate),
       checkOutDate: toStoredDate(checkOutDate),
       nights,

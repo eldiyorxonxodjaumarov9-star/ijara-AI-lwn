@@ -23,9 +23,14 @@ import {
   canTransition,
   countCurrentGuests,
   isBookingIndustry,
+  arrivalBadge,
+  ARRIVAL_STATUS_LABELS,
   parseBookingInput,
   parseBookingUpdate,
   selectCurrentStays,
+  selectExpectedArrivals,
+  selectOverdueArrivals,
+  selectTodayArrivals,
   selectTodayCheckIns,
   selectTodayCheckOuts,
   selectUpcomingArrivals,
@@ -94,7 +99,8 @@ function fakeDb() {
       t[name].filter((r) => matches(r, where)).map((r) => withInclude(r, include)),
     count: async ({ where }: { where: Cond }) => t[name].filter((r) => matches(r, where)).length,
     create: async ({ data }: { data: Row }) => {
-      const row = { createdAt: new Date(), ...data, id: data.id ?? `${name}-${++seq}` } as Row;
+      const defaults = name === "booking" ? { arrivalStatus: "EXPECTED" } : {};
+      const row = { createdAt: new Date(), ...defaults, ...data, id: data.id ?? `${name}-${++seq}` } as Row;
       t[name].push(row);
       return row;
     },
@@ -181,13 +187,15 @@ describe("Stage 10: booking total cannot drop below paid", () => {
 
 const input = (
   propertyId: string,
-  tenantId: string,
+  tenantId: string | null,
   checkInDate: string,
   checkOutDate: string,
   extra: Partial<BookingInput> = {}
 ): BookingInput => ({
   propertyId,
   tenantId,
+  guestName: "",
+  guestPhone: null,
   checkInDate,
   checkOutDate,
   nightlyRate: 400_000,
@@ -479,7 +487,7 @@ describe("delete/history safety", () => {
     const schema = read("server/prisma/schema.prisma");
     const model = schema.slice(schema.indexOf("model Booking {"), schema.indexOf('@@map("bookings")'));
     assert.match(model, /property\s+Property\s+@relation\([^)]*onDelete: NoAction\)/);
-    assert.match(model, /tenant\s+Tenant\s+@relation\([^)]*onDelete: NoAction\)/);
+    assert.match(model, /tenant\s+Tenant\?\s+@relation\([^)]*onDelete: NoAction\)/);
   });
 
   it("property/tenant delete guards return 409 when history exists", async () => {
@@ -654,5 +662,108 @@ describe("dashboard booking data", () => {
     assert.match(src, /todayIncome=\{todayIncome\}/);
     assert.match(src, /monthlyIncome=\{industryMonthlyIncome\}/);
     assert.match(src, /usesSourcePayments\s*\?\s*metrics\.monthlyIncomeActual \+ sourceIncome\.month\s*:\s*metrics\.monthlyIncome;/);
+  });
+});
+
+describe("smart booking: reservation without a guest record", () => {
+  it("guestName is required without a tenant; phone is optional and stored", () => {
+    const base = { propertyId: "p", checkInDate: day(0), checkOutDate: day(2), nightlyRate: 100, guestCount: 3 };
+    assert.match(parseBookingInput(base).error ?? "", /Mehmon F\.I\.O/);
+    assert.match(parseBookingInput({ ...base, guestName: " a " }).error ?? "", /Mehmon F\.I\.O/);
+    const ok = parseBookingInput({ ...base, guestName: "  Ali   Valiyev ", guestPhone: "+998 90 123 45 67" }).data!;
+    assert.equal(ok.guestName, "Ali Valiyev");
+    assert.equal(ok.guestPhone, "+998 90 123 45 67");
+    assert.equal(ok.tenantId, null);
+    assert.equal(ok.guestCount, 3);
+    assert.equal(parseBookingInput({ ...base, guestName: "Ali" }).data?.guestPhone, null);
+    assert.match(parseBookingInput({ ...base, guestName: "Ali", guestPhone: "12" }).error ?? "", /Telefon/);
+  });
+
+  it("creates the booking with tenantId null and no tenant row; view shows guestName", async () => {
+    const s = setup();
+    const tenantsBefore = s.t.tenant.length;
+    const b = await s.create(input(s.room.id, null, day(0), day(2), { guestName: "Ali Valiyev", guestPhone: "+998901234567", guestCount: 3 }));
+    assert.equal(b.tenantId, null);
+    assert.equal(b.guestName, "Ali Valiyev");
+    assert.equal(b.guestPhone, "+998901234567");
+    assert.equal(b.arrivalStatus, "EXPECTED");
+    assert.equal(b.guestCount, 3);
+    assert.equal(s.t.tenant.length, tenantsBefore, "no guest record before arrival");
+    assert.deepEqual((await s.transaction((db) => listBookings(db, "A"))).map((x) => x.guestName), ["Ali Valiyev"]);
+  });
+
+  it("an expected reservation blocks the room (half-open); NO_SHOW + CANCELLED frees it", async () => {
+    const s = setup();
+    const b = await s.create(input(s.room.id, null, day(0), day(2), { guestName: "Ali" }));
+    await rejects(s.create(input(s.room.id, null, day(1), day(3), { guestName: "Vali" })), 409, "PROPERTY_NOT_AVAILABLE");
+    await s.create(input(s.room.id, null, day(2), day(3), { guestName: "Adjacent" }));
+    Object.assign(s.t.booking.find((r) => r.id === b.id)!, { status: "CANCELLED", arrivalStatus: "NO_SHOW" });
+    const next = await s.create(input(s.room.id, null, day(0), day(2), { guestName: "Vali" }));
+    assert.equal(next.status, "CONFIRMED");
+  });
+
+  it("direct check-in without a linked guest → 409 ARRIVAL_REQUIRED; with a guest it marks ARRIVED", async () => {
+    const s = setup();
+    const b = await s.create(input(s.room.id, null, day(0), day(2), { guestName: "Ali" }));
+    await rejects(s.update(b.id, { status: "CHECKED_IN" }), 409, "ARRIVAL_REQUIRED");
+    const linked = await s.update(b.id, { tenantId: s.guest.id, status: "CHECKED_IN" });
+    assert.equal(linked.status, "CHECKED_IN");
+    assert.equal(linked.arrivalStatus, "ARRIVED");
+    assert.equal(linked.tenantId, s.guest.id);
+    assert.equal(linked.guestName, s.guest.fullName, "linking a guest record adopts its name");
+    assert.equal((await s.update(b.id, { status: "CHECKED_OUT" })).status, "CHECKED_OUT");
+  });
+
+  it("arrival selectors: today expected, future excluded, overdue stays actionable", () => {
+    const row = (id: string, inOff: number, status: Booking["status"], arrivalStatus: Booking["arrivalStatus"]) =>
+      ({ id, status, arrivalStatus, checkInDate: day(inOff), checkOutDate: day(inOff + 2) }) as Booking;
+    const rows = [
+      row("today", 0, "CONFIRMED", "EXPECTED"),
+      row("todayPending", 0, "PENDING", "EXPECTED"),
+      row("future", 1, "CONFIRMED", "EXPECTED"),
+      row("late2", -2, "CONFIRMED", "EXPECTED"),
+      row("late1", -1, "PENDING", "EXPECTED"),
+      row("arrived", 0, "CHECKED_IN", "ARRIVED"),
+      row("noShow", 0, "CANCELLED", "NO_SHOW"),
+      row("cancelled", 0, "CANCELLED", "EXPECTED"),
+    ];
+    assert.deepEqual(selectExpectedArrivals(rows, TODAY).map((x) => x.id), ["today", "todayPending"]);
+    assert.deepEqual(selectOverdueArrivals(rows, TODAY).map((x) => x.id), ["late2", "late1"]);
+    assert.deepEqual(selectTodayArrivals(rows, TODAY).map((x) => x.id), ["today", "todayPending", "arrived", "noShow"]);
+    assert.deepEqual(
+      selectTodayArrivals(rows, TODAY).map((x) => ARRIVAL_STATUS_LABELS[arrivalBadge(x)!]),
+      ["Kutilmoqda", "Kutilmoqda", "Keldi", "Kelmadi"]
+    );
+    assert.equal(arrivalBadge(row("x", 0, "CANCELLED", "EXPECTED")), null);
+    assert.equal(countCurrentGuests([{ ...rows[5], guestCount: 3 }, { ...rows[0], guestCount: 4 }] as Booking[]), 3);
+  });
+
+  it("migration is additive, idempotent and backfills from tenants without deleting data", () => {
+    const sql = read("server/prisma/migrations/20261006110000_smart_booking_arrivals/migration.sql");
+    assert.match(sql, /CREATE TYPE "BookingArrivalStatus" AS ENUM \('EXPECTED', 'ARRIVED', 'NO_SHOW'\)/);
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS "guestName" TEXT NOT NULL DEFAULT ''/);
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS "guestPhone" TEXT/);
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS "arrivalStatus" "BookingArrivalStatus" NOT NULL DEFAULT 'EXPECTED'/);
+    assert.match(sql, /ALTER COLUMN "tenantId" DROP NOT NULL/);
+    assert.match(sql, /FROM "tenants"/);
+    assert.doesNotMatch(sql, /\b(DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE)\b/i);
+    const runtime = read("src/lib/api-server/workspace-schema-sql.ts");
+    assert.match(runtime, /"arrivalStatus" "BookingArrivalStatus"/);
+  });
+
+  it("HOTEL booking dialog asks for name + phone (no guest dropdown); VILLA keeps the select", () => {
+    const dialog = read("src/components/bookings/booking-dialog.tsx");
+    const view = read("src/components/bookings/bookings-view.tsx");
+    assert.match(dialog, /smartGuest \?/);
+    assert.match(dialog, /id="booking-guest-name"/);
+    assert.match(dialog, /id="booking-guest-phone"/);
+    assert.match(dialog, /\{terms\.guest\} F\.I\.O \*/);
+    assert.doesNotMatch(dialog, /Mehmonni tanlang/);
+    assert.match(view, /smartGuest=\{smart\}/);
+    assert.match(view, /isHotelGuestIndustry\(industry\)/);
+    assert.match(view, /Kelish holati/);
+    for (const label of ["Kirish sanasi", "Chiqish sanasi", "Mehmonlar soni", "Tunlik narx", "Jami", "Holat", "Izoh", "Bron yaratish"]) {
+      assert.ok(dialog.includes(label) || view.includes(label), label);
+    }
   });
 });

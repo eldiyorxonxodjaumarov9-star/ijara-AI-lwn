@@ -128,6 +128,7 @@ type BookingWithNames = {
   totalAmount: number;
   checkInDate: Date;
   checkOutDate: Date;
+  guestName?: string;
   property?: { title: string } | null;
   tenant?: { fullName: string } | null;
 };
@@ -150,7 +151,7 @@ function bookingRecord(b: BookingWithNames): SourceRecord {
     id: b.id,
     status: b.status,
     total: b.totalAmount,
-    customerName: b.tenant?.fullName ?? "—",
+    customerName: b.guestName || b.tenant?.fullName || "—",
     unitName: b.property?.title ?? "—",
     startDate: fromStoredDate(b.checkInDate),
     endDate: fromStoredDate(b.checkOutDate),

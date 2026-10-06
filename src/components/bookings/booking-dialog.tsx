@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { MoneyInput } from "@/components/shared/money-input";
+import { UzPhoneInput } from "@/components/shared/uz-phone-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,12 +36,15 @@ import {
   type Booking,
   type BookingInput,
 } from "@/lib/bookings";
+import { UZ_PHONE_PATTERN } from "@/lib/uz-phone";
 import { formatCurrency } from "@/lib/utils";
 import type { Property, Tenant } from "@/types";
 
 type FormState = {
   propertyId: string;
   tenantId: string;
+  guestName: string;
+  guestPhone: string;
   checkInDate: string;
   checkOutDate: string;
   guestCount: number;
@@ -54,6 +58,8 @@ const emptyForm = (): FormState => {
   return {
     propertyId: "",
     tenantId: "",
+    guestName: "",
+    guestPhone: "",
     checkInDate: today,
     checkOutDate: addDays(today, 1),
     guestCount: 1,
@@ -71,6 +77,7 @@ export function BookingDialog({
   properties,
   guests,
   terms,
+  smartGuest = false,
   onSaved,
 }: {
   open: boolean;
@@ -81,6 +88,8 @@ export function BookingDialog({
   properties: Property[];
   guests: Tenant[];
   terms: { unit: string; guest: string };
+  /** HOTEL: the guest is typed in (name + phone); the guest record is created on arrival. */
+  smartGuest?: boolean;
   onSaved: () => void | Promise<void>;
 }) {
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -98,7 +107,9 @@ export function BookingDialog({
         booking
           ? {
               propertyId: booking.propertyId,
-              tenantId: booking.tenantId,
+              tenantId: booking.tenantId ?? "",
+              guestName: booking.guestName === "—" ? "" : booking.guestName,
+              guestPhone: booking.guestPhone ?? "",
               checkInDate: booking.checkInDate,
               checkOutDate: booking.checkOutDate,
               guestCount: booking.guestCount,
@@ -135,16 +146,28 @@ export function BookingDialog({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const phoneChanged = form.guestPhone !== (booking?.guestPhone ?? "");
+    if (smartGuest && form.guestPhone && phoneChanged && !UZ_PHONE_PATTERN.test(form.guestPhone)) {
+      setError("Telefon raqamini to‘liq kiriting");
+      return;
+    }
+    if (!smartGuest && !form.tenantId) {
+      setError(`${terms.guest}ni tanlang`);
+      return;
+    }
+    const guest = smartGuest
+      ? { guestName: form.guestName, guestPhone: form.guestPhone }
+      : { tenantId: form.tenantId };
+    const common = {
+      checkInDate: form.checkInDate,
+      checkOutDate: form.checkOutDate,
+      guestCount: form.guestCount,
+      nightlyRate: form.nightlyRate,
+      notes: form.notes,
+    };
     const parsed = booking
-      ? parseBookingUpdate({
-          tenantId: form.tenantId,
-          checkInDate: form.checkInDate,
-          checkOutDate: form.checkOutDate,
-          guestCount: form.guestCount,
-          nightlyRate: form.nightlyRate,
-          notes: form.notes,
-        })
-      : parseBookingInput(form);
+      ? parseBookingUpdate({ ...guest, ...common })
+      : parseBookingInput({ ...guest, ...common, propertyId: form.propertyId, status: form.status });
     if (parsed.error !== undefined) {
       setError(parsed.error);
       return;
@@ -200,21 +223,43 @@ export function BookingDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>{terms.guest} *</Label>
-              <Select value={form.tenantId} onValueChange={(v) => set("tenantId", v)}>
-                <SelectTrigger aria-label={terms.guest}>
-                  <SelectValue placeholder={`${terms.guest}ni tanlang`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeGuests.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {smartGuest ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="booking-guest-name">{terms.guest} F.I.O *</Label>
+                  <Input
+                    id="booking-guest-name"
+                    placeholder="To‘liq ism"
+                    value={form.guestName}
+                    onChange={(e) => set("guestName", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="booking-guest-phone">Telefon</Label>
+                  <UzPhoneInput
+                    id="booking-guest-phone"
+                    value={form.guestPhone}
+                    onChange={(v) => set("guestPhone", v)}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>{terms.guest} *</Label>
+                <Select value={form.tenantId} onValueChange={(v) => set("tenantId", v)}>
+                  <SelectTrigger aria-label={terms.guest}>
+                    <SelectValue placeholder={`${terms.guest}ni tanlang`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeGuests.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="booking-check-in">Kirish sanasi *</Label>
               <Input
@@ -268,7 +313,7 @@ export function BookingDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CONFIRMED">Tasdiqlangan</SelectItem>
-                    <SelectItem value="PENDING">Kutilmoqda</SelectItem>
+                    <SelectItem value="PENDING">Tasdiq kutilmoqda</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -285,7 +330,7 @@ export function BookingDialog({
             </div>
           </div>
 
-          {activeGuests.length === 0 && (
+          {!smartGuest && activeGuests.length === 0 && (
             <p className="text-xs text-muted-foreground">Avval {guestLower} qo‘shing.</p>
           )}
           {error && (

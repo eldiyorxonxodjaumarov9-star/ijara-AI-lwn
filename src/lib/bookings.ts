@@ -13,12 +13,28 @@ export const BOOKING_STATUSES = ["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 export const BOOKING_STATUS_LABELS: Record<BookingStatus, string> = {
-  PENDING: "Kutilmoqda",
+  PENDING: "Tasdiq kutilmoqda",
   CONFIRMED: "Tasdiqlangan",
   CHECKED_IN: "Joylashgan",
   CHECKED_OUT: "Chiqib ketgan",
   CANCELLED: "Bekor qilingan",
 };
+
+/** Whether the guest showed up. Independent of BookingStatus (the reservation lifecycle). */
+export const BOOKING_ARRIVAL_STATUSES = ["EXPECTED", "ARRIVED", "NO_SHOW"] as const;
+export type BookingArrivalStatus = (typeof BOOKING_ARRIVAL_STATUSES)[number];
+
+export const ARRIVAL_STATUS_LABELS: Record<BookingArrivalStatus, string> = {
+  EXPECTED: "Kutilmoqda",
+  ARRIVED: "Keldi",
+  NO_SHOW: "Kelmadi",
+};
+
+/** Arrival badge for a booking; a reservation cancelled before arrival has none. */
+export function arrivalBadge(b: { status: BookingStatus; arrivalStatus: BookingArrivalStatus }): BookingArrivalStatus | null {
+  if (b.arrivalStatus !== "EXPECTED") return b.arrivalStatus;
+  return b.status === "PENDING" || b.status === "CONFIRMED" ? "EXPECTED" : null;
+}
 
 /** Statuses that occupy the unit for their nights. */
 export const BLOCKING_BOOKING_STATUSES: readonly BookingStatus[] = ["PENDING", "CONFIRMED", "CHECKED_IN"];
@@ -66,7 +82,8 @@ export const MAX_GUESTS = 50;
 export type Booking = {
   id: string;
   propertyId: string;
-  tenantId: string;
+  /** Null until the guest arrives and a guest record is linked. */
+  tenantId: string | null;
   /** YYYY-MM-DD (Asia/Tashkent calendar day). */
   checkInDate: string;
   checkOutDate: string;
@@ -78,6 +95,8 @@ export type Booking = {
   notes: string | null;
   propertyName: string;
   guestName: string;
+  guestPhone: string | null;
+  arrivalStatus: BookingArrivalStatus;
   createdAt: string;
 };
 
@@ -118,7 +137,11 @@ export function bookingTerms(industry: unknown) {
 
 export type BookingInput = {
   propertyId: string;
-  tenantId: string;
+  /** Optional link to an existing guest; a reservation only needs `guestName`. */
+  tenantId: string | null;
+  /** Empty when `tenantId` is set: the server copies the guest's name. */
+  guestName: string;
+  guestPhone: string | null;
   checkInDate: string;
   checkOutDate: string;
   nightlyRate: number;
@@ -128,7 +151,8 @@ export type BookingInput = {
 };
 
 /** `propertyId` is never parsed from /api/bookings PATCH; only the hotel guest flow moves a stay. */
-export type BookingUpdateInput = Partial<Omit<BookingInput, "status">> & {
+export type BookingUpdateInput = Partial<Omit<BookingInput, "status" | "tenantId">> & {
+  tenantId?: string;
   status?: BookingStatus;
 };
 
@@ -163,14 +187,38 @@ export function parseGuests(value: unknown): Parsed<number> {
 
 export const optionalNotes = (value: unknown) => String(value ?? "").trim().slice(0, 1000) || null;
 
-/** Create body. `customerId`/`guestId` alias `tenantId`; workspaceId and industry are ignored. */
+export function parseGuestName(value: unknown): Parsed<string> {
+  const name = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (name.length < 2) return { error: "Mehmon F.I.O kiriting" };
+  return { data: name.slice(0, 120) };
+}
+
+/** Optional phone: empty → null; otherwise at least 7 digits. */
+export function parseGuestPhone(value: unknown): Parsed<string | null> {
+  const phone = String(value ?? "").trim();
+  if (!phone) return { data: null };
+  if (phone.replace(/\D/g, "").length < 7) return { error: "Telefon raqamini to‘liq kiriting" };
+  return { data: phone.slice(0, 32) };
+}
+
+/**
+ * Create body. A reservation needs `guestName`; `tenantId` (alias `customerId`/`guestId`) optionally
+ * links an existing guest. workspaceId and industry are ignored.
+ */
 export function parseBookingInput(body: unknown): Parsed<BookingInput> {
   if (!body || typeof body !== "object") return { error: "Ma’lumotlar noto‘g‘ri" };
   const b = body as Record<string, unknown>;
   const propertyId = String(b.propertyId ?? "").trim();
   if (!propertyId) return { error: "Xona yoki obyektni tanlang" };
-  const tenantId = String(b.tenantId ?? b.customerId ?? b.guestId ?? "").trim();
-  if (!tenantId) return { error: "Mehmon yoki mijozni tanlang" };
+  const tenantId = String(b.tenantId ?? b.customerId ?? b.guestId ?? "").trim() || null;
+  let guestName = "";
+  if (!tenantId || String(b.guestName ?? "").trim()) {
+    const name = parseGuestName(b.guestName);
+    if (name.error !== undefined) return { error: name.error };
+    guestName = name.data;
+  }
+  const phone = parseGuestPhone(b.guestPhone);
+  if (phone.error !== undefined) return { error: phone.error };
   const dates = parseDates(b.checkInDate, b.checkOutDate);
   if (dates.error !== undefined) return { error: dates.error };
   const rate = parseRate(b.nightlyRate);
@@ -179,12 +227,14 @@ export function parseBookingInput(body: unknown): Parsed<BookingInput> {
   if (guests.error !== undefined) return { error: guests.error };
   const status = b.status ?? "CONFIRMED";
   if (status !== "PENDING" && status !== "CONFIRMED") {
-    return { error: "Yangi bron faqat «Kutilmoqda» yoki «Tasdiqlangan» bo‘lishi mumkin" };
+    return { error: "Yangi bron faqat «Tasdiq kutilmoqda» yoki «Tasdiqlangan» bo‘lishi mumkin" };
   }
   return {
     data: {
       propertyId,
       tenantId,
+      guestName,
+      guestPhone: phone.data,
       ...dates.data,
       nightlyRate: rate.data,
       guestCount: guests.data,
@@ -207,6 +257,16 @@ export function parseBookingUpdate(body: unknown): Parsed<BookingUpdateInput> {
   if (tenant !== undefined) {
     out.tenantId = String(tenant).trim();
     if (!out.tenantId) return { error: "Mehmon yoki mijozni tanlang" };
+  }
+  if (b.guestName !== undefined) {
+    const name = parseGuestName(b.guestName);
+    if (name.error !== undefined) return { error: name.error };
+    out.guestName = name.data;
+  }
+  if (b.guestPhone !== undefined) {
+    const phone = parseGuestPhone(b.guestPhone);
+    if (phone.error !== undefined) return { error: phone.error };
+    out.guestPhone = phone.data;
   }
   if (b.checkInDate !== undefined || b.checkOutDate !== undefined) {
     const dates = parseDates(b.checkInDate, b.checkOutDate);
@@ -246,6 +306,28 @@ export function selectOccupiedPropertyIds<T extends Stay & Pick<Booking, "proper
 /** Arrivals expected today (not yet cancelled; includes ones already checked in today). */
 export function selectTodayCheckIns<T extends Stay>(bookings: T[], today: string) {
   return bookings.filter((b) => b.checkInDate === today && isBlocking(b));
+}
+
+type Arrival = Stay & Pick<Booking, "arrivalStatus">;
+
+/** Dashboard "Bugungi check-in" list: today's arrivals incl. no-shows, labelled by arrival status. */
+export function selectTodayArrivals<T extends Arrival>(bookings: T[], today: string) {
+  return bookings.filter((b) => b.checkInDate === today && (isBlocking(b) || b.arrivalStatus === "NO_SHOW"));
+}
+
+const awaitingArrival = (b: Arrival) =>
+  b.arrivalStatus === "EXPECTED" && (b.status === "PENDING" || b.status === "CONFIRMED");
+
+/** Reservations arriving today that still need "Keldi" / "Kelmadi". */
+export function selectExpectedArrivals<T extends Arrival>(bookings: T[], today: string) {
+  return bookings.filter((b) => awaitingArrival(b) && b.checkInDate === today);
+}
+
+/** Arrival day passed without "Keldi" / "Kelmadi": stays actionable, never auto-removed. */
+export function selectOverdueArrivals<T extends Arrival>(bookings: T[], today: string) {
+  return bookings
+    .filter((b) => awaitingArrival(b) && b.checkInDate < today)
+    .sort((a, b) => a.checkInDate.localeCompare(b.checkInDate));
 }
 
 /** Departures due today: still in house or already checked out today. */

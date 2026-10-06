@@ -35,10 +35,13 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { VEHICLE_STATUS_LABELS, type Vehicle } from "@/lib/vehicles";
 import {
+  ARRIVAL_STATUS_LABELS,
+  arrivalBadge,
   BOOKING_STATUS_LABELS,
   countCurrentGuests,
   occupiesToday,
   selectCurrentStays,
+  selectTodayArrivals,
   selectTodayCheckIns,
   selectTodayCheckOuts,
   selectUpcomingArrivals,
@@ -302,7 +305,7 @@ function BlockBody({
     const byArrival = mode === "todayCheckIns" || mode === "upcomingArrivals";
     const list =
       mode === "todayCheckIns"
-        ? selectTodayCheckIns(bookings, today)
+        ? selectTodayArrivals(bookings, today)
         : mode === "todayCheckOuts"
           ? selectTodayCheckOuts(bookings, today)
           : mode === "activeBookings"
@@ -318,7 +321,10 @@ function BlockBody({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-slate-100">{booking.propertyName}</p>
               <p className="truncate text-xs text-slate-400">
-                {booking.guestName} • {booking.guestCount} kishi • {BOOKING_STATUS_LABELS[booking.status]}
+                {booking.guestName} • {booking.guestCount} kishi •{" "}
+                {mode === "todayCheckIns" && arrivalBadge(booking)
+                  ? ARRIVAL_STATUS_LABELS[arrivalBadge(booking)!]
+                  : BOOKING_STATUS_LABELS[booking.status]}
               </p>
             </div>
             <div className="text-right">

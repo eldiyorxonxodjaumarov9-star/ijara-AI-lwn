@@ -8,7 +8,9 @@ import { NextRequest } from "next/server";
 
 import { GET as listRoute, POST as createRoute } from "@/app/api/hotel-guests/route";
 import { PATCH as editRoute } from "@/app/api/hotel-guests/[id]/route";
-import { GET as bookingsRoute } from "@/app/api/bookings/route";
+import { POST as arrivalRoute } from "@/app/api/hotel-guests/[id]/arrival/route";
+import { POST as noShowRoute } from "@/app/api/hotel-guests/[id]/no-show/route";
+import { GET as bookingsRoute, POST as bookingCreateRoute } from "@/app/api/bookings/route";
 import { PATCH as bookingPatchRoute } from "@/app/api/bookings/[id]/route";
 import { prisma } from "@/lib/api-server/prisma";
 import {
@@ -91,7 +93,7 @@ function withInclude(name: string, row: Row, include?: Row) {
 
 const DEFAULTS: Record<string, Row> = {
   tenant: { login: null, password: null, leftAt: null, clientNumber: null, telegramChatId: null },
-  booking: { status: "CONFIRMED", guestCount: 1, notes: null },
+  booking: { status: "CONFIRMED", guestCount: 1, notes: null, tenantId: null, guestName: "", guestPhone: null, arrivalStatus: "EXPECTED" },
   client: { loginCount: 1 },
 };
 
@@ -177,6 +179,11 @@ const edit = (ws: string, id: string, body: unknown) =>
 const setStatus = (ws: string, id: string, status: string) =>
   bookingPatchRoute(req("PATCH", `/api/bookings/${id}`, owner(ws), { status }), { params: Promise.resolve({ id }) }).then(json);
 const bookingsOf = async (ws: string) => (await json(await bookingsRoute(req("GET", "/api/bookings", owner(ws))))).data as Booking[];
+const reserve = (ws: string, body: Row) => bookingCreateRoute(req("POST", "/api/bookings", owner(ws), body)).then(json);
+const arrive = (ws: string, id: string, body: unknown, user = owner(ws)) =>
+  arrivalRoute(req("POST", `/api/hotel-guests/${id}/arrival`, user, body), { params: Promise.resolve({ id }) }).then(json);
+const noShow = (ws: string, id: string, user = owner(ws)) =>
+  noShowRoute(req("POST", `/api/hotel-guests/${id}/no-show`, user, {}), { params: Promise.resolve({ id }) }).then(json);
 
 function addWorkspace(id: string, industry: string) {
   workspaces.set(id, {
@@ -238,14 +245,21 @@ before(() => {
       : ((workspaces.get(where.workspaceId)?.subscription as Row | undefined) ?? null)
   );
   mock(prisma, "$queryRaw", async () => []);
-  mock(prisma, "$transaction", async (fn: (tx: typeof prisma) => unknown) => {
-    const snapshot = Object.fromEntries(Object.entries(tables).map(([k, v]) => [k, v.map((r) => ({ ...r }))]));
-    try {
-      return await fn(prisma);
-    } catch (err) {
-      tables = snapshot;
-      throw err;
-    }
+  // Serializes transactions like the FOR UPDATE row locks do for the same booking/room in Postgres.
+  let queue: Promise<unknown> = Promise.resolve();
+  mock(prisma, "$transaction", (fn: (tx: typeof prisma) => unknown) => {
+    const run = async () => {
+      const snapshot = Object.fromEntries(Object.entries(tables).map(([k, v]) => [k, v.map((r) => ({ ...r }))]));
+      try {
+        return await fn(prisma);
+      } catch (err) {
+        tables = snapshot;
+        throw err;
+      }
+    };
+    const next = queue.then(run, run);
+    queue = next.catch(() => undefined);
+    return next;
   });
 });
 
@@ -304,10 +318,11 @@ describe("hotel guest create", () => {
     assert.equal(res.data.booking.nights, 4);
   });
 
-  it("future arrival → CONFIRMED", async () => {
+  it("future arrival is a reservation, not a guest: 400 and nothing written", async () => {
     const res = await create("hotel", guest(roomA, { checkInDate: day(3), checkOutDate: day(5) }));
-    assert.equal(res.status, 201);
-    assert.equal(res.data.booking.status, "CONFIRMED");
+    assert.equal(res.status, 400);
+    assert.match(res.message ?? "", /Bronlar/);
+    assert.equal(tables.tenant!.length + tables.booking!.length, 0);
   });
 
   it("never creates a Contract and never stores credentials or monthly-rent fields", async () => {
@@ -378,11 +393,11 @@ describe("hotel guest room rules and isolation", () => {
 
   it("overlapping stay in the same room → 409 PROPERTY_NOT_AVAILABLE, second guest rolled back", async () => {
     await create("hotel", guest(roomA));
-    const res = await create("hotel", guest(roomA, { fullName: "Boshqa", checkInDate: day(2), checkOutDate: day(6) }));
+    const res = await create("hotel", guest(roomA, { fullName: "Boshqa", checkInDate: day(-1), checkOutDate: day(2) }));
     assert.equal(res.status, 409);
     assert.equal(res.code, "PROPERTY_NOT_AVAILABLE");
     assert.equal(tables.tenant!.length, 1);
-    const back = await create("hotel", guest(roomA, { fullName: "Keyingi", checkInDate: day(4), checkOutDate: day(6) }));
+    const back = await reserve("hotel", { propertyId: roomA, guestName: "Keyingi", checkInDate: day(4), checkOutDate: day(6), nightlyRate: 500_000 });
     assert.equal(back.status, 201, "checkout day is free for the next guest");
   });
 
@@ -485,7 +500,8 @@ describe("hotel guest list, edit, checkout, dashboard", () => {
 
   it("dashboard selectors see the new guest immediately (occupied, guests, check-ins, upcoming)", async () => {
     await create("hotel", guest(roomA));
-    await create("hotel", guest(roomB, { fullName: "Kelajak", guestCount: 2, checkInDate: day(2), checkOutDate: day(3) }));
+    const future = await reserve("hotel", { propertyId: roomB, guestName: "Kelajak", guestCount: 2, checkInDate: day(2), checkOutDate: day(3), nightlyRate: 300_000 });
+    assert.equal(future.status, 201, future.message);
     const bookings = await bookingsOf("hotel");
     assert.equal(bookings.length, 2);
     assert.deepEqual([...selectOccupiedPropertyIds(bookings, TODAY)], [roomA]);
@@ -501,9 +517,9 @@ describe("hotel guest helpers and form", () => {
     for (const i of ["VILLA_RENTAL", "OFFICE_RENTAL", "APARTMENT_RENTAL", undefined]) assert.equal(isHotelGuestIndustry(i), false);
   });
 
-  it("initial status: started stay → CHECKED_IN, future → CONFIRMED, ended → error", () => {
+  it("initial status: started stay → CHECKED_IN, future → error (use a booking), ended → error", () => {
     assert.equal(initialGuestStatus({ checkInDate: "2026-10-06", checkOutDate: "2026-10-08" }, "2026-10-06").data, "CHECKED_IN");
-    assert.equal(initialGuestStatus({ checkInDate: "2026-10-07", checkOutDate: "2026-10-08" }, "2026-10-06").data, "CONFIRMED");
+    assert.match(initialGuestStatus({ checkInDate: "2026-10-07", checkOutDate: "2026-10-08" }, "2026-10-06").error ?? "", /Bronlar/);
     assert.ok(initialGuestStatus({ checkInDate: "2026-10-01", checkOutDate: "2026-10-06" }, "2026-10-06").error);
   });
 
@@ -539,8 +555,215 @@ describe("hotel guest helpers and form", () => {
     for (const banned of [" oy", "Ijara", "To'lov muddati", "Butunlay o"]) {
       assert.equal(view.includes(banned), false, `${banned} must not appear in the hotel view`);
     }
-    for (const col of ["Xona / Domik", "Odam soni", "Kelish", "Ketish", "Holat", "To‘langan / Qolgan", "Check-out"]) {
-      assert.ok(view.includes(col), col);
+    for (const col of ["F.I.O", "Telefon", "Xona", "Odam soni", "Kirish", "Chiqish", "Jami", "To‘langan", "Qolgan", "Status", "Check-out"]) {
+      assert.ok(view.includes(`<TableHead>${col}</TableHead>`) || view.includes(`>${col}</TableHead>`) || view.includes(col), col);
     }
+    for (const text of [
+      "Bugun kutilayotgan mehmonlar",
+      "Kechikkan kelishlar",
+      "Kelmadi belgilanmagan",
+      "Joylashgan mehmonlar",
+      "Mehmon kelmadi deb belgilaysizmi?",
+      "/no-show",
+      "selectExpectedArrivals(list.rows, today)",
+      "selectOverdueArrivals(list.rows, today)",
+    ]) {
+      assert.ok(view.includes(text), text);
+    }
+    assert.match(view, /<UserCheck className="size-4" \/> Keldi/);
+    assert.match(view, /<UserX className="size-4" \/> Kelmadi/);
+    assert.doesNotMatch(view, /Mehmonni tanlang/);
+  });
+
+  it("arrival modal: summary, payment status, method enum, Joylashtirish", () => {
+    const src = read("src/components/tenants/hotel-arrival-dialog.tsx");
+    for (const text of ["Mehmon keldi", "Mehmon", "Xona", "Mehmonlar soni", "Jami summa", "Oldin to‘langan", "Qolgan",
+      "To‘lov holati *", "To‘landi", "To‘lanmadi", "To‘lov summasi *", "SOURCE_PAYMENT_METHODS", "Joylashtirish"]) {
+      assert.ok(src.includes(text), text);
+    }
+    assert.match(src, /\/hotel-guests\/\$\{row\.bookingId\}\/arrival/);
+    assert.match(src, /choice === "PAID" &&/);
+  });
+});
+
+describe("smart booking arrival (Keldi / Kelmadi)", () => {
+  const book = async (extra: Row = {}) => {
+    const res = await reserve("hotel", {
+      propertyId: roomA, guestName: "Ali Valiyev", guestPhone: "+998 90 111 22 33", guestCount: 3,
+      checkInDate: TODAY, checkOutDate: day(2), nightlyRate: 1_000_000, ...extra,
+    });
+    assert.equal(res.status, 201, res.message);
+    return res.data as Booking;
+  };
+
+  it("booking create stores name/phone, no tenant; shows in today's expected list, not as in-house", async () => {
+    const b = await book();
+    assert.equal(b.tenantId, null);
+    assert.equal(b.guestName, "Ali Valiyev");
+    assert.equal(b.guestPhone, "+998 90 111 22 33");
+    assert.equal(b.arrivalStatus, "EXPECTED");
+    assert.equal(tables.tenant!.length, 0, "no guest record before arrival");
+    assert.equal(tables.client!.length, 0);
+    const { rows } = await list("hotel");
+    assert.equal(rows[0]!.fullName, "Ali Valiyev");
+    assert.equal(rows[0]!.tenantId, null);
+    assert.equal(rows.filter((r) => r.status === "CHECKED_IN").length, 0);
+    const bookings = await bookingsOf("hotel");
+    assert.equal(bookings[0]!.guestName, "Ali Valiyev");
+    assert.equal(countCurrentGuests(bookings), 0, "expected guests are not counted as today's guests");
+  });
+
+  it("guestName is required on booking create", async () => {
+    const res = await reserve("hotel", { propertyId: roomA, checkInDate: TODAY, checkOutDate: day(2), nightlyRate: 1 });
+    assert.equal(res.status, 400);
+    assert.equal(tables.booking!.length, 0);
+  });
+
+  it("Keldi + partial payment: guest created and linked, CHECKED_IN/ARRIVED, people kept, PARTIAL", async () => {
+    const b = await book();
+    const res = await arrive("hotel", b.id, { paymentStatus: "PAID", paymentAmount: 1_000_000, paymentMethod: "CARD" });
+    assert.equal(res.status, 200, res.message);
+    assert.equal(res.data.guestCreated, true);
+    const tenant = tables.tenant!.find((t) => t.id === res.data.tenantId)!;
+    assert.equal(tenant.fullName, "Ali Valiyev");
+    assert.equal(tenant.workspaceId, "hotel");
+    const row = tables.booking![0]!;
+    assert.equal(row.tenantId, tenant.id);
+    assert.equal(row.status, "CHECKED_IN");
+    assert.equal(row.arrivalStatus, "ARRIVED");
+    assert.equal(row.guestCount, 3);
+    assert.deepEqual(res.data.payment, { total: 2_000_000, paid: 1_000_000, remaining: 1_000_000, status: "PARTIAL" });
+    assert.equal(tables.sourcePayment!.length, 1);
+    assert.equal(tables.sourcePayment![0]!.sourceType, "BOOKING");
+    assert.equal(tables.sourcePayment![0]!.paymentMethod, "CARD");
+    assert.ok(tables.client!.some((c) => c.tenantId === tenant.id), "client base synced");
+    const bookings = await bookingsOf("hotel");
+    assert.equal(countCurrentGuests(bookings), 3);
+  });
+
+  it("Keldi full payment → PAID; unpaid → UNPAID with no payment row", async () => {
+    const a = await book();
+    const paid = await arrive("hotel", a.id, { paymentStatus: "PAID", paymentAmount: 2_000_000, paymentMethod: "CASH" });
+    assert.equal(paid.data.payment.status, "PAID");
+    const b = await book({ propertyId: roomB, guestPhone: "" });
+    const unpaid = await arrive("hotel", b.id, { paymentStatus: "UNPAID", paymentAmount: 999 });
+    assert.equal(unpaid.status, 200, unpaid.message);
+    assert.equal(unpaid.data.payment.status, "UNPAID");
+    assert.equal(tables.sourcePayment!.length, 1);
+  });
+
+  it("payment validation: status required, amount > 0, not above remaining, employee cannot pay", async () => {
+    const b = await book();
+    assert.equal((await arrive("hotel", b.id, {})).status, 400);
+    assert.equal((await arrive("hotel", b.id, { paymentStatus: "PAID", paymentAmount: 0 })).status, 400);
+    const over = await arrive("hotel", b.id, { paymentStatus: "PAID", paymentAmount: 2_000_001, paymentMethod: "CASH" });
+    assert.equal(over.status, 409);
+    users.set("emp", { role: "EMPLOYEE", workspaceId: "hotel" });
+    assert.equal((await arrive("hotel", b.id, { paymentStatus: "PAID", paymentAmount: 1, paymentMethod: "CASH" }, "emp")).status, 403);
+    assert.equal(tables.tenant!.length + tables.sourcePayment!.length, 0, "rejected arrivals leave nothing behind");
+    assert.equal(tables.booking![0]!.arrivalStatus, "EXPECTED");
+    assert.equal((await arrive("hotel", b.id, { paymentStatus: "UNPAID" }, "emp")).status, 200);
+  });
+
+  it("same-workspace phone match reuses the guest; other workspace or name-only never merges", async () => {
+    tables.tenant!.push(
+      { id: "same", workspaceId: "hotel", fullName: "Boshqa ism", phone: "998901112233" },
+      { id: "foreign", workspaceId: "other", fullName: "Ali Valiyev", phone: "+998901112244" },
+      { id: "namesake", workspaceId: "hotel", fullName: "Ali Valiyev", phone: "+998935550000" }
+    );
+    const a = await book();
+    const linked = await arrive("hotel", a.id, { paymentStatus: "UNPAID" });
+    assert.equal(linked.data.tenantId, "same");
+    assert.equal(linked.data.guestCreated, false);
+    assert.equal(tables.booking![0]!.guestName, "Ali Valiyev", "reservation name stays on the booking");
+    const b = await book({ propertyId: roomB, guestPhone: "+998901112244" });
+    const fresh = await arrive("hotel", b.id, { paymentStatus: "UNPAID" });
+    assert.equal(fresh.data.guestCreated, true);
+    assert.ok(!["foreign", "namesake"].includes(fresh.data.tenantId));
+  });
+
+  it("Kelmadi: CANCELLED + NO_SHOW, no guest, no payment, room free, history kept", async () => {
+    const b = await book();
+    const res = await noShow("hotel", b.id);
+    assert.equal(res.status, 200, res.message);
+    assert.equal(res.data.status, "CANCELLED");
+    assert.equal(res.data.arrivalStatus, "NO_SHOW");
+    assert.equal(tables.tenant!.length, 0);
+    assert.equal(tables.sourcePayment!.length, 0);
+    assert.equal(tables.booking!.length, 1, "booking is kept as history");
+    const again = await book({ guestName: "Vali" });
+    assert.equal(again.status, "CONFIRMED", "room is available again for the same nights");
+    assert.equal((await arrive("hotel", b.id, { paymentStatus: "UNPAID" })).code, "ARRIVAL_ALREADY_PROCESSED");
+  });
+
+  it("future booking: not in today's arrivals and Kelmadi is too early", async () => {
+    const b = await book({ checkInDate: day(1), checkOutDate: day(3) });
+    const res = await noShow("hotel", b.id);
+    assert.equal(res.status, 409);
+    assert.equal(res.code, "NO_SHOW_TOO_EARLY");
+    assert.equal((await arrive("hotel", b.id, { paymentStatus: "UNPAID" })).code, "CHECK_IN_TOO_EARLY");
+    assert.equal(tables.tenant!.length, 0);
+  });
+
+  it("overdue expected booking stays actionable (Keldi and Kelmadi still work)", async () => {
+    const late = await book({ checkInDate: day(-1), checkOutDate: day(2) });
+    const late2 = await book({ propertyId: roomB, checkInDate: day(-2), checkOutDate: day(1) });
+    assert.equal((await arrive("hotel", late.id, { paymentStatus: "UNPAID" })).status, 200);
+    assert.equal((await noShow("hotel", late2.id)).status, 200);
+  });
+
+  it("parallel Keldi: one wins, the other gets 409 ARRIVAL_ALREADY_PROCESSED; no duplicates", async () => {
+    const b = await book();
+    const body = { paymentStatus: "PAID", paymentAmount: 500_000, paymentMethod: "CASH" };
+    const results = await Promise.all([arrive("hotel", b.id, body), arrive("hotel", b.id, body)]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+    assert.equal(results.find((r) => r.status === 409)!.code, "ARRIVAL_ALREADY_PROCESSED");
+    assert.equal(tables.tenant!.length, 1);
+    assert.equal(tables.sourcePayment!.length, 1);
+  });
+
+  it("Keldi vs Kelmadi race: a single winner", async () => {
+    const b = await book();
+    const results = await Promise.all([arrive("hotel", b.id, { paymentStatus: "UNPAID" }), noShow("hotel", b.id)]);
+    assert.equal(results.filter((r) => r.status === 200).length, 1);
+    assert.equal(results.filter((r) => r.code === "ARRIVAL_ALREADY_PROCESSED").length, 1);
+    const row = tables.booking![0]!;
+    assert.ok(
+      (row.status === "CHECKED_IN" && row.arrivalStatus === "ARRIVED" && tables.tenant!.length === 1) ||
+        (row.status === "CANCELLED" && row.arrivalStatus === "NO_SHOW" && tables.tenant!.length === 0)
+    );
+  });
+
+  it("security: cross-workspace 404, other industries 403, no auth 401", async () => {
+    const b = await book();
+    assert.equal((await arrive("other", b.id, { paymentStatus: "UNPAID" })).status, 404);
+    assert.equal((await noShow("other", b.id)).status, 404);
+    assert.equal((await arrive("villa", b.id, { paymentStatus: "UNPAID" })).code, "INDUSTRY_NOT_SUPPORTED");
+    assert.equal((await noShow("office", b.id)).status, 403);
+    const anon = await arrivalRoute(
+      new NextRequest(`http://localhost/api/hotel-guests/${b.id}/arrival`, { method: "POST", body: "{}" }),
+      { params: Promise.resolve({ id: b.id }) }
+    );
+    assert.equal(anon.status, 401);
+    assert.equal(tables.booking![0]!.arrivalStatus, "EXPECTED");
+    assert.equal(tables.tenant!.length, 0);
+  });
+
+  it("check-out after Keldi keeps booking, guest and payment history", async () => {
+    const b = await book();
+    await arrive("hotel", b.id, { paymentStatus: "PAID", paymentAmount: 2_000_000, paymentMethod: "BANK" });
+    const out = await setStatus("hotel", b.id, "CHECKED_OUT");
+    assert.equal(out.status, 200, out.message);
+    assert.equal(tables.booking![0]!.status, "CHECKED_OUT");
+    assert.equal(tables.booking![0]!.arrivalStatus, "ARRIVED");
+    assert.equal(tables.tenant!.length, 1);
+    assert.equal(tables.sourcePayment!.length, 1);
+  });
+
+  it("direct booking check-in without a guest is refused (must go through Keldi)", async () => {
+    const b = await book();
+    const res = await setStatus("hotel", b.id, "CHECKED_IN");
+    assert.equal(res.status, 409);
+    assert.equal(res.code, "ARRIVAL_REQUIRED");
   });
 });

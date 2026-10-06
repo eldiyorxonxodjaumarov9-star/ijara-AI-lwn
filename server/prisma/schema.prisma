@@ -423,13 +423,23 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum BookingArrivalStatus {
+  EXPECTED
+  ARRIVED
+  NO_SHOW
+}
+
 /// HOTEL_HOSTEL / VILLA_RENTAL short stays. Separate from Contract (monthly leases).
 /// Not linked to payments: totalAmount is the agreed price, not income.
 model Booking {
-  id           String        @id @default(uuid())
-  workspaceId  String
-  propertyId   String
-  tenantId     String
+  id            String               @id @default(uuid())
+  workspaceId   String
+  propertyId    String
+  /// Null for a reservation whose guest has not arrived yet; set when the guest record is linked.
+  tenantId      String?
+  guestName     String               @default("")
+  guestPhone    String?
+  arrivalStatus BookingArrivalStatus @default(EXPECTED)
   /// Asia/Tashkent midnight. Nights = checkOut - checkIn; checkOut day is free for the next guest.
   checkInDate  DateTime
   checkOutDate DateTime
@@ -445,10 +455,11 @@ model Booking {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   /// NoAction on both: deleting a room or guest must never erase booking history.
   property  Property  @relation(fields: [propertyId], references: [id], onDelete: NoAction)
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: NoAction)
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: NoAction)
   payments  SourcePayment[]
 
   @@index([workspaceId])
+  @@index([workspaceId, checkInDate])
   @@index([propertyId, status])
   @@index([tenantId])
   @@map("bookings")

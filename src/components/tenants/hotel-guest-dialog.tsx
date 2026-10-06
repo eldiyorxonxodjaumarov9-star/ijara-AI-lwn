@@ -259,6 +259,7 @@ export function HotelGuestDialog({
               <Input
                 id="guest-check-in"
                 type="date"
+                max={row ? undefined : tashkentToday()}
                 value={form.checkInDate}
                 onChange={(e) => set("checkInDate", e.target.value)}
               />

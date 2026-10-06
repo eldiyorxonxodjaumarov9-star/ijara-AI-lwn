@@ -30,6 +30,19 @@ async function lockSubscription(db: Prisma.TransactionClient, workspaceId: strin
   return db.workspaceSubscription.findUnique({ where: { workspaceId } });
 }
 
+/**
+ * Locks the subscription row and returns a quota check for use inside an existing transaction,
+ * for flows that create a quota row only conditionally (e.g. a reused guest needs no quota).
+ */
+export async function lockPlanQuota(db: Prisma.TransactionClient, ctx: WorkspaceContext) {
+  const subscription = await lockSubscription(db, ctx.workspace.id);
+  const access = evaluateSubscriptionAccess({ isInternal: ctx.isInternal, subscription });
+  return async (resource: Quota) => {
+    const usage = await getPlanUsage(ctx.workspace.id, db);
+    assertPlanLimit({ ...ctx, subscription, ...access }, resource, usage[resource]);
+  };
+}
+
 export async function createWithinPlanLimit<T>(
   ctx: WorkspaceContext,
   resource: Quota,
@@ -37,10 +50,8 @@ export async function createWithinPlanLimit<T>(
   options?: { timeout?: number }
 ): Promise<T> {
   return prisma.$transaction(async db => {
-    const subscription = await lockSubscription(db, ctx.workspace.id);
-    const access = evaluateSubscriptionAccess({ isInternal: ctx.isInternal, subscription });
-    const usage = await getPlanUsage(ctx.workspace.id, db);
-    assertPlanLimit({ ...ctx, subscription, ...access }, resource, usage[resource]);
+    const assertQuota = await lockPlanQuota(db, ctx);
+    await assertQuota(resource);
     return create(db);
   }, options);
 }

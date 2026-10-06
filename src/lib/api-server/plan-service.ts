@@ -30,14 +30,19 @@ async function lockSubscription(db: Prisma.TransactionClient, workspaceId: strin
   return db.workspaceSubscription.findUnique({ where: { workspaceId } });
 }
 
-export async function createWithinPlanLimit<T>(ctx: WorkspaceContext, resource: Quota, create: (db: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+export async function createWithinPlanLimit<T>(
+  ctx: WorkspaceContext,
+  resource: Quota,
+  create: (db: Prisma.TransactionClient) => Promise<T>,
+  options?: { timeout?: number }
+): Promise<T> {
   return prisma.$transaction(async db => {
     const subscription = await lockSubscription(db, ctx.workspace.id);
     const access = evaluateSubscriptionAccess({ isInternal: ctx.isInternal, subscription });
     const usage = await getPlanUsage(ctx.workspace.id, db);
     assertPlanLimit({ ...ctx, subscription, ...access }, resource, usage[resource]);
     return create(db);
-  });
+  }, options);
 }
 
 export async function selectPlan(ctx: WorkspaceContext, plan: Plan) {

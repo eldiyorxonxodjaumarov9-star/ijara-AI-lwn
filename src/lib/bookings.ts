@@ -127,13 +127,14 @@ export type BookingInput = {
   notes: string | null;
 };
 
-export type BookingUpdateInput = Partial<Omit<BookingInput, "propertyId" | "status">> & {
+/** `propertyId` is never parsed from /api/bookings PATCH; only the hotel guest flow moves a stay. */
+export type BookingUpdateInput = Partial<Omit<BookingInput, "status">> & {
   status?: BookingStatus;
 };
 
 type Parsed<T> = { data: T; error?: undefined } | { data?: undefined; error: string };
 
-function parseDates(checkIn: unknown, checkOut: unknown): Parsed<{ checkInDate: string; checkOutDate: string }> {
+export function parseDates(checkIn: unknown, checkOut: unknown): Parsed<{ checkInDate: string; checkOutDate: string }> {
   if (dayIndex(checkIn) === null) return { error: "Kirish sanasini to‘g‘ri kiriting" };
   if (dayIndex(checkOut) === null) return { error: "Chiqish sanasini to‘g‘ri kiriting" };
   const checkInDate = String(checkIn).trim();
@@ -144,7 +145,7 @@ function parseDates(checkIn: unknown, checkOut: unknown): Parsed<{ checkInDate: 
   return { data: { checkInDate, checkOutDate } };
 }
 
-function parseRate(value: unknown): Parsed<number> {
+export function parseRate(value: unknown): Parsed<number> {
   const rate = Number(value);
   if (value === "" || value == null || !Number.isFinite(rate) || rate <= 0) {
     return { error: "Tunlik narx 0 dan katta bo‘lishi kerak" };
@@ -152,7 +153,7 @@ function parseRate(value: unknown): Parsed<number> {
   return { data: rate };
 }
 
-function parseGuests(value: unknown): Parsed<number> {
+export function parseGuests(value: unknown): Parsed<number> {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1 || n > MAX_GUESTS) {
     return { error: `Mehmonlar soni 1 dan ${MAX_GUESTS} gacha bo‘lishi kerak` };
@@ -160,7 +161,7 @@ function parseGuests(value: unknown): Parsed<number> {
   return { data: n };
 }
 
-const optionalNotes = (value: unknown) => String(value ?? "").trim().slice(0, 1000) || null;
+export const optionalNotes = (value: unknown) => String(value ?? "").trim().slice(0, 1000) || null;
 
 /** Create body. `customerId`/`guestId` alias `tenantId`; workspaceId and industry are ignored. */
 export function parseBookingInput(body: unknown): Parsed<BookingInput> {

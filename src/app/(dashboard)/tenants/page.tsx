@@ -18,8 +18,11 @@ import { SendPaymentRemindersButton } from "@/components/shared/send-payment-rem
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { HotelGuestsView } from "@/components/tenants/hotel-guests-view";
 import { TenantDialog } from "@/components/tenants/tenant-dialog";
 import { TenantAssignDialog } from "@/components/tenants/tenant-assign-dialog";
+import { useAuth } from "@/context/auth-context";
+import { isHotelGuestIndustry } from "@/lib/hotel-guests";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -76,6 +79,12 @@ import type { Contract, Payment, Tenant } from "@/types";
 type TenantRow = Tenant & { assignedRoom: string };
 
 export default function TenantsPage() {
+  const { workspace } = useAuth();
+  if (isHotelGuestIndustry(workspace?.industry)) return <HotelGuestsView />;
+  return <RentalTenantsPage />;
+}
+
+function RentalTenantsPage() {
   const { data, loading, api } = useCollection<Tenant>("tenants");
   const { data: contracts } = useCollection<Contract>("contracts");
   const { data: payments } = useCollection<Payment>("payments");

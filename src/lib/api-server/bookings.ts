@@ -236,7 +236,27 @@ export async function updateBooking(
     data.tenantId = input.tenantId;
   }
 
-  if (input.checkInDate !== undefined || input.nightlyRate !== undefined) {
+  let propertyId = existing.propertyId;
+  const moved = input.propertyId !== undefined && input.propertyId !== existing.propertyId;
+  if (moved) {
+    const next = await lockProperty(db, workspaceId, input.propertyId!);
+    if (next.status === "MAINTENANCE") {
+      throw new BookingError("Ta’mirdagi joyni bron qilib bo‘lmaydi", 409, "PROPERTY_NOT_BOOKABLE");
+    }
+    propertyId = next.id;
+    data.propertyId = next.id;
+  }
+
+  const datesChanged = input.checkInDate !== undefined || input.nightlyRate !== undefined;
+  if (moved && !datesChanged) {
+    const nextStatus = (data.status as BookingStatus | undefined) ?? existing.status;
+    if (!isClosedBooking(nextStatus)) {
+      const range = { checkInDate: fromStoredDate(existing.checkInDate), checkOutDate: fromStoredDate(existing.checkOutDate) };
+      await assertAvailable(db, workspaceId, propertyId, range, id);
+    }
+  }
+
+  if (datesChanged) {
     const checkInDate = input.checkInDate ?? fromStoredDate(existing.checkInDate);
     const checkOutDate = input.checkOutDate ?? fromStoredDate(existing.checkOutDate);
     const nightlyRate = input.nightlyRate ?? existing.nightlyRate;
@@ -246,7 +266,7 @@ export async function updateBooking(
     }
     const nextStatus = (data.status as BookingStatus | undefined) ?? existing.status;
     if (!isClosedBooking(nextStatus)) {
-      await assertAvailable(db, workspaceId, existing.propertyId, { checkInDate, checkOutDate }, id);
+      await assertAvailable(db, workspaceId, propertyId, { checkInDate, checkOutDate }, id);
     }
     const totalAmount = bookingTotal(nights, nightlyRate);
     if (totalAmount < existing.totalAmount) {

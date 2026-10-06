@@ -1,6 +1,8 @@
 import { selectCanonicalDebts } from "@/lib/debts/canonical-debts";
 import type { Contract, Payment, Tenant } from "@/types";
 
+export type CheckoutDebtDecision = "KEEP_DEBT" | "WRITE_OFF";
+
 function isOpen(c: Contract) {
   return c.status === "active" || c.status === "pending";
 }
@@ -8,6 +10,7 @@ function isOpen(c: Contract) {
 /**
  * Checkout shu paytda bo'lsa qoladigan qarz — server bilan bir xil qoida:
  * ochiq shartnomalar TERMINATED, endDate = min(endDate, now), tenant.leftAt = now.
+ * Faqat ko'rsatish uchun; write-off summasini server o'zi hisoblaydi.
  */
 export function previewCheckoutDebt(
   tenantId: string,
@@ -35,6 +38,7 @@ export function previewCheckoutDebt(
   return {
     remainingDebt: rows.reduce((s, r) => s + r.debt, 0),
     unpaidMonths: rows.reduce((s, r) => s + r.unpaidMonths, 0),
+    perContract: rows.map((r) => ({ contractId: r.contractId, debt: r.debt })),
     roomName:
       contracts.find((c) => c.tenantId === tenantId && isOpen(c))?.propertyName ?? null,
   };
@@ -48,8 +52,15 @@ export function formatCheckoutDebt(amount: number) {
   return `${n} UZS`;
 }
 
-export function checkoutSuccessMessage(remainingDebt: number) {
-  return remainingDebt > 0
-    ? `Ijarachi xonadan chiqarildi. ${formatCheckoutDebt(remainingDebt)} qarzdorlik saqlandi.`
-    : "Ijarachi xonadan chiqarildi. Qarzdorlik mavjud emas.";
+export function checkoutSuccessMessage(result: {
+  remainingDebt: number;
+  writtenOffAmount?: number;
+}) {
+  if (result.remainingDebt > 0) {
+    return `Ijarachi xonadan chiqarildi. ${formatCheckoutDebt(result.remainingDebt)} qarzdorlik saqlandi.`;
+  }
+  if ((result.writtenOffAmount ?? 0) > 0) {
+    return "Ijarachi xonadan chiqarildi. Qarzdorlik 0 UZS qilib yopildi.";
+  }
+  return "Ijarachi xonadan chiqarildi. Qarzdorlik mavjud emas.";
 }

@@ -65,10 +65,11 @@ import {
   checkoutSuccessMessage,
   formatCheckoutDebt,
   previewCheckoutDebt,
+  type CheckoutDebtDecision,
 } from "@/lib/tenant-checkout-debt";
 import { formatTashkentDate, getTashkentDateParts } from "@/lib/payment-due-schedule";
 import { useTashkentNow } from "@/context/tashkent-time-context";
-import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import { deleteTenantWithLinkedClients } from "@/lib/tenant-client-sync";
 import type { Contract, Payment, Tenant } from "@/types";
 
@@ -108,6 +109,7 @@ export default function TenantsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [debtDecision, setDebtDecision] = useState<CheckoutDebtDecision | null>(null);
 
   const { search, setSearch, page, setPage, totalPages, total, paged } =
     useTableData<TenantRow>({
@@ -140,14 +142,25 @@ export default function TenantsPage() {
     [checkoutId, contracts, payments, data, tashkentNow]
   );
 
+  const checkoutHasDebt = (checkoutPreview?.remainingDebt ?? 0) > 0;
+  // Qarz ko'rinmasa — xavfsiz tanlov KEEP_DEBT (server baribir qarz topsa, u saqlanadi).
+  const effectiveDebtDecision: CheckoutDebtDecision | null = checkoutHasDebt
+    ? debtDecision
+    : "KEEP_DEBT";
+
+  const openCheckout = (tenantId: string) => {
+    setDebtDecision(null);
+    setCheckoutId(tenantId);
+  };
+
   const handleCheckout = async () => {
-    if (!checkoutId) return;
+    if (!checkoutId || !effectiveDebtDecision) return;
     setCheckingOut(true);
     try {
-      let remainingDebt: number;
+      let outcome: { remainingDebt: number; writtenOffAmount: number };
       if (isApiConfigured) {
-        const result = await checkoutTenantApi(checkoutId);
-        remainingDebt = result.remainingDebt;
+        const result = await checkoutTenantApi(checkoutId, effectiveDebtDecision);
+        outcome = result;
         await Promise.all([
           api.list(),
           refreshCollection("contracts"),
@@ -156,15 +169,19 @@ export default function TenantsPage() {
           refreshCollection("clients"),
         ]);
       } else {
-        await checkoutTenantLocal(checkoutId);
-        remainingDebt = checkoutPreview?.remainingDebt ?? 0;
+        const writeOff = effectiveDebtDecision === "WRITE_OFF";
+        await checkoutTenantLocal(checkoutId, writeOff ? checkoutPreview?.perContract : []);
+        const debt = checkoutPreview?.remainingDebt ?? 0;
+        outcome = writeOff
+          ? { remainingDebt: 0, writtenOffAmount: debt }
+          : { remainingDebt: debt, writtenOffAmount: 0 };
         await Promise.all([
           api.list(),
           refreshCollection("contracts"),
           refreshCollection("properties"),
         ]);
       }
-      toast.success(checkoutSuccessMessage(remainingDebt), { duration: 6000 });
+      toast.success(checkoutSuccessMessage(outcome), { duration: 6000 });
       setCheckoutId(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Chiqish xatosi");
@@ -321,11 +338,11 @@ export default function TenantsPage() {
                             <Pencil className="size-4" /> Tahrirlash
                           </DropdownMenuItem>
                           {tenant.assignedRoom ? (
-                            <DropdownMenuItem onClick={() => setCheckoutId(tenant.id)}>
+                            <DropdownMenuItem onClick={() => openCheckout(tenant.id)}>
                               <LogOut className="size-4" /> Xonadan chiqarish
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={() => setCheckoutId(tenant.id)}>
+                            <DropdownMenuItem onClick={() => openCheckout(tenant.id)}>
                               <LogOut className="size-4" /> Chiqish (arxivga)
                             </DropdownMenuItem>
                           )}
@@ -372,8 +389,7 @@ export default function TenantsPage() {
             <DialogTitle>Ijarachini xonadan chiqarasizmi?</DialogTitle>
             <DialogDescription>
               Xona bo&apos;shaydi, shartnoma shu sana bilan yopiladi. To&apos;lov
-              tarixi va mavjud qarzdorlik saqlanadi — keyingi oylar uchun yangi
-              qarz yozilmaydi.
+              tarixi saqlanadi — keyingi oylar uchun yangi qarz yozilmaydi.
             </DialogDescription>
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -381,19 +397,57 @@ export default function TenantsPage() {
             <dd className="font-medium">{checkoutTenant?.fullName ?? "—"}</dd>
             <dt className="text-muted-foreground">Xona</dt>
             <dd className="font-medium">{checkoutPreview?.roomName ?? "Biriktirilmagan"}</dd>
-            <dt className="text-muted-foreground">Checkout sana</dt>
-            <dd className="font-medium">{formatTashkentDate(getTashkentDateParts(tashkentNow))}</dd>
-            <dt className="text-muted-foreground">Qarzdorlik</dt>
-            <dd
-              className={
-                (checkoutPreview?.remainingDebt ?? 0) > 0
-                  ? "font-semibold text-destructive"
-                  : "font-medium"
-              }
-            >
+            <dt className="text-muted-foreground">Hozirgi qarzdorlik</dt>
+            <dd className={checkoutHasDebt ? "font-semibold text-destructive" : "font-medium"}>
               {formatCheckoutDebt(checkoutPreview?.remainingDebt ?? 0)}
             </dd>
+            <dt className="text-muted-foreground">Checkout sana</dt>
+            <dd className="font-medium">{formatTashkentDate(getTashkentDateParts(tashkentNow))}</dd>
           </dl>
+          {checkoutHasDebt ? (
+            <fieldset className="space-y-2" disabled={checkingOut}>
+              <legend className="mb-2 text-sm font-medium">Qarzdorlikni saqlaysizmi?</legend>
+              {(
+                [
+                  {
+                    value: "KEEP_DEBT",
+                    title: "Qarzdorlikka qo‘shilsin",
+                    hint: "Qarz saqlanadi va Qarzdorliklar bo‘limida turadi.",
+                  },
+                  {
+                    value: "WRITE_OFF",
+                    title: "Qarzdorlikka qo‘shilmasin",
+                    hint: "Mavjud qarz 0 UZS qilib yopiladi.",
+                  },
+                ] as const
+              ).map((option) => (
+                <label
+                  key={option.value}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                    debtDecision === option.value
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="checkout-debt-decision"
+                    value={option.value}
+                    checked={debtDecision === option.value}
+                    onChange={() => setDebtDecision(option.value)}
+                    className="mt-1 accent-primary"
+                  />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium">{option.title}</span>
+                    <span className="block text-xs text-muted-foreground">{option.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          ) : (
+            <p className="rounded-lg border bg-muted/40 p-3 text-sm">Qarzdorlik mavjud emas</p>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -402,7 +456,11 @@ export default function TenantsPage() {
             >
               Bekor qilish
             </Button>
-            <Button variant="destructive" onClick={handleCheckout} disabled={checkingOut}>
+            <Button
+              variant="destructive"
+              onClick={handleCheckout}
+              disabled={checkingOut || !effectiveDebtDecision}
+            >
               {checkingOut ? "Jarayonda..." : "Xonadan chiqarish"}
             </Button>
           </DialogFooter>

@@ -88,6 +88,8 @@ export interface Contract {
   status: ContractStatus;
   signaturePlaceholder?: boolean;
   notes?: string;
+  /** Hisobdan chiqarilgan qarz jami (DebtAdjustment WRITE_OFF). To'lov emas. */
+  writtenOffAmount?: number;
   createdAt: string;
 }
 

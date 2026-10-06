@@ -8,6 +8,7 @@ import { tenantRentalHistoryResponse } from "@/lib/api-server/vehicle-rentals";
 import { deleteTenantAndLinkedClients } from "@/lib/api-server/clients";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
+import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
 import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok } from "@/lib/api-server/http";
@@ -24,6 +25,14 @@ const ALLOWED = new Set<RbacResource>([
   "expenses",
   "maintenance",
   "notifications",
+]);
+
+/** Nested relation writes (masalan, soxta write-off yoki to'lov) PATCH orqali taqiqlanadi. */
+const CONTRACT_PATCH_DENY = new Set([
+  "debtAdjustments",
+  "payments",
+  "archives",
+  "writtenOffAmount",
 ]);
 
 async function resolveWorkspace(user: Parameters<typeof resolveUserWorkspaceContext>[0]) {
@@ -61,10 +70,10 @@ export async function GET(
     case "contracts": {
       const row = await prisma.contract.findUnique({
         where: { id, workspaceId: ws.workspaceId },
-        include: { property: true, tenant: true },
+        include: { property: true, tenant: true, debtAdjustments: WRITE_OFF_AMOUNTS },
       });
       found = row;
-      if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(row);
+      if (row && isRecordInWorkspace(row, ws.workspaceId)) return ok(withWrittenOff(row));
       break;
     }
     case "payments": {
@@ -160,16 +169,21 @@ export async function PATCH(
         if (!isRecordInWorkspace(existing, ws.workspaceId)) {
           return fail("Topilmadi", 404);
         }
+        const contractFields = Object.fromEntries(
+          Object.entries(body).filter(([key]) => !CONTRACT_PATCH_DENY.has(key))
+        );
         return ok(
-          await prisma.contract.update({
-            where: { id },
-            data: {
-              ...body,
-              startDate: body.startDate ? new Date(String(body.startDate)) : undefined,
-              endDate: body.endDate ? new Date(String(body.endDate)) : undefined,
-            } as never,
-            include: { property: true, tenant: true },
-          })
+          withWrittenOff(
+            await prisma.contract.update({
+              where: { id },
+              data: {
+                ...contractFields,
+                startDate: body.startDate ? new Date(String(body.startDate)) : undefined,
+                endDate: body.endDate ? new Date(String(body.endDate)) : undefined,
+              } as never,
+              include: { property: true, tenant: true, debtAdjustments: WRITE_OFF_AMOUNTS },
+            })
+          )
         );
       }
       case "payments": {

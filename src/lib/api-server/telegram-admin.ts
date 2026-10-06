@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import type { Role, User } from "@prisma/client";
 
+import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
 import { prisma } from "@/lib/api-server/prisma";
 import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 import { computeContractDebt } from "@/lib/debt-calculator";
@@ -112,6 +113,7 @@ export async function getAdminDashboardRows(
         include: {
           property: true,
           payments: true,
+          debtAdjustments: WRITE_OFF_AMOUNTS,
         },
         orderBy: { createdAt: "desc" },
       },
@@ -141,6 +143,7 @@ export async function getAdminDashboardRows(
         depositPaid: contractRow.depositPaid,
         status: contractRow.status.toLowerCase() as ContractStatus,
         notes: contractRow.notes ?? undefined,
+        writtenOffAmount: withWrittenOff(contractRow).writtenOffAmount,
         createdAt: contractRow.createdAt.toISOString(),
       };
       const tenant: Tenant = {

@@ -46,6 +46,10 @@ enum RentalIndustry {
   OTHER
 }
 
+enum DebtAdjustmentType {
+  WRITE_OFF
+}
+
 enum PropertyStatus {
   AVAILABLE
   RENTED
@@ -257,6 +261,7 @@ model User {
   contractRequestsCreated ContractRequest[]   @relation("ContractRequestCreatedBy")
   contractStatusEvents    ContractStatusEvent[] @relation("ContractStatusActor")
   workspaceMemberships WorkspaceMembership[]
+  debtAdjustments      DebtAdjustment[]
 
   @@index([phone])
   @@index([role])
@@ -315,6 +320,7 @@ model Workspace {
   vehicleRentals VehicleRental[]
   bookings      Booking[]
   sourcePayments SourcePayment[]
+  debtAdjustments DebtAdjustment[]
 
   @@index([isInternal])
   @@map("workspaces")
@@ -597,6 +603,7 @@ model Tenant {
   contractRequests ContractRequest[]
   vehicleRentals   VehicleRental[]
   bookings         Booking[]
+  debtAdjustments  DebtAdjustment[]
 
   @@index([workspaceId])
   @@map("tenants")
@@ -622,12 +629,39 @@ model Contract {
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   payments Payment[]
   archives TenantArchive[]
+  debtAdjustments DebtAdjustment[]
 
   @@index([workspaceId])
   @@index([status])
   @@index([propertyId])
   @@index([tenantId])
   @@map("contracts")
+}
+
+/**
+ * Qarzni hisobdan chiqarish (write-off). To'lov emas — canonical debt
+ * calculator uni to'lovlardan keyin alohida ayiradi. Audit uchun o'chirilmaydi.
+ */
+model DebtAdjustment {
+  id          String             @id @default(uuid())
+  workspaceId String
+  contractId  String
+  tenantId    String
+  amount      Float
+  type        DebtAdjustmentType @default(WRITE_OFF)
+  reason      String
+  createdById String?
+  createdAt   DateTime           @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contract  Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([contractId, type, reason])
+  @@index([workspaceId])
+  @@index([tenantId])
+  @@map("debt_adjustments")
 }
 
 model Payment {

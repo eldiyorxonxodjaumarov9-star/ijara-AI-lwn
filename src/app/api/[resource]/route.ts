@@ -5,6 +5,7 @@ import { mapTenantCreate, stripTenantSecret } from "@/lib/api-server/tenants";
 import { ensureTenantClientNumber } from "@/lib/api-server/client-number";
 import { upsertClientFromTenant } from "@/lib/api-server/clients";
 import { upsertContractFromTenant } from "@/lib/api-server/contract-sync";
+import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
 import { findRecentDuplicatePayment } from "@/lib/api-server/payment-dedupe";
 import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notifications";
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
@@ -66,17 +67,17 @@ export async function GET(
       return ok(paginated(data, total, page, limit));
     }
     case "contracts": {
-      const [data, total] = await Promise.all([
+      const [rows, total] = await Promise.all([
         prisma.contract.findMany({
           where: { ...ws },
           skip,
           take: limit,
           orderBy: { [sortBy]: order },
-          include: { property: true, tenant: true },
+          include: { property: true, tenant: true, debtAdjustments: WRITE_OFF_AMOUNTS },
         }),
         prisma.contract.count({ where: { ...ws } }),
       ]);
-      return ok(paginated(data, total, page, limit));
+      return ok(paginated(rows.map(withWrittenOff), total, page, limit));
     }
     case "payments": {
       const [data, total] = await Promise.all([

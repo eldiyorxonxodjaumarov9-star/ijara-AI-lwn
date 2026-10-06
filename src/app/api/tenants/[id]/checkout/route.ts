@@ -3,7 +3,11 @@ import { NextRequest } from "next/server";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
 import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
-import { checkoutTenant, TenantCheckoutError } from "@/lib/api-server/tenant-checkout";
+import {
+  checkoutTenant,
+  parseCheckoutDebtDecision,
+  TenantCheckoutError,
+} from "@/lib/api-server/tenant-checkout";
 import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 
 export async function POST(
@@ -19,10 +23,19 @@ export async function POST(
     return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
   }
 
+  const body = (await req.json().catch(() => null)) as { debtDecision?: unknown } | null;
+  const debtDecision = parseCheckoutDebtDecision(body?.debtDecision);
+  if (!debtDecision) {
+    return fail("Qarzdorlik bo'yicha qaror tanlanmagan", 400, "DEBT_DECISION_REQUIRED");
+  }
+
   const { id } = await ctx.params;
 
   try {
-    const result = await checkoutTenant(id, wsCtx.workspace.id);
+    const result = await checkoutTenant(id, wsCtx.workspace.id, {
+      debtDecision,
+      actorUserId: auth.user.id,
+    });
     return ok(result);
   } catch (err) {
     if (err instanceof TenantCheckoutError) {

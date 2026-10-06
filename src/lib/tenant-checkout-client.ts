@@ -44,7 +44,11 @@ export function listLocalTenantArchives() {
   );
 }
 
-export async function checkoutTenantLocal(tenantId: string) {
+/** Demo (localStorage) rejimi. writeOffs — previewCheckoutDebt().perContract. */
+export async function checkoutTenantLocal(
+  tenantId: string,
+  writeOffs: { contractId: string; debt: number }[] = []
+) {
   const tenantApi = getCollectionApi<Tenant>("tenants");
   const contractApi = getCollectionApi<Contract>("contracts");
   const paymentApi = getCollectionApi<Payment>("payments");
@@ -116,6 +120,16 @@ export async function checkoutTenantLocal(tenantId: string) {
     }
   }
 
+  for (const w of writeOffs) {
+    if (w.debt <= 0) continue;
+    const target = (await contractApi.list()).find((c) => c.id === w.contractId);
+    if (!target) continue;
+    await contractApi.update(target.id, {
+      ...target,
+      writtenOffAmount: (target.writtenOffAmount ?? 0) + w.debt,
+    });
+  }
+
   await tenantApi.update(tenant.id, {
     ...tenant,
     clientNumber,
@@ -125,19 +139,24 @@ export async function checkoutTenantLocal(tenantId: string) {
   return archive;
 }
 
+export type CheckoutDebtDecision = "KEEP_DEBT" | "WRITE_OFF";
+
 export type TenantCheckoutApiResult = {
   archive: TenantArchive;
   leaveDate: string;
+  debtDecision: CheckoutDebtDecision;
   closedContractIds: string[];
   releasedPropertyIds: string[];
+  writtenOffAmount: number;
+  writeOffs: { contractId: string; amount: number }[];
   remainingDebt: number;
   unpaidMonths: number;
 };
 
-/** Bearer token + avtomatik refresh — apiFetch orqali. */
-export async function checkoutTenantApi(tenantId: string) {
+/** Bearer token + avtomatik refresh — apiFetch orqali. Qarz summasini server hisoblaydi. */
+export async function checkoutTenantApi(tenantId: string, debtDecision: CheckoutDebtDecision) {
   return apiFetch<TenantCheckoutApiResult>(
     `/tenants/${encodeURIComponent(tenantId)}/checkout`,
-    { method: "POST", body: {} }
+    { method: "POST", body: { debtDecision } }
   );
 }

@@ -1,3 +1,4 @@
+import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
 import { prisma } from "@/lib/api-server/prisma";
 import { stripTenantSecret } from "@/lib/api-server/tenants";
 import {
@@ -29,6 +30,7 @@ export async function getPortalDataForTenant(tenantId: string) {
       property: true,
       tenant: true,
       payments: { orderBy: { paymentDate: "desc" } },
+      debtAdjustments: WRITE_OFF_AMOUNTS,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -50,7 +52,7 @@ export async function getPortalDataForTenant(tenantId: string) {
   ]);
 
   const safeContracts = contracts.map(({ tenant: nestedTenant, ...contract }) => ({
-    ...contract,
+    ...withWrittenOff(contract),
     tenant: stripTenantSecret(nestedTenant),
   }));
 

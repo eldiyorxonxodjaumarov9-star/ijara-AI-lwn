@@ -236,6 +236,7 @@ const contract: MapperConfig = {
       depositPaid: Boolean(i.depositPaid),
       status: contractStatusFromApi(i.status),
       notes: s(i.notes),
+      writtenOffAmount: n(i.writtenOffAmount),
       createdAt: String(i.createdAt ?? new Date().toISOString()),
     };
   },

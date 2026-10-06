@@ -20,6 +20,8 @@ export type CanonicalDebtRow = {
   unpaidMonths: number;
   expected: number;
   paid: number;
+  /** Hisobdan chiqarilgan — to'lov emas, alohida ayiriladi. */
+  writtenOff: number;
   debt: number;
   endDate: string;
   overdueDays: number;
@@ -55,6 +57,7 @@ export function selectCanonicalDebts(
         unpaidMonths: result.unpaidMonths,
         expected: result.expected,
         paid: result.paid,
+        writtenOff: result.writtenOff,
         debt: result.debt,
         endDate: c.endDate,
         overdueDays: result.overdueDays,

@@ -1,3 +1,6 @@
+import type { Prisma } from "@prisma/client";
+
+import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustments";
 import { prisma } from "@/lib/api-server/prisma";
 import {
   buildPaymentReminderMessage,
@@ -35,9 +38,10 @@ export type ServerDebtScope = {
 };
 
 export async function computeServerDebts(
-  scope: ServerDebtScope = {}
+  scope: ServerDebtScope = {},
+  db: Prisma.TransactionClient = prisma
 ): Promise<DebtReminderInput[]> {
-  const contracts = await prisma.contract.findMany({
+  const contracts = await db.contract.findMany({
     where: {
       status: { in: [...DEBT_CONTRACT_STATUSES] },
       ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
@@ -77,6 +81,7 @@ export async function computeServerDebts(
           createdAt: true,
         },
       },
+      debtAdjustments: WRITE_OFF_AMOUNTS,
     },
   });
   const now = scope.now ?? new Date();
@@ -96,6 +101,7 @@ export async function computeServerDebts(
       endDate: c.endDate.toISOString(),
       monthlyPayment: c.monthlyRent,
       status: c.status.toLowerCase() as ContractStatus,
+      writtenOffAmount: withWrittenOff(c).writtenOffAmount,
       createdAt: c.createdAt.toISOString(),
     });
     tenantsById.set(c.tenant.id, {

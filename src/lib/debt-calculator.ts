@@ -164,7 +164,10 @@ export interface ContractDebtResult {
   /** Muddati o'tgan barcha oylar (to'langanlari ham). */
   monthsDue: number;
   expected: number;
+  /** Faqat haqiqiy to'lovlar bilan yopilgan summa. */
   paid: number;
+  /** Hisobdan chiqarilgan (write-off) summa — to'lov emas. */
+  writtenOff: number;
   debt: number;
   /** Eng eski yopilmagan oy to'lov sanasidan bugungacha kunlar. */
   overdueDays: number;
@@ -204,6 +207,7 @@ export function computeContractDebt(
       monthsDue,
       expected: 0,
       paid: 0,
+      writtenOff: 0,
       debt: 0,
       overdueDays: 0,
       oldestUnpaidDueDate: null,
@@ -249,6 +253,24 @@ export function computeContractDebt(
     pool -= apply;
   }
 
+  let unpaidAfterPayments = 0;
+  for (const value of remainingByMonth.values()) unpaidAfterPayments += value;
+  const paidApplied = Math.max(0, expected - unpaidAfterPayments);
+  const remainingAfterPayments = new Map(remainingByMonth);
+
+  let writeOffPool = Math.max(0, contract.writtenOffAmount ?? 0);
+  let writtenOff = 0;
+  for (const m of overdueMonths) {
+    if (writeOffPool <= 0) break;
+    const key = monthKey(m.year, m.month);
+    const need = remainingByMonth.get(key) ?? 0;
+    if (need <= 0) continue;
+    const apply = Math.min(writeOffPool, need);
+    remainingByMonth.set(key, need - apply);
+    writeOffPool -= apply;
+    writtenOff += apply;
+  }
+
   let debt = 0;
   const unpaidPeriods: DebtPeriod[] = [];
   for (const m of overdueMonths) {
@@ -260,12 +282,11 @@ export function computeContractDebt(
         month: m.month,
         dueDate: formatTashkentDate(m.due),
         expected: monthly,
-        paid: monthly - remaining,
+        paid: monthly - (remainingAfterPayments.get(monthKey(m.year, m.month)) ?? 0),
         remaining,
       });
     }
   }
-  const paidApplied = Math.max(0, expected - debt);
 
   const oldest = overdueMonths.find(
     (m) => (remainingByMonth.get(monthKey(m.year, m.month)) ?? 0) > 0
@@ -276,6 +297,7 @@ export function computeContractDebt(
     monthsDue,
     expected,
     paid: paidApplied,
+    writtenOff,
     debt,
     overdueDays,
     oldestUnpaidDueDate: unpaidPeriods[0]?.dueDate ?? null,

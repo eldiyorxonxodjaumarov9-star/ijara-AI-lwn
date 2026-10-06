@@ -44,6 +44,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ExpenseCategorySelectItems } from "@/components/expenses/expense-category-items";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { useTableData } from "@/hooks/use-table-data";
 import { MONTHS_UZ_FULL } from "@/lib/analytics";
@@ -212,16 +213,12 @@ export default function ExpensesPage() {
               </SelectContent>
             </Select>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-52">
                 <SelectValue placeholder="Kategoriya" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_CATEGORIES}>Barchasi</SelectItem>
-                {Object.entries(EXPENSE_CATEGORY_MAP).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
+                <ExpenseCategorySelectItems />
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={handlePdf} disabled={loading}>
@@ -302,7 +299,7 @@ export default function ExpensesPage() {
                   <TableRow key={e.id}>
                     <TableCell>
                       <Badge variant="secondary">
-                        {EXPENSE_CATEGORY_MAP[e.category]}
+                        {EXPENSE_CATEGORY_MAP[e.category] ?? e.category}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">

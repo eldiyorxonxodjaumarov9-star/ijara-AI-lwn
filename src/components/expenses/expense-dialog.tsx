@@ -30,11 +30,16 @@ import { ImageUpload } from "@/components/shared/image-upload";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { zResolver } from "@/lib/form";
 import { expenseSchema, type ExpenseInput } from "@/lib/validations";
+import { ExpenseCategorySelectItems } from "@/components/expenses/expense-category-items";
 import {
-  EXPENSE_CATEGORY_MAP,
   MONTHLY_EXPENSE_TYPE_CATEGORY,
   MONTHLY_EXPENSE_TYPE_MAP,
 } from "@/lib/constants";
+import {
+  isSelfDescribingCategory,
+  monthlyTypeRequired,
+  resolveExpenseCategory,
+} from "@/lib/expense-category-form";
 import type {
   Employee,
   Expense,
@@ -102,7 +107,7 @@ export function ExpenseDialog({
     category === "advance" ||
     (category === "other" &&
       (workerPayType === "salary" || workerPayType === "advance"));
-  const showMonthlyType = !isWorkerPayCategory;
+  const showMonthlyType = !isWorkerPayCategory && !isSelfDescribingCategory(category);
 
   useEffect(() => {
     if (!open) return;
@@ -141,6 +146,8 @@ export function ExpenseDialog({
       clearMonthlyType();
     } else if (v === "other") {
       setWorkerPayType("expense");
+    } else if (isSelfDescribingCategory(v)) {
+      clearMonthlyType();
     }
   };
 
@@ -222,9 +229,12 @@ export function ExpenseDialog({
     const isWorkerPay =
       resolvedCategory === "salary" || resolvedCategory === "advance";
 
-    // Yangi xarajat: Maosh/Avansdan tashqari oylik tur majburiy
+    // Yangi xarajat: Maosh/Avans va o‘zi nomlangan kategoriyalardan tashqari oylik tur majburiy
     // Edit: eski yozuvlarda tur bo'lmasa majburiy emas
-    if (!expense && !isWorkerPay && !values.monthlyExpenseType) {
+    if (
+      monthlyTypeRequired({ isNew: !expense, isWorkerPay, category: resolvedCategory }) &&
+      !values.monthlyExpenseType
+    ) {
       setError("monthlyExpenseType", {
         message: "Oylik xarajat turini tanlang",
       });
@@ -240,14 +250,13 @@ export function ExpenseDialog({
       return;
     }
 
-    if (
-      !isWorkerPay &&
-      values.monthlyExpenseType &&
-      MONTHLY_EXPENSE_TYPE_CATEGORY[values.monthlyExpenseType]
-    ) {
-      resolvedCategory =
-        MONTHLY_EXPENSE_TYPE_CATEGORY[values.monthlyExpenseType];
-    }
+    const resolved = resolveExpenseCategory({
+      category: resolvedCategory,
+      monthlyExpenseType: values.monthlyExpenseType,
+      isWorkerPay,
+      originalCategory: expense?.category,
+    });
+    resolvedCategory = resolved.category;
 
     const needsEmployee =
       resolvedCategory === "salary" ||
@@ -263,9 +272,7 @@ export function ExpenseDialog({
         : emp.fullName
       : undefined;
 
-    const monthlyExpenseType = isWorkerPay
-      ? null
-      : values.monthlyExpenseType || null;
+    const monthlyExpenseType = resolved.monthlyExpenseType;
     const monthlyExpenseCustomName =
       monthlyExpenseType === "custom"
         ? values.monthlyExpenseCustomName?.trim() || null
@@ -339,11 +346,7 @@ export function ExpenseDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(EXPENSE_CATEGORY_MAP).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  <ExpenseCategorySelectItems />
                 </SelectContent>
               </Select>
             </div>

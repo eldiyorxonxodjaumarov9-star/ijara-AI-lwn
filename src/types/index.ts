@@ -118,7 +118,12 @@ export type ExpenseCategory =
   | "repair"
   | "marketing"
   | "advance"
-  | "other";
+  | "other"
+  | "waste_service"
+  | "electricity"
+  | "water"
+  | "gas"
+  | "internet";
 
 /** Oylik xarajat turi (frontend lowercase) */
 export type MonthlyExpenseType =

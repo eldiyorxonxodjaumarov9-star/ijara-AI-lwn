@@ -67,9 +67,16 @@ const EXPENSE_CATEGORY_TO_API: Record<ExpenseCategory, string> = {
   marketing: "MARKETING",
   advance: "ADVANCE",
   other: "OTHER",
+  waste_service: "WASTE_SERVICE",
+  electricity: "ELECTRICITY",
+  water: "WATER",
+  gas: "GAS",
+  internet: "INTERNET",
 };
-const expenseCategoryFromApi = (v: unknown): ExpenseCategory =>
-  String(v ?? "OTHER").toLowerCase() as ExpenseCategory;
+const expenseCategoryFromApi = (v: unknown): ExpenseCategory => {
+  const key = String(v ?? "OTHER").toLowerCase();
+  return key in EXPENSE_CATEGORY_TO_API ? (key as ExpenseCategory) : "other";
+};
 
 const MONTHLY_EXPENSE_TYPE_TO_API: Record<MonthlyExpenseType, string> = {
   water: "WATER",

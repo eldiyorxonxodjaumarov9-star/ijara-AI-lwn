@@ -86,6 +86,11 @@ enum ExpenseCategory {
   MARKETING
   ADVANCE
   OTHER
+  WASTE_SERVICE
+  ELECTRICITY
+  WATER
+  GAS
+  INTERNET
 }
 
 enum MonthlyExpenseType {

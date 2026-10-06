@@ -16,6 +16,7 @@ import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notificatio
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
 import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
+import { parseExpenseCategory } from "@/lib/expense-categories";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import {
   resolveUserWorkspaceContext,
@@ -297,12 +298,14 @@ export async function POST(
           monthlyType === "CUSTOM" && monthlyTypeCustomRaw
             ? String(monthlyTypeCustomRaw).trim() || null
             : null;
+        const category = body.category == null ? "OTHER" : parseExpenseCategory(body.category);
+        if (!category) return fail("Xarajat kategoriyasi noto‘g‘ri", 400, "INVALID_CATEGORY");
         const created = await prisma.expense.create({
           data: {
             workspaceId,
             title: String(body.title ?? body.note ?? "Xarajat"),
             amount: Number(body.amount ?? 0),
-            category: (body.category as never) ?? "OTHER",
+            category,
             date: new Date(String(body.date ?? Date.now())),
             notes: body.notes ? String(body.notes) : undefined,
             receiptUrl: body.receiptUrl ? String(body.receiptUrl) : undefined,

@@ -69,14 +69,38 @@ export const PAYMENT_METHOD_MAP: Record<PaymentMethod, string> = {
 };
 
 export const EXPENSE_CATEGORY_MAP: Record<ExpenseCategory, string> = {
+  waste_service: "Maishiy chiqindi ta’minoti",
+  electricity: "Elektr ta’minoti",
+  water: "Suv ta’minoti",
+  gas: "Gaz ta’minoti",
+  internet: "Internet ta’minoti",
   utilities: "Kommunal",
-  salary: "Maosh",
   tax: "Soliq",
+  salary: "Maosh",
   repair: "Ta'mirlash",
   marketing: "Marketing",
   advance: "Avans",
   other: "Boshqa",
 };
+
+export const EXPENSE_CATEGORY_GROUPS: { label: string; categories: ExpenseCategory[] }[] = [
+  {
+    label: "Kommunal xizmatlar",
+    categories: ["waste_service", "electricity", "water", "gas", "internet", "utilities"],
+  },
+  { label: "Majburiy to‘lovlar", categories: ["tax"] },
+  { label: "Boshqa xarajatlar", categories: ["salary", "advance", "repair", "marketing", "other"] },
+];
+
+/** The category itself names the expense, so the "Oylik xarajat turi" step is skipped. */
+export const SELF_DESCRIBING_EXPENSE_CATEGORIES: ReadonlySet<ExpenseCategory> = new Set<ExpenseCategory>([
+  "waste_service",
+  "electricity",
+  "water",
+  "gas",
+  "internet",
+  "tax",
+]);
 
 export const MONTHLY_EXPENSE_TYPE_MAP: Record<MonthlyExpenseType, string> = {
   water: "Suv",

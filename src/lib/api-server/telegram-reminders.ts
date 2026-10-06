@@ -6,7 +6,7 @@ import {
   type DebtReminderInput,
   type ReminderTimeSlot,
 } from "@/lib/payment-reminder-utils";
-import { computeContractDebt } from "@/lib/debt-calculator";
+import { selectCanonicalDebts } from "@/lib/debts/canonical-debts";
 import type { Contract, Payment, Tenant } from "@/types";
 import { normalizePhone } from "@/lib/api-server/tenant-lookup";
 import { updateBotUserPhone } from "@/lib/api-server/telegram-bot-users";
@@ -24,43 +24,92 @@ function monthsBetween(from: Date, to: Date) {
   );
 }
 
-export async function computeServerDebts(): Promise<DebtReminderInput[]> {
+/** Qarz hisoblanadigan statuslar — tugagan shartnomalar qarz 0 bo'lguncha qoladi. */
+export const DEBT_CONTRACT_STATUSES = ["ACTIVE", "EXPIRED", "TERMINATED"] as const;
+
+export type ServerDebtScope = {
+  /** Faqat shu workspace (bulk eslatma). Berilmasa — barcha workspace (cron). */
+  workspaceId?: string;
+  tenantId?: string;
+  now?: Date;
+};
+
+export async function computeServerDebts(
+  scope: ServerDebtScope = {}
+): Promise<DebtReminderInput[]> {
   const contracts = await prisma.contract.findMany({
     where: {
-      status: { in: ["ACTIVE", "EXPIRED"] },
-      tenant: { leftAt: null },
+      status: { in: [...DEBT_CONTRACT_STATUSES] },
+      ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
+      ...(scope.tenantId ? { tenantId: scope.tenantId } : {}),
     },
-    include: { property: true, tenant: true, payments: true },
+    select: {
+      id: true,
+      propertyId: true,
+      tenantId: true,
+      startDate: true,
+      endDate: true,
+      monthlyRent: true,
+      status: true,
+      createdAt: true,
+      property: { select: { title: true } },
+      tenant: {
+        select: {
+          id: true,
+          fullName: true,
+          phone: true,
+          passport: true,
+          rentAmount: true,
+          paymentDueDate: true,
+          leftAt: true,
+          createdAt: true,
+        },
+      },
+      payments: {
+        select: {
+          id: true,
+          contractId: true,
+          amount: true,
+          paymentDate: true,
+          periodYear: true,
+          periodMonth: true,
+          paymentMethod: true,
+          createdAt: true,
+        },
+      },
+    },
   });
-  const now = new Date();
+  const now = scope.now ?? new Date();
 
-  return contracts
-    .map((c) => {
-      const contract: Contract = {
-        id: c.id,
-        propertyId: c.propertyId,
-        tenantId: c.tenantId,
-        propertyName: c.property.title,
-        tenantName: c.tenant.fullName,
-        startDate: c.startDate.toISOString(),
-        endDate: c.endDate.toISOString(),
-        monthlyPayment: c.monthlyRent,
-        deposit: c.deposit ?? undefined,
-        depositPaid: c.depositPaid,
-        status: c.status.toLowerCase() as ContractStatus,
-        notes: c.notes ?? undefined,
-        createdAt: c.createdAt.toISOString(),
-      };
-      const tenant: Tenant = {
-        id: c.tenant.id,
-        fullName: c.tenant.fullName,
-        phone: c.tenant.phone,
-        passport: c.tenant.passport,
-        rentAmount: c.tenant.rentAmount,
-        paymentDueDate: c.tenant.paymentDueDate?.toISOString(),
-        createdAt: c.tenant.createdAt.toISOString(),
-      };
-      const payments: Payment[] = c.payments.map((p) => ({
+  const clientContracts: Contract[] = [];
+  const tenantsById = new Map<string, Tenant>();
+  const payments: Payment[] = [];
+
+  for (const c of contracts) {
+    clientContracts.push({
+      id: c.id,
+      propertyId: c.propertyId,
+      tenantId: c.tenantId,
+      propertyName: c.property.title,
+      tenantName: c.tenant.fullName,
+      startDate: c.startDate.toISOString(),
+      endDate: c.endDate.toISOString(),
+      monthlyPayment: c.monthlyRent,
+      status: c.status.toLowerCase() as ContractStatus,
+      createdAt: c.createdAt.toISOString(),
+    });
+    tenantsById.set(c.tenant.id, {
+      id: c.tenant.id,
+      fullName: c.tenant.fullName,
+      phone: c.tenant.phone,
+      passport: c.tenant.passport,
+      rentAmount: c.tenant.rentAmount,
+      paymentDueDate: c.tenant.paymentDueDate?.toISOString(),
+      leftAt: c.tenant.leftAt?.toISOString(),
+      createdAt: c.tenant.createdAt.toISOString(),
+    });
+    for (const p of c.payments) {
+      payments.push({
         id: p.id,
         contractId: p.contractId,
         tenantId: c.tenantId,
@@ -69,25 +118,31 @@ export async function computeServerDebts(): Promise<DebtReminderInput[]> {
         periodYear: p.periodYear ?? undefined,
         periodMonth: p.periodMonth ?? undefined,
         method: p.paymentMethod.toLowerCase() as Payment["method"],
-        note: p.notes ?? undefined,
         createdAt: p.createdAt.toISOString(),
-      }));
-      const result = computeContractDebt(contract, payments, tenant, now);
-      return {
-        contractId: c.id,
-        tenantId: c.tenantId,
-        tenantName: c.tenant.fullName,
-        propertyName: c.property.title,
-        debt: result.debt,
-        overdueDays: result.overdueDays,
-        monthsDue: result.monthsDue,
-      };
-    })
-    .filter((d) => d.debt > 0);
+      });
+    }
+  }
+
+  return selectCanonicalDebts(
+    clientContracts,
+    payments,
+    [...tenantsById.values()],
+    now
+  ).map((row) => ({
+    contractId: row.contractId,
+    tenantId: row.tenantId,
+    tenantName: row.tenantName,
+    propertyName: row.propertyName,
+    debt: row.debt,
+    overdueDays: row.overdueDays,
+    monthsDue: row.monthsDue,
+    unpaidMonths: row.unpaidMonths,
+    oldestUnpaidDueDate: row.oldestUnpaidDueDate,
+  }));
 }
 
 export async function getTenantDebtSummary(tenantId: string) {
-  const debts = (await computeServerDebts()).filter((d) => d.tenantId === tenantId);
+  const debts = await computeServerDebts({ tenantId });
   const grouped = groupDebtsByTenant(debts);
   return grouped[0] ?? null;
 }
@@ -224,36 +279,43 @@ export async function sendTelegramPaymentReminders(
   slot?: ReminderTimeSlot
 ) {
   if (!isTelegramBotConfigured()) {
-    return { sent: 0, skipped: 0, reason: "bot_not_configured" };
+    return { sent: 0, skipped: 0, failed: 0, reason: "bot_not_configured" };
   }
 
   const debtList = debts ?? (await computeServerDebts());
   const grouped = groupDebtsByTenant(debtList);
   let sent = 0;
   let skipped = 0;
+  let failed = 0;
+
+  const tenantIds = [
+    ...new Set(grouped.map((d) => d.tenantId).filter((id): id is string => !!id)),
+  ];
+  const tenantRows = tenantIds.length
+    ? await prisma.tenant.findMany({
+        where: { id: { in: tenantIds } },
+        select: { id: true, telegramChatId: true },
+      })
+    : [];
+  const chatByTenant = new Map(tenantRows.map((t) => [t.id, t.telegramChatId]));
+  const sentChats = new Set<string>();
 
   for (const debt of grouped) {
-    if (!debt.tenantId) {
+    const chatId = debt.tenantId ? chatByTenant.get(debt.tenantId) : null;
+    if (!chatId || sentChats.has(chatId)) {
       skipped += 1;
       continue;
     }
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: debt.tenantId },
-      select: { telegramChatId: true, fullName: true },
-    });
-    if (!tenant?.telegramChatId) {
-      skipped += 1;
-      continue;
-    }
+    sentChats.add(chatId);
 
     const text = buildPaymentReminderMessage(debt, slot);
     try {
-      await sendTelegramMessage(tenant.telegramChatId, text);
+      await sendTelegramMessage(chatId, text);
       sent += 1;
     } catch {
-      skipped += 1;
+      failed += 1;
     }
   }
 
-  return { sent, skipped };
+  return { sent, skipped, failed };
 }

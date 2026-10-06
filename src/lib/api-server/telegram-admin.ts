@@ -151,7 +151,7 @@ export async function getAdminDashboardRows(): Promise<AdminTenantRow[]> {
       const result = computeContractDebt(contract, payments, tenant, now);
       debtAmount = result.debt;
       overdueDays = result.overdueDays;
-      monthsDue = result.monthsDue;
+      monthsDue = result.unpaidMonths;
     }
 
     const hasDebt = debtAmount > 0;

@@ -32,23 +32,19 @@ export function readTenantLocalNotifications(tenantId: string): AppNotification[
   }
 }
 
-export async function sendPaymentRemindersApi(
-  debts?: Array<{
-    contractId: string;
-    tenantId?: string;
-    tenantName: string;
-    propertyName: string;
-    debt: number;
-  }>
-) {
-  if (!isApiConfigured) return { sent: 0, telegramSent: 0, telegramSkipped: 0 };
+/** Server qarzlarni workspace bo'yicha o'zi hisoblaydi (joriy + o'tgan oylar). */
+export async function sendPaymentRemindersApi() {
+  if (!isApiConfigured) {
+    return { sent: 0, telegramSent: 0, telegramSkipped: 0, telegramFailed: 0 };
+  }
   return apiFetch<{
     sent: number;
     telegramSent?: number;
     telegramSkipped?: number;
+    telegramFailed?: number;
   }>("/notifications/payment-reminders", {
     method: "POST",
-    body: debts ? { debts } : {},
+    body: {},
   });
 }
 
@@ -58,16 +54,16 @@ export async function sendPaymentRemindersLocal(
   tenants: Tenant[] = [],
   now = new Date()
 ) {
-  const debts = computeDebts(contracts, payments, tenants, now).map((d) => {
-    const c = contracts.find((x) => x.id === d.contractId);
-    return {
-      contractId: d.contractId,
-      tenantId: c?.tenantId,
-      tenantName: d.tenantName,
-      propertyName: d.propertyName,
-      debt: d.debt,
-    };
-  });
+  const debts = computeDebts(contracts, payments, tenants, now).map((d) => ({
+    contractId: d.contractId,
+    tenantId: d.tenantId,
+    tenantName: d.tenantName,
+    propertyName: d.propertyName,
+    debt: d.debt,
+    unpaidMonths: d.unpaidMonths,
+    oldestUnpaidDueDate: d.oldestUnpaidDueDate,
+    overdueDays: d.overdueDays,
+  }));
 
   const grouped = groupDebtsByTenant(debts);
   const api = getCollectionApi<AppNotification>("notifications");

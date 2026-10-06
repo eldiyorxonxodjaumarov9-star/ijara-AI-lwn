@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, TrendingDown } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  TrendingDown,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -21,6 +26,8 @@ import {
 import { useCollection } from "@/hooks/use-collection";
 import { useTashkentNow } from "@/context/tashkent-time-context";
 import { computeDebts } from "@/lib/analytics";
+import { summarizeCanonicalDebts } from "@/lib/debts/canonical-debts";
+import { MONTHS_UZ } from "@/lib/payment-reminder-utils";
 import { formatTashkentClock } from "@/lib/payment-due-schedule";
 import { formatCurrency } from "@/lib/utils";
 import type { Contract, Payment, Tenant } from "@/types";
@@ -36,7 +43,15 @@ export default function DebtsPage() {
     () => computeDebts(contracts, payments, tenants, tashkentNow),
     [contracts, payments, tenants, tashkentNow]
   );
-  const totalDebt = debts.reduce((s, d) => s + d.debt, 0);
+  const summary = useMemo(() => summarizeCanonicalDebts(debts), [debts]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <div className="space-y-6">
@@ -51,14 +66,14 @@ export default function DebtsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="Umumiy qarzdorlik"
-          value={formatCurrency(totalDebt)}
+          value={formatCurrency(summary.totalDebtAmount)}
           icon={TrendingDown}
           tone="rose"
           loading={loading}
         />
         <StatCard
           title="Qarzdor shartnomalar"
-          value={String(debts.length)}
+          value={String(summary.debtorContractCount)}
           icon={AlertTriangle}
           tone="amber"
           loading={loading}
@@ -95,41 +110,98 @@ export default function DebtsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Mulk</TableHead>
-                  <TableHead>Arendator</TableHead>
-                  <TableHead className="hidden md:table-cell">Oylar</TableHead>
+                  <TableHead>Ijarachi</TableHead>
+                  <TableHead className="hidden md:table-cell">Qarzdor oylar</TableHead>
                   <TableHead className="hidden lg:table-cell">Kutilgan</TableHead>
                   <TableHead className="hidden lg:table-cell">To&apos;langan</TableHead>
-                  <TableHead>Qarz</TableHead>
+                  <TableHead>Qarz jami</TableHead>
+                  <TableHead className="hidden md:table-cell">Eng eski qarz</TableHead>
                   <TableHead>Holat</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {debts.map((d) => (
-                  <TableRow key={d.contractId} className="bg-destructive/[0.03]">
-                    <TableCell className="font-medium">{d.propertyName}</TableCell>
-                    <TableCell>{d.tenantName}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {d.monthsDue} oy
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-muted-foreground">
-                      {formatCurrency(d.expected)}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-muted-foreground">
-                      {formatCurrency(d.paid)}
-                    </TableCell>
-                    <TableCell className="font-bold text-destructive">
-                      {formatCurrency(d.debt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="destructive">
-                        <AlertTriangle className="mr-1 size-3" />
-                        {d.overdueDays > 0
-                          ? `${d.overdueDays} kun kechikkan`
-                          : "Qarzdor"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {debts.map((d) => {
+                  const open = expanded.has(d.contractId);
+                  const ended =
+                    d.contractStatus === "expired" ||
+                    d.contractStatus === "terminated";
+                  return (
+                    <Fragment key={d.contractId}>
+                      <TableRow className="bg-destructive/[0.03]">
+                        <TableCell className="font-medium">
+                          <button
+                            type="button"
+                            onClick={() => toggle(d.contractId)}
+                            className="inline-flex items-center gap-1 text-left hover:underline"
+                            aria-expanded={open}
+                            aria-label="Qarzdorlik tafsiloti"
+                          >
+                            <ChevronRight
+                              className={`size-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+                            />
+                            {d.propertyName}
+                          </button>
+                        </TableCell>
+                        <TableCell>{d.tenantName}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {d.unpaidMonths} oy
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-muted-foreground">
+                          {formatCurrency(d.expected)}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-muted-foreground">
+                          {formatCurrency(d.paid)}
+                        </TableCell>
+                        <TableCell className="font-bold text-destructive">
+                          {formatCurrency(d.debt)}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-muted-foreground">
+                          {d.oldestUnpaidDueDate ?? "—"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="destructive">
+                              <AlertTriangle className="mr-1 size-3" />
+                              {d.overdueDays > 0
+                                ? `${d.overdueDays} kun kechikkan`
+                                : "Qarzdor"}
+                            </Badge>
+                            {ended && (
+                              <Badge variant="outline">Shartnoma tugagan</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {open && (
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableCell colSpan={8} className="py-3">
+                            <p className="mb-2 text-xs font-medium text-muted-foreground">
+                              Qarzdorlik tafsiloti
+                            </p>
+                            <ul className="grid gap-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                              {d.unpaidPeriods.map((p) => (
+                                <li
+                                  key={`${p.year}-${p.month}`}
+                                  className="flex justify-between gap-4 rounded-md border border-border/60 px-3 py-1.5"
+                                >
+                                  <span>
+                                    {MONTHS_UZ[p.month - 1]} {p.year}
+                                    <span className="ml-1 text-xs text-muted-foreground">
+                                      ({p.dueDate})
+                                    </span>
+                                  </span>
+                                  <span className="font-semibold text-destructive">
+                                    {formatCurrency(p.remaining)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -137,10 +209,11 @@ export default function DebtsPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        * Qarzdorlik Toshkent vaqti bo&apos;yicha hisoblanadi. Bir oy uchun
-        to&apos;langan summa shu oyda saqlanib qoladi — keyingi oy alohida
-        hisoblanadi. Shartnoma tugasa ham eski to&apos;lovlar o&apos;chmaydi
-        («Yakunlash»). Soat yarim tunda va har daqiqada yangilanadi.
+        * Qarzdorlik Toshkent vaqti bo&apos;yicha hisoblanadi. To&apos;lanmagan
+        oylar keyingi oyga o&apos;tib boradi va to&apos;liq yopilmaguncha
+        ro&apos;yxatda qoladi — shartnoma tugagan bo&apos;lsa ham. Bir oy uchun
+        to&apos;langan summa shu oyda saqlanib qoladi. Soat yarim tunda va har
+        daqiqada yangilanadi.
       </p>
     </div>
   );

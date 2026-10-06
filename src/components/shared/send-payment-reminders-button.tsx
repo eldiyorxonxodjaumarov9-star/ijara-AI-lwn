@@ -22,16 +22,16 @@ export function buildPaymentReminderPayload(
   tenants: Tenant[] = [],
   now = new Date()
 ) {
-  return computeDebts(contracts, payments, tenants, now).map((d) => {
-    const c = contracts.find((x) => x.id === d.contractId);
-    return {
-      contractId: d.contractId,
-      tenantId: c?.tenantId,
-      tenantName: d.tenantName,
-      propertyName: d.propertyName,
-      debt: d.debt,
-    };
-  });
+  return computeDebts(contracts, payments, tenants, now).map((d) => ({
+    contractId: d.contractId,
+    tenantId: d.tenantId,
+    tenantName: d.tenantName,
+    propertyName: d.propertyName,
+    debt: d.debt,
+    unpaidMonths: d.unpaidMonths,
+    oldestUnpaidDueDate: d.oldestUnpaidDueDate,
+    overdueDays: d.overdueDays,
+  }));
 }
 
 export function usePaymentReminderCount() {
@@ -80,7 +80,7 @@ export function SendPaymentRemindersButton({
     setSending(true);
     try {
       const result = isApiConfigured
-        ? await sendPaymentRemindersApi(payload)
+        ? await sendPaymentRemindersApi()
         : await sendPaymentRemindersLocal(contracts, payments, tenants, tashkentNow);
 
       await refreshCollection("notifications");
@@ -89,6 +89,8 @@ export function SendPaymentRemindersButton({
         "telegramSent" in result ? Number(result.telegramSent ?? 0) : 0;
       const tgSkipped =
         "telegramSkipped" in result ? Number(result.telegramSkipped ?? 0) : 0;
+      const tgFailed =
+        "telegramFailed" in result ? Number(result.telegramFailed ?? 0) : 0;
 
       if (result.sent === 0) {
         toast.warning("Qarzdorlar topilmadi — xabar yuborilmadi");
@@ -107,6 +109,12 @@ export function SendPaymentRemindersButton({
           toast.info(
             `${tgSkipped} ta arendator botga ulanmagan — faqat panelda eslatma.`,
             { duration: 5000 }
+          );
+        }
+        if (tgFailed > 0) {
+          toast.warning(
+            `${tgFailed} ta Telegram xabar yuborilmadi (xatolik).`,
+            { duration: 6000 }
           );
         }
       }

@@ -10,10 +10,11 @@ import { sendTelegramPaymentReminders } from "@/lib/api-server/telegram-reminder
 export type { DebtReminderInput };
 export { buildPaymentReminderMessage, groupDebtsByTenant, getTenantNotifications };
 
-/** Eski to'lov eslatmalarini tozalash (yangi yuborishdan oldin) */
-export async function clearPreviousPaymentReminderNotifications() {
+/** Shu workspace'dagi eski to'lov eslatmalarini tozalash (yangi yuborishdan oldin) */
+export async function clearPreviousPaymentReminderNotifications(workspaceId: string) {
   await prisma.notification.deleteMany({
     where: {
+      workspaceId,
       OR: [
         { type: "LATE_PAYMENT" },
         { type: "INFO", title: "To'lov eslatmalari yuborildi" },
@@ -24,9 +25,10 @@ export async function clearPreviousPaymentReminderNotifications() {
 
 export async function sendPaymentReminders(
   debts: DebtReminderInput[],
-  adminUserId?: string
+  opts: { workspaceId: string; adminUserId?: string }
 ) {
-  await clearPreviousPaymentReminderNotifications();
+  const { workspaceId, adminUserId } = opts;
+  await clearPreviousPaymentReminderNotifications(workspaceId);
 
   const grouped = groupDebtsByTenant(debts);
   const results = [];
@@ -35,6 +37,7 @@ export async function sendPaymentReminders(
     const message = buildPaymentReminderMessage(debt);
     const created = await prisma.notification.create({
       data: {
+        workspaceId,
         userId: adminUserId ?? null,
         title: "To'lov eslatmasi",
         message,
@@ -46,6 +49,9 @@ export async function sendPaymentReminders(
           propertyName: debt.propertyName,
           debt: debt.debt,
           propertyCount: debt.propertyCount,
+          unpaidMonths: debt.unpaidMonths ?? null,
+          oldestUnpaidDueDate: debt.oldestUnpaidDueDate ?? null,
+          overdueDays: debt.overdueDays ?? null,
         },
       },
     });
@@ -55,6 +61,7 @@ export async function sendPaymentReminders(
   if (results.length > 0 && adminUserId) {
     const summary = await prisma.notification.create({
       data: {
+        workspaceId,
         userId: adminUserId,
         title: "To'lov eslatmalari yuborildi",
         message: `${results.length} ta arendatorga to'lov qilish bo'yicha eslatma yuborildi.`,

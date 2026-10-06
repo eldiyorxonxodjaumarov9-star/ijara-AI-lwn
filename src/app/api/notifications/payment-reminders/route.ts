@@ -5,47 +5,57 @@ import { fail, ok } from "@/lib/api-server/http";
 import { isDatabaseConfigured } from "@/lib/api-server/prisma";
 import {
   buildPaymentReminderMessage,
+  groupDebtsByTenant,
   sendPaymentReminders,
-  type DebtReminderInput,
 } from "@/lib/api-server/payment-reminders";
-import {
-  computeServerDebts,
-} from "@/lib/api-server/telegram-reminders";
+import { computeServerDebts } from "@/lib/api-server/telegram-reminders";
+import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 
-function parseClientDebts(body: Record<string, unknown>): DebtReminderInput[] | null {
-  if (!Array.isArray(body.debts)) return null;
-  return body.debts
-    .map((row) => {
-      const d = row as Record<string, unknown>;
-      return {
-        contractId: String(d.contractId ?? ""),
-        tenantId: d.tenantId ? String(d.tenantId) : undefined,
-        tenantName: String(d.tenantName ?? ""),
-        propertyName: String(d.propertyName ?? ""),
-        debt: Number(d.debt ?? 0),
-      };
-    })
-    .filter((d) => d.debt > 0 && d.tenantName);
-}
-
-/** Admin: barcha qarzdorlarga to'lov eslatmasi yuborish */
+/**
+ * Admin: workspace'dagi barcha qarzdorlarga (joriy + o'tgan oylar) to'lov eslatmasi.
+ * Qarzlar serverda shu workspace bo'yicha hisoblanadi — client yuborgan ro'yxatga ishonilmaydi.
+ * `dryRun: true` — hech narsa yubormasdan kimga yuborilishini qaytaradi.
+ */
 export async function POST(req: NextRequest) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
   const auth = await requireStaffUser(req);
   if (auth.error) return auth.error;
 
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const debts = parseClientDebts(body) ?? (await computeServerDebts());
+    const ctx = await resolveUserWorkspaceContext(auth.user);
+    if (!ctx.hasAccess) {
+      return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
+    }
+    const workspaceId = ctx.workspace.id;
 
-    if (debts.length === 0) {
-      return ok({ sent: 0, message: "Qarzdorlar topilmadi" });
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const debts = await computeServerDebts({ workspaceId });
+    const recipients = groupDebtsByTenant(debts);
+
+    if (body.dryRun === true) {
+      return ok({
+        dryRun: true,
+        debtorContracts: debts.length,
+        recipients: recipients.length,
+        totalDebt: debts.reduce((s, d) => s + d.debt, 0),
+        debts,
+      });
     }
 
-    const { notifications, telegram } = await sendPaymentReminders(
-      debts,
-      auth.user.id
-    );
+    if (debts.length === 0) {
+      return ok({
+        sent: 0,
+        telegramSent: 0,
+        telegramSkipped: 0,
+        telegramFailed: 0,
+        message: "Qarzdorlar topilmadi",
+      });
+    }
+
+    const { notifications, telegram } = await sendPaymentReminders(debts, {
+      workspaceId,
+      adminUserId: auth.user.id,
+    });
     const tenantCount = notifications.filter(
       (n) => n.type === "LATE_PAYMENT"
     ).length;
@@ -53,6 +63,7 @@ export async function POST(req: NextRequest) {
       sent: tenantCount,
       telegramSent: telegram.sent,
       telegramSkipped: telegram.skipped,
+      telegramFailed: telegram.failed,
       data: notifications,
     });
   } catch (err) {
@@ -70,7 +81,10 @@ export async function GET(req: NextRequest) {
     sampleMessage: buildPaymentReminderMessage({
       tenantName: "Arendator",
       propertyName: "Live Work Network",
-      debt: 5000000,
+      debt: 1600000,
+      unpaidMonths: 2,
+      oldestUnpaidDueDate: "2026-08-05",
+      overdueDays: 62,
     }),
   });
 }

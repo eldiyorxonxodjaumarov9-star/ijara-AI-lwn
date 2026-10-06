@@ -118,19 +118,18 @@ export type ExpenseCategory =
   | "repair"
   | "marketing"
   | "advance"
-  | "other"
-  | "waste_service"
-  | "electricity"
-  | "water"
-  | "gas"
-  | "internet";
+  | "other";
 
 /** Oylik xarajat turi (frontend lowercase) */
 export type MonthlyExpenseType =
   | "water"
   | "electricity"
   | "office"
-  | "custom";
+  | "custom"
+  | "waste_service"
+  | "gas"
+  | "internet"
+  | "tax";
 
 export interface Expense {
   id: string;

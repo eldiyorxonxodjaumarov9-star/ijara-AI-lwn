@@ -143,11 +143,6 @@ export const expenseSchema = z
       "marketing",
       "advance",
       "other",
-      "waste_service",
-      "electricity",
-      "water",
-      "gas",
-      "internet",
     ]),
     amount: z.coerce.number().min(1, "Summani kiriting"),
     date: z.string().min(1, "Sanani tanlang"),
@@ -155,7 +150,7 @@ export const expenseSchema = z
     note: z.string().optional(),
     employeeId: z.string().optional(),
     monthlyExpenseType: z
-      .enum(["water", "electricity", "office", "custom"])
+      .enum(["water", "electricity", "office", "custom", "waste_service", "gas", "internet", "tax"])
       .optional()
       .nullable(),
     monthlyExpenseCustomName: z.string().optional().nullable(),

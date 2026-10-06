@@ -8,6 +8,7 @@
 import { MONTHS_UZ_FULL } from "@/lib/analytics";
 import {
   EXPENSE_CATEGORY_MAP,
+  MONTHLY_EXPENSE_TYPE_GROUPS,
   MONTHLY_EXPENSE_TYPE_MAP,
   PAYMENT_METHOD_MAP,
 } from "@/lib/constants";
@@ -782,13 +783,9 @@ export type ExpenseFilterOption = { value: string; label: string };
 export function expenseFilterOptions(): ExpenseFilterOption[] {
   return [
     { value: "all", label: "Barchasi" },
-    { value: "monthly:water", label: MONTHLY_EXPENSE_TYPE_MAP.water },
-    {
-      value: "monthly:electricity",
-      label: MONTHLY_EXPENSE_TYPE_MAP.electricity,
-    },
-    { value: "monthly:office", label: MONTHLY_EXPENSE_TYPE_MAP.office },
-    { value: "monthly:custom", label: MONTHLY_EXPENSE_TYPE_MAP.custom },
+    ...MONTHLY_EXPENSE_TYPE_GROUPS.flatMap((group) =>
+      group.types.map((type) => ({ value: `monthly:${type}`, label: MONTHLY_EXPENSE_TYPE_MAP[type] }))
+    ),
     ...Object.entries(EXPENSE_CATEGORY_MAP).map(([value, label]) => ({
       value: `cat:${value}`,
       label,

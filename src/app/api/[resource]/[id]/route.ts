@@ -17,7 +17,7 @@ import { WRITE_OFF_AMOUNTS, withWrittenOff } from "@/lib/api-server/debt-adjustm
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
 import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok } from "@/lib/api-server/http";
-import { parseExpenseCategory } from "@/lib/expense-categories";
+import { parseExpenseCategory, parseMonthlyExpenseType } from "@/lib/expense-categories";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import {
   isRecordInWorkspace,
@@ -272,10 +272,13 @@ export async function PATCH(
           body.monthlyExpenseType !== undefined
         ) {
           const raw = body.monthlyType ?? body.monthlyExpenseType;
-          data.monthlyType =
-            raw == null || raw === ""
-              ? null
-              : String(raw).toUpperCase();
+          if (raw == null || raw === "") {
+            data.monthlyType = null;
+          } else {
+            const monthlyType = parseMonthlyExpenseType(raw);
+            if (!monthlyType) return fail("Oylik xarajat turi noto‘g‘ri", 400, "INVALID_MONTHLY_TYPE");
+            data.monthlyType = monthlyType;
+          }
         }
         if (
           body.monthlyTypeCustom !== undefined ||

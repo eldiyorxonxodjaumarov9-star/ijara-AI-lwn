@@ -16,7 +16,7 @@ import { notifyTenantPaymentReceived } from "@/lib/api-server/tenant-notificatio
 import { requireResourceAccess, type RbacResource } from "@/lib/api-server/rbac";
 import { sanitizeEmployeeForRole } from "@/lib/api-server/employees/sanitize";
 import { fail, ok, paginated, parsePagination } from "@/lib/api-server/http";
-import { parseExpenseCategory } from "@/lib/expense-categories";
+import { parseExpenseCategory, parseMonthlyExpenseType } from "@/lib/expense-categories";
 import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import {
   resolveUserWorkspaceContext,
@@ -286,12 +286,17 @@ export async function POST(
         const employeeId = body.employeeId
           ? String(body.employeeId)
           : undefined;
-        const monthlyType =
+        const monthlyTypeRaw =
           body.monthlyType != null && body.monthlyType !== ""
-            ? String(body.monthlyType)
+            ? body.monthlyType
             : body.monthlyExpenseType != null && body.monthlyExpenseType !== ""
-              ? String(body.monthlyExpenseType).toUpperCase()
+              ? body.monthlyExpenseType
               : undefined;
+        const monthlyType =
+          monthlyTypeRaw === undefined ? undefined : parseMonthlyExpenseType(monthlyTypeRaw);
+        if (monthlyType === null) {
+          return fail("Oylik xarajat turi noto‘g‘ri", 400, "INVALID_MONTHLY_TYPE");
+        }
         const monthlyTypeCustomRaw =
           body.monthlyTypeCustom ?? body.monthlyExpenseCustomName;
         const monthlyTypeCustom =
@@ -310,7 +315,7 @@ export async function POST(
             notes: body.notes ? String(body.notes) : undefined,
             receiptUrl: body.receiptUrl ? String(body.receiptUrl) : undefined,
             employeeId: employeeId || undefined,
-            monthlyType: (monthlyType as never) || undefined,
+            monthlyType,
             monthlyTypeCustom: monthlyTypeCustom || undefined,
           },
           include: { employee: { include: { company: true } } },

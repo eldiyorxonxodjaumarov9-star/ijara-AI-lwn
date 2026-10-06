@@ -86,6 +86,7 @@ enum ExpenseCategory {
   MARKETING
   ADVANCE
   OTHER
+  /// Present in the DB since 20261007090000 but not used by the app — utilities live in MonthlyExpenseType.
   WASTE_SERVICE
   ELECTRICITY
   WATER
@@ -98,6 +99,10 @@ enum MonthlyExpenseType {
   ELECTRICITY
   OFFICE
   CUSTOM
+  WASTE_SERVICE
+  GAS
+  INTERNET
+  TAX
 }
 
 enum MaintenanceStatus {

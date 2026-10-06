@@ -67,11 +67,6 @@ const EXPENSE_CATEGORY_TO_API: Record<ExpenseCategory, string> = {
   marketing: "MARKETING",
   advance: "ADVANCE",
   other: "OTHER",
-  waste_service: "WASTE_SERVICE",
-  electricity: "ELECTRICITY",
-  water: "WATER",
-  gas: "GAS",
-  internet: "INTERNET",
 };
 const expenseCategoryFromApi = (v: unknown): ExpenseCategory => {
   const key = String(v ?? "OTHER").toLowerCase();
@@ -83,6 +78,10 @@ const MONTHLY_EXPENSE_TYPE_TO_API: Record<MonthlyExpenseType, string> = {
   electricity: "ELECTRICITY",
   office: "OFFICE",
   custom: "CUSTOM",
+  waste_service: "WASTE_SERVICE",
+  gas: "GAS",
+  internet: "INTERNET",
+  tax: "TAX",
 };
 const monthlyExpenseTypeFromApi = (
   v: unknown

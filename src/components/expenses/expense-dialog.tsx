@@ -30,13 +30,12 @@ import { ImageUpload } from "@/components/shared/image-upload";
 import { useCollection, useCollectionActions } from "@/hooks/use-collection";
 import { zResolver } from "@/lib/form";
 import { expenseSchema, type ExpenseInput } from "@/lib/validations";
-import { ExpenseCategorySelectItems } from "@/components/expenses/expense-category-items";
+import { MonthlyExpenseTypeSelectItems } from "@/components/expenses/monthly-expense-type-items";
 import {
+  EXPENSE_CATEGORY_MAP,
   MONTHLY_EXPENSE_TYPE_CATEGORY,
-  MONTHLY_EXPENSE_TYPE_MAP,
 } from "@/lib/constants";
 import {
-  isSelfDescribingCategory,
   monthlyTypeRequired,
   resolveExpenseCategory,
 } from "@/lib/expense-category-form";
@@ -107,7 +106,7 @@ export function ExpenseDialog({
     category === "advance" ||
     (category === "other" &&
       (workerPayType === "salary" || workerPayType === "advance"));
-  const showMonthlyType = !isWorkerPayCategory && !isSelfDescribingCategory(category);
+  const showMonthlyType = !isWorkerPayCategory;
 
   useEffect(() => {
     if (!open) return;
@@ -146,8 +145,6 @@ export function ExpenseDialog({
       clearMonthlyType();
     } else if (v === "other") {
       setWorkerPayType("expense");
-    } else if (isSelfDescribingCategory(v)) {
-      clearMonthlyType();
     }
   };
 
@@ -229,12 +226,9 @@ export function ExpenseDialog({
     const isWorkerPay =
       resolvedCategory === "salary" || resolvedCategory === "advance";
 
-    // Yangi xarajat: Maosh/Avans va o‘zi nomlangan kategoriyalardan tashqari oylik tur majburiy
+    // Yangi xarajat: Maosh/Avansdan tashqari oylik tur majburiy
     // Edit: eski yozuvlarda tur bo'lmasa majburiy emas
-    if (
-      monthlyTypeRequired({ isNew: !expense, isWorkerPay, category: resolvedCategory }) &&
-      !values.monthlyExpenseType
-    ) {
+    if (monthlyTypeRequired({ isNew: !expense, isWorkerPay }) && !values.monthlyExpenseType) {
       setError("monthlyExpenseType", {
         message: "Oylik xarajat turini tanlang",
       });
@@ -254,7 +248,6 @@ export function ExpenseDialog({
       category: resolvedCategory,
       monthlyExpenseType: values.monthlyExpenseType,
       isWorkerPay,
-      originalCategory: expense?.category,
     });
     resolvedCategory = resolved.category;
 
@@ -346,7 +339,11 @@ export function ExpenseDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <ExpenseCategorySelectItems />
+                  {Object.entries(EXPENSE_CATEGORY_MAP).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -380,13 +377,7 @@ export function ExpenseDialog({
                     <SelectValue placeholder="Turini tanlang" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(
-                      Object.keys(MONTHLY_EXPENSE_TYPE_MAP) as MonthlyExpenseType[]
-                    ).map((key) => (
-                      <SelectItem key={key} value={key}>
-                        {MONTHLY_EXPENSE_TYPE_MAP[key]}
-                      </SelectItem>
-                    ))}
+                    <MonthlyExpenseTypeSelectItems />
                   </SelectContent>
                 </Select>
                 {errors.monthlyExpenseType && (

@@ -1,12 +1,9 @@
 import { MONTHLY_EXPENSE_TYPE_MAP } from "@/lib/constants";
 import type { Expense, MonthlyExpenseType } from "@/types";
 
-const MONTHLY_TYPES = new Set<MonthlyExpenseType>([
-  "water",
-  "electricity",
-  "office",
-  "custom",
-]);
+const MONTHLY_TYPES = new Set<MonthlyExpenseType>(
+  Object.keys(MONTHLY_EXPENSE_TYPE_MAP) as MonthlyExpenseType[]
+);
 
 export function isMonthlyExpenseType(v: unknown): v is MonthlyExpenseType {
   return typeof v === "string" && MONTHLY_TYPES.has(v as MonthlyExpenseType);

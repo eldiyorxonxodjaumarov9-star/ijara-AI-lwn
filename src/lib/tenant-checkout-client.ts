@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api/client";
 import { getCollectionApi } from "@/lib/data/store";
 import { formatClientNumber } from "@/lib/client-number";
 import type {
@@ -102,7 +103,10 @@ export async function checkoutTenantLocal(tenantId: string) {
     await contractApi.update(contract.id, {
       ...contract,
       status: "terminated",
-      endDate: leaveDate,
+      endDate:
+        new Date(contract.endDate).getTime() < new Date(leaveDate).getTime()
+          ? contract.endDate
+          : leaveDate,
     });
     const property = (await propertyApi.list()).find(
       (p) => p.id === contract.propertyId
@@ -121,14 +125,19 @@ export async function checkoutTenantLocal(tenantId: string) {
   return archive;
 }
 
+export type TenantCheckoutApiResult = {
+  archive: TenantArchive;
+  leaveDate: string;
+  closedContractIds: string[];
+  releasedPropertyIds: string[];
+  remainingDebt: number;
+  unpaidMonths: number;
+};
+
+/** Bearer token + avtomatik refresh — apiFetch orqali. */
 export async function checkoutTenantApi(tenantId: string) {
-  const res = await fetch(`/api/tenants/${tenantId}/checkout`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json?.message ?? "Chiqish xatosi");
-  }
-  return (json?.data ?? json) as TenantArchive;
+  return apiFetch<TenantCheckoutApiResult>(
+    `/tenants/${encodeURIComponent(tenantId)}/checkout`,
+    { method: "POST", body: {} }
+  );
 }

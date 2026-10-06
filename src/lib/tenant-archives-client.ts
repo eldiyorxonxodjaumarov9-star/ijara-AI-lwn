@@ -1,6 +1,5 @@
-import { tokenStore } from "@/lib/api/client";
+import { apiFetch, isApiConfigured } from "@/lib/api/client";
 import { listLocalTenantArchives } from "@/lib/tenant-checkout-client";
-import { isApiConfigured } from "@/lib/api/client";
 import type { TenantArchive } from "@/types";
 
 export async function fetchTenantArchives(search = ""): Promise<TenantArchive[]> {
@@ -17,21 +16,14 @@ export async function fetchTenantArchives(search = ""): Promise<TenantArchive[]>
     );
   }
 
-  const token = tokenStore.access;
   const params = new URLSearchParams({ limit: "500", sortBy: "leaveDate", order: "desc" });
   if (search.trim()) params.set("search", search.trim());
 
-  const res = await fetch(`/api/tenant-archives?${params}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json?.message ?? "Yuklash xatosi");
-  }
-
-  const rows = (json?.data?.items ?? json?.data ?? json?.items ?? json) as Array<
-    Record<string, unknown>
-  >;
+  const json = await apiFetch<unknown>(`/tenant-archives?${params}`);
+  const body = json as { items?: unknown; data?: unknown } | unknown[];
+  const rows = (
+    Array.isArray(body) ? body : (body?.items ?? body?.data ?? [])
+  ) as Array<Record<string, unknown>>;
 
   return rows.map(mapArchiveFromApi);
 }

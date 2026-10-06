@@ -21,6 +21,14 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TenantDialog } from "@/components/tenants/tenant-dialog";
 import { TenantAssignDialog } from "@/components/tenants/tenant-assign-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,16 +61,25 @@ import {
   checkoutTenantApi,
   checkoutTenantLocal,
 } from "@/lib/tenant-checkout-client";
+import {
+  checkoutSuccessMessage,
+  formatCheckoutDebt,
+  previewCheckoutDebt,
+} from "@/lib/tenant-checkout-debt";
+import { formatTashkentDate, getTashkentDateParts } from "@/lib/payment-due-schedule";
+import { useTashkentNow } from "@/context/tashkent-time-context";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import { deleteTenantWithLinkedClients } from "@/lib/tenant-client-sync";
-import type { Contract, Tenant } from "@/types";
+import type { Contract, Payment, Tenant } from "@/types";
 
 type TenantRow = Tenant & { assignedRoom: string };
 
 export default function TenantsPage() {
   const { data, loading, api } = useCollection<Tenant>("tenants");
   const { data: contracts } = useCollection<Contract>("contracts");
+  const { data: payments } = useCollection<Payment>("payments");
   const { remove } = useCollectionActions<Tenant>("tenants");
+  const tashkentNow = useTashkentNow();
   const terms = useIndustryTerminology();
 
   const { byTenant: roomByTenant } = useMemo(
@@ -111,29 +128,43 @@ export default function TenantsPage() {
     setDeleteId(null);
   };
 
+  const checkoutTenant = useMemo(
+    () => (checkoutId ? data.find((t) => t.id === checkoutId) ?? null : null),
+    [checkoutId, data]
+  );
+  const checkoutPreview = useMemo(
+    () =>
+      checkoutId
+        ? previewCheckoutDebt(checkoutId, contracts, payments, data, tashkentNow)
+        : null,
+    [checkoutId, contracts, payments, data, tashkentNow]
+  );
+
   const handleCheckout = async () => {
     if (!checkoutId) return;
     setCheckingOut(true);
     try {
+      let remainingDebt: number;
       if (isApiConfigured) {
-        await checkoutTenantApi(checkoutId);
+        const result = await checkoutTenantApi(checkoutId);
+        remainingDebt = result.remainingDebt;
         await Promise.all([
           api.list(),
           refreshCollection("contracts"),
           refreshCollection("properties"),
+          refreshCollection("payments"),
           refreshCollection("clients"),
         ]);
       } else {
         await checkoutTenantLocal(checkoutId);
+        remainingDebt = checkoutPreview?.remainingDebt ?? 0;
         await Promise.all([
           api.list(),
           refreshCollection("contracts"),
           refreshCollection("properties"),
         ]);
       }
-      toast.success(
-        "Klient chiqdi — xona bo'shadi, to'lovlar Klient bazasida saqlanadi"
-      );
+      toast.success(checkoutSuccessMessage(remainingDebt), { duration: 6000 });
       setCheckoutId(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Chiqish xatosi");
@@ -291,7 +322,7 @@ export default function TenantsPage() {
                           </DropdownMenuItem>
                           {tenant.assignedRoom ? (
                             <DropdownMenuItem onClick={() => setCheckoutId(tenant.id)}>
-                              <LogOut className="size-4" /> Xonadan chiqish
+                              <LogOut className="size-4" /> Xonadan chiqarish
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem onClick={() => setCheckoutId(tenant.id)}>
@@ -332,19 +363,56 @@ export default function TenantsPage() {
         onOpenChange={setAssignOpen}
         tenant={assigning}
       />
-      <ConfirmDialog
+      <Dialog
         open={!!checkoutId}
-        onOpenChange={(o) => !o && setCheckoutId(null)}
-        title="Klientni xonadan chiqarish"
-        description="Xona bo'shaydi. Barcha to'lovlar va shartnoma ma'lumotlari Klient bazasida saqlanadi — pul kamaymaydi."
-        confirmText={checkingOut ? "Jarayonda..." : "Chiqish"}
-        onConfirm={handleCheckout}
-      />
+        onOpenChange={(o) => !o && !checkingOut && setCheckoutId(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ijarachini xonadan chiqarasizmi?</DialogTitle>
+            <DialogDescription>
+              Xona bo&apos;shaydi, shartnoma shu sana bilan yopiladi. To&apos;lov
+              tarixi va mavjud qarzdorlik saqlanadi — keyingi oylar uchun yangi
+              qarz yozilmaydi.
+            </DialogDescription>
+          </DialogHeader>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">Ijarachi</dt>
+            <dd className="font-medium">{checkoutTenant?.fullName ?? "—"}</dd>
+            <dt className="text-muted-foreground">Xona</dt>
+            <dd className="font-medium">{checkoutPreview?.roomName ?? "Biriktirilmagan"}</dd>
+            <dt className="text-muted-foreground">Checkout sana</dt>
+            <dd className="font-medium">{formatTashkentDate(getTashkentDateParts(tashkentNow))}</dd>
+            <dt className="text-muted-foreground">Qarzdorlik</dt>
+            <dd
+              className={
+                (checkoutPreview?.remainingDebt ?? 0) > 0
+                  ? "font-semibold text-destructive"
+                  : "font-medium"
+              }
+            >
+              {formatCheckoutDebt(checkoutPreview?.remainingDebt ?? 0)}
+            </dd>
+          </dl>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCheckoutId(null)}
+              disabled={checkingOut}
+            >
+              Bekor qilish
+            </Button>
+            <Button variant="destructive" onClick={handleCheckout} disabled={checkingOut}>
+              {checkingOut ? "Jarayonda..." : "Xonadan chiqarish"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
         title={terms.deleteCustomerTitle}
-        description="Diqqat: shartnoma va barcha to'lovlar ham o'chadi. Tarixni saqlash uchun «Xonadan chiqish»ni tanlang."
+        description="Diqqat: shartnoma va barcha to'lovlar ham o'chadi. Tarixni saqlash uchun «Xonadan chiqarish»ni tanlang."
         onConfirm={handleDelete}
       />
     </div>

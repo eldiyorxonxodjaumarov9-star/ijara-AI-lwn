@@ -12,6 +12,7 @@ import { POST as leadUpsert } from "@/app/api/internal/agent/v1/leads/upsert/rou
 import { recordActivity, sanitizeActivityMetadata, toActivityRow, writeActivities } from "@/lib/api-server/activity-events";
 import { completedAiRunAction } from "@/lib/api-server/agent-gateway/ai-activity";
 import { seedDemoWorkspace } from "@/lib/api-server/demo-seed";
+import { DEMO_SEED_CUSTOMER_NAMES, DEMO_SEED_NOTE as DEMO_NOTE } from "@/lib/api-server/demo-seed-plan";
 import { prisma } from "@/lib/api-server/prisma";
 import { sendTelegramPaymentReminders } from "@/lib/api-server/telegram-reminders";
 
@@ -38,6 +39,7 @@ const users = new Map<string, string>();
 function addWorkspace(id: string, industry: string) {
   workspaces.set(id, {
     id, name: id, slug: null, industry, isInternal: false, createdAt: new Date(), updatedAt: new Date(),
+    demoSeededAt: null, demoDataClearedAt: null,
     subscription: { id: `sub-${id}`, workspaceId: id, status: "ACTIVE", plan: "PRO", startedAt: new Date() },
   });
   users.set(`owner-${id}`, id);
@@ -67,13 +69,41 @@ const createExpense = (ws: string, body: Row = {}) =>
     params: Promise.resolve({ resource: "expenses" }),
   }).then(json);
 
-const matchesWhere = (r: Row, where: Row = {}) =>
-  Object.entries(where).every(([k, cond]) => {
-    if (cond && typeof cond === "object" && !(cond instanceof Date) && "gte" in (cond as Row)) {
-      return (r[k] as Date).getTime() >= ((cond as Row).gte as Date).getTime();
+const time = (v: unknown) => (v as Date).getTime();
+function matchesField(value: unknown, cond: unknown): boolean {
+  if (cond === null) return value === null || value === undefined;
+  if (!cond || typeof cond !== "object" || cond instanceof Date) return value === cond;
+  return Object.entries(cond as Row).every(([op, arg]) => {
+    switch (op) {
+      case "gte": return time(value) >= time(arg);
+      case "lt": return time(value) < time(arg);
+      case "gt": return time(value) > time(arg);
+      case "lte": return time(value) <= time(arg);
+      case "in": return (arg as unknown[]).includes(value);
+      case "notIn": return value != null && !(arg as unknown[]).includes(value);
+      case "startsWith": return typeof value === "string" && value.startsWith(arg as string);
+      case "not": return value != null && !matchesField(value, arg);
+      default: throw new Error(`unsupported where op ${op}`);
     }
-    return r[k] === cond;
   });
+}
+const matchesWhere = (r: Row, where: Row = {}): boolean =>
+  Object.entries(where).every(([k, cond]) => {
+    if (k === "OR") return (cond as Row[]).some((c) => matchesWhere(r, c));
+    if (k === "AND") return (cond as Row[]).every((c) => matchesWhere(r, c));
+    if (k === "NOT") return !matchesWhere(r, cond as Row);
+    return matchesField(r[k], cond);
+  });
+
+const RECORD_MODELS = [
+  "property", "tenant", "contract", "booking", "vehicle", "vehicleRental", "payment",
+  "sourcePayment", "manualDebt", "debtAdjustment", "expense", "workTask",
+] as const;
+type RecordModel = (typeof RECORD_MODELS)[number];
+let records: Record<RecordModel, Row[]>;
+let recordQueries = 0;
+const addRecord = (model: RecordModel, row: Row) =>
+  records[model].push({ id: randomUUID(), createdAt: new Date(), notes: null, ...row });
 
 before(() => {
   process.env.DATABASE_URL = "postgresql://test:test@localhost:1/test";
@@ -117,6 +147,26 @@ before(() => {
   mock(prisma.agentActionAudit, "findUnique", async () => null);
   mock(prisma.agentActionAudit, "create", async ({ data }: { data: Row }) => ({ id: randomUUID(), ...data }));
 
+  for (const model of RECORD_MODELS) {
+    mock(prisma[model], "findFirst", async ({ where }: { where: Row }) => {
+      recordQueries += 1;
+      const hit = records[model].find((r) => matchesWhere(r, where));
+      return hit ? { id: hit.id } : null;
+    });
+  }
+  mock(prisma.contract, "findMany", async ({ where }: { where: Row }) => {
+    recordQueries += 1;
+    return records.contract
+      .filter((r) => matchesWhere(r, where))
+      .map((c) => ({
+        ...c,
+        property: { title: "Xona" },
+        tenant: { id: c.tenantId, fullName: "Ijarachi", phone: "+998901112233", passport: null, rentAmount: c.monthlyRent, paymentDueDate: null, leftAt: null, createdAt: c.createdAt },
+        payments: [],
+        debtAdjustments: [],
+      }));
+  });
+
   mock(prisma.workspaceActivityEvent, "createMany", async ({ data }: { data: Row[] }) => {
     for (const d of data) events.push({ id: randomUUID(), createdAt: new Date(), ...d });
     return { count: data.length };
@@ -147,6 +197,8 @@ after(() => {
 beforeEach(() => {
   events = [];
   groupByCalls = 0;
+  records = Object.fromEntries(RECORD_MODELS.map((m) => [m, []])) as unknown as Record<RecordModel, Row[]>;
+  recordQueries = 0;
   expenseFails = false;
   leadFails = false;
   workspaces.clear();
@@ -332,14 +384,160 @@ describe("GET /api/dashboard/usage-analytics", () => {
     assert.equal(hotel.data.workShare.total, 0);
   });
 
-  it("uses one bounded groupBy per request regardless of event volume", async () => {
+  it("bounded queries: fixed groupBy + existence checks regardless of data volume", async () => {
     for (let i = 0; i < 50; i++) await createExpense("office");
+    for (let i = 0; i < 200; i++) addRecord("property", { workspaceId: "office", description: null });
     groupByCalls = 0;
+    recordQueries = 0;
     const res = await usage("office");
-    assert.equal(groupByCalls, 1);
+    assert.equal(groupByCalls, 2, "one period groupBy + one all-time groupBy");
+    // 7 data features; payments + debts use two probes each, debts adds one contract scan.
+    assert.ok(recordQueries <= 10, `record queries=${recordQueries}`);
     assert.equal(res.data.workShare.human.count, 50);
-    assert.equal(res.data.platformUsage.usedFeatures, 1);
+    assert.equal(res.data.platformUsage.usedFeatures, 2);
     assert.equal(res.data.features.find((f: { key: string }) => f.key === "expenses").used, true);
+  });
+});
+
+const feature = (res: { data: { features: { key: string; used: boolean }[] } }, key: string) =>
+  res.data.features.find((f) => f.key === key)?.used;
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+
+describe("platform usage: all-time real data", () => {
+  it("old room with no events → rooms used", async () => {
+    addRecord("property", { workspaceId: "office", description: "2-qavat", createdAt: daysAgo(400) });
+    const res = await usage("office");
+    assert.equal(feature(res, "properties"), true);
+    assert.equal(res.data.platformUsage.percentage, 13);
+    assert.equal(res.data.workShare.total, 0);
+  });
+
+  it("old tenant → tenants used", async () => {
+    addRecord("tenant", { workspaceId: "office", fullName: "Ali Valiyev", phone: "+998901234567", createdAt: daysAgo(300) });
+    assert.equal(feature(await usage("office"), "tenants"), true);
+  });
+
+  it("old contract → contracts used", async () => {
+    addRecord("contract", {
+      workspaceId: "office", status: "TERMINATED", tenantId: "t0", propertyId: "p0", monthlyRent: 500_000,
+      startDate: daysAgo(400), endDate: daysAgo(200), createdAt: daysAgo(400),
+    });
+    assert.equal(feature(await usage("office"), "contracts"), true);
+  });
+
+  it("old payment (or source payment) → payments used", async () => {
+    addRecord("payment", { workspaceId: "office", createdAt: daysAgo(500) });
+    assert.equal(feature(await usage("office"), "payments"), true);
+    records.payment = [];
+    addRecord("sourcePayment", { workspaceId: "hotel", createdAt: daysAgo(100) });
+    assert.equal(feature(await usage("hotel"), "payments"), true);
+  });
+
+  it("debts: manual debt or a canonical non-demo debt counts", async () => {
+    addRecord("manualDebt", { workspaceId: "office" });
+    assert.equal(feature(await usage("office"), "debts"), true);
+    records.manualDebt = [];
+    addRecord("contract", {
+      workspaceId: "office", status: "ACTIVE", tenantId: "t1", propertyId: "p1", monthlyRent: 1_000_000,
+      startDate: daysAgo(120), endDate: daysAgo(-200), createdAt: daysAgo(120),
+    });
+    assert.equal(feature(await usage("office"), "debts"), true);
+  });
+
+  it("reports are never inferred from data — only from report events", async () => {
+    addRecord("property", { workspaceId: "office" });
+    addRecord("payment", { workspaceId: "office" });
+    assert.equal(feature(await usage("office"), "reports"), false);
+    events.push({ workspaceId: "office", actorType: "HUMAN", actionType: "REPORT_VIEW", featureKey: "reports", createdAt: daysAgo(200) });
+    assert.equal(feature(await usage("office"), "reports"), true);
+  });
+
+  it("event only (row since deleted) → used, even outside the selected period", async () => {
+    events.push({ workspaceId: "office", actorType: "HUMAN", actionType: "EXPENSE_CREATE", featureKey: "expenses", createdAt: daysAgo(150) });
+    const res = await usage("office", "?period=7d");
+    assert.equal(feature(res, "expenses"), true);
+    assert.equal(res.data.workShare.total, 0);
+  });
+
+  it("platform % is all-time and identical for 7d / 30d / 90d; actor counts follow the period", async () => {
+    addRecord("property", { workspaceId: "office", createdAt: daysAgo(365) });
+    addRecord("tenant", { workspaceId: "office", fullName: "Real", phone: "+998935551122", createdAt: daysAgo(365) });
+    for (const [age, n] of [[3, 1], [20, 2], [60, 4]] as const) {
+      for (let i = 0; i < n; i++) {
+        events.push({ workspaceId: "office", actorType: "HUMAN", actionType: "PAYMENT_CREATE", featureKey: "payments", createdAt: daysAgo(age) });
+      }
+    }
+    events.push({ workspaceId: "office", actorType: "AI", actionType: "AI_CUSTOMER_RESPONSE", featureKey: "ai_customer_chat", createdAt: daysAgo(45) });
+    const [d7, d30, d90] = await Promise.all(["7d", "30d", "90d"].map((p) => usage("office", `?period=${p}`)));
+    for (const res of [d7, d30, d90]) {
+      assert.deepEqual(res.data.platformUsage, { scope: "ALL_TIME", usedFeatures: 3, eligibleFeatures: 8, percentage: 38 });
+    }
+    assert.deepEqual([d7, d30, d90].map((r) => r.data.workShare.human.count), [1, 3, 7]);
+    assert.deepEqual([d7, d30, d90].map((r) => r.data.workShare.ai.count), [0, 0, 1]);
+  });
+
+  it("HOTEL and CAR detect their own models", async () => {
+    addRecord("booking", { workspaceId: "hotel" });
+    addRecord("vehicle", { workspaceId: "car" });
+    addRecord("vehicleRental", { workspaceId: "car" });
+    const hotel = await usage("hotel");
+    const car = await usage("car");
+    assert.equal(hotel.data.features.find((f: { key: string }) => f.key === "bookings").used, true);
+    assert.equal(car.data.features.find((f: { key: string }) => f.key === "vehicles").used, true);
+    assert.equal(car.data.features.find((f: { key: string }) => f.key === "vehicle_rentals").used, true);
+    assert.equal(hotel.data.platformUsage.usedFeatures, 1);
+    assert.equal(car.data.platformUsage.usedFeatures, 2);
+  });
+
+  it("cross-workspace records never leak, even with a client workspaceId", async () => {
+    addRecord("property", { workspaceId: "car" });
+    addRecord("tenant", { workspaceId: "car", fullName: "X", phone: "+998901110000" });
+    const office = await usage("office", "?workspaceId=car");
+    assert.equal(office.data.platformUsage.usedFeatures, 0);
+    assert.equal(office.data.platformUsage.percentage, 0);
+  });
+});
+
+describe("platform usage: demo seed exclusion", () => {
+  const seedDemo = (ws: string, seededAt: Date) => {
+    Object.assign(workspaces.get(ws)!, { demoSeededAt: seededAt });
+    const at = new Date(seededAt.getTime() + 60_000);
+    addRecord("property", { workspaceId: ws, description: DEMO_NOTE, createdAt: at });
+    addRecord("tenant", { workspaceId: ws, fullName: DEMO_SEED_CUSTOMER_NAMES[0], phone: "+998900001234", createdAt: at });
+    addRecord("contract", {
+      workspaceId: ws, notes: DEMO_NOTE, status: "ACTIVE", tenantId: "dt", propertyId: "dp", monthlyRent: 2_000_000,
+      startDate: daysAgo(90), endDate: daysAgo(-90), createdAt: at,
+    });
+    addRecord("payment", { workspaceId: ws, notes: DEMO_NOTE, createdAt: at });
+    addRecord("expense", { workspaceId: ws, notes: DEMO_NOTE, createdAt: at });
+  };
+
+  it("demo seed only → nothing counted as used (incl. canonical debts on demo contracts)", async () => {
+    seedDemo("office", daysAgo(2));
+    const res = await usage("office");
+    assert.equal(res.data.platformUsage.usedFeatures, 0);
+    assert.equal(res.data.platformUsage.percentage, 0);
+    assert.ok(res.data.features.every((f: { used: boolean }) => !f.used));
+  });
+
+  it("demo cleared + real room → only the real room counts", async () => {
+    Object.assign(workspaces.get("office")!, { demoSeededAt: daysAgo(10), demoDataClearedAt: daysAgo(9) });
+    addRecord("property", { workspaceId: "office", description: null, createdAt: daysAgo(5) });
+    const res = await usage("office");
+    assert.equal(feature(res, "properties"), true);
+    assert.equal(res.data.platformUsage.usedFeatures, 1);
+  });
+
+  it("real records alongside an uncleared demo seed still count", async () => {
+    const seededAt = daysAgo(2);
+    seedDemo("office", seededAt);
+    addRecord("property", { workspaceId: "office", description: null, createdAt: new Date(seededAt.getTime() + 60_000) });
+    addRecord("expense", { workspaceId: "office", notes: DEMO_NOTE, createdAt: daysAgo(1) });
+    const res = await usage("office");
+    assert.equal(feature(res, "properties"), true, "real room inside window (no marker)");
+    assert.equal(feature(res, "expenses"), true, "marker but created after the seed window");
+    assert.equal(feature(res, "tenants"), false);
+    assert.equal(feature(res, "payments"), false);
   });
 });
 
@@ -356,6 +554,8 @@ describe("dashboard UI copy", () => {
       "Faol",
       "Ishlatilmagan",
       "Ma'lumot yig'ilmoqda",
+      "Barcha vaqt bo‘yicha",
+      "periodLabel",
     ]) {
       assert.ok(src.includes(text), text);
     }

@@ -12,6 +12,8 @@ import {
   DEFAULT_USAGE_PERIOD,
   USAGE_PERIODS,
   WORK_SHARE_LABELS,
+  periodLabel,
+  usagePeriodDays,
   usageSubtitle,
   type UsageAnalytics,
   type UsagePeriod,
@@ -55,6 +57,8 @@ export function PlatformUsageSection() {
 
   const share = data?.workShare;
   const hasWork = (share?.total ?? 0) > 0;
+  const periodText = periodLabel(usagePeriodDays(period));
+  const usageLoading = loading && !data;
 
   return (
     <section className="space-y-3" aria-labelledby="platform-usage-title" data-testid="platform-usage">
@@ -63,9 +67,9 @@ export function PlatformUsageSection() {
           <h2 id="platform-usage-title" className="text-lg font-semibold tracking-tight text-foreground">
             Platformadan foydalanish
           </h2>
-          <p className="text-xs text-slate-400">Statistika yangi faoliyatlardan boshlab yig&apos;iladi</p>
+          <p className="text-xs text-slate-400">Foydalanish foizi — barcha vaqt bo‘yicha · Ish ulushi — tanlangan davr</p>
         </div>
-        <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Davr">
+        <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Ish ulushi davri">
           {USAGE_PERIODS.map((p) => (
             <button
               key={p}
@@ -94,8 +98,8 @@ export function PlatformUsageSection() {
               value={data ? `${data.platformUsage.percentage}%` : "0%"}
               icon={Activity}
               tone="cyan"
-              loading={loading}
-              subtitle={data ? (data.collecting ? COLLECTING : usageSubtitle(data)) : undefined}
+              loading={usageLoading}
+              subtitle={data ? usageSubtitle(data) : undefined}
             />
             <DashboardKpiCard
               index={1}
@@ -104,6 +108,7 @@ export function PlatformUsageSection() {
               icon={User}
               tone="blue"
               loading={loading}
+              subtitle={periodText}
             />
             <DashboardKpiCard
               index={2}
@@ -112,6 +117,7 @@ export function PlatformUsageSection() {
               icon={Bot}
               tone="violet"
               loading={loading}
+              subtitle={periodText}
             />
             <DashboardKpiCard
               index={3}
@@ -120,11 +126,12 @@ export function PlatformUsageSection() {
               icon={Cog}
               tone="emerald"
               loading={loading}
+              subtitle={periodText}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <DashboardPanel title="Ishlarning bajarilish ulushi" delayMs={80}>
+            <DashboardPanel title="Ishlarning bajarilish ulushi" description={periodText} delayMs={80}>
               {loading ? (
                 <Skeleton className="h-[180px] w-full bg-white/10" />
               ) : !hasWork || !share ? (
@@ -176,8 +183,8 @@ export function PlatformUsageSection() {
               )}
             </DashboardPanel>
 
-            <DashboardPanel title="Qaysi funksiyalar ishlatilmoqda" delayMs={120}>
-              {loading ? (
+            <DashboardPanel title="Qaysi funksiyalar ishlatilmoqda" description="Barcha vaqt bo‘yicha" delayMs={120}>
+              {usageLoading ? (
                 <Skeleton className="h-[180px] w-full bg-white/10" />
               ) : (
                 <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -199,7 +206,7 @@ export function PlatformUsageSection() {
             </DashboardPanel>
           </div>
 
-          <DashboardPanel title="Funksiyalar bo'yicha taqsimot" delayMs={160}>
+          <DashboardPanel title="Funksiyalar bo'yicha taqsimot" description={periodText} delayMs={160}>
             {loading ? (
               <Skeleton className="h-24 w-full bg-white/10" />
             ) : !data || data.breakdown.length === 0 ? (

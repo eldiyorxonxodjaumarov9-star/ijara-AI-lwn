@@ -214,18 +214,21 @@ export type ActivityGroupRow = {
 
 export type ShareBucket = { count: number; percentage: number };
 
+export type FeatureUsageSource = "events" | "data" | "both";
+
 export type UsageAnalytics = {
   period: UsagePeriod;
   periodDays: number;
   collecting: boolean;
-  platformUsage: { usedFeatures: number; eligibleFeatures: number; percentage: number };
+  /** Adoption is always all-time; only work share and breakdown follow `period`. */
+  platformUsage: { scope: "ALL_TIME"; usedFeatures: number; eligibleFeatures: number; percentage: number };
   workShare: {
     total: number;
     human: ShareBucket;
     ai: ShareBucket;
     automation: ShareBucket;
   };
-  features: { key: string; label: string; used: boolean; count: number }[];
+  features: { key: string; label: string; used: boolean; source: FeatureUsageSource | null }[];
   breakdown: {
     featureKey: string;
     label: string;
@@ -268,15 +271,47 @@ function featureLabel(key: string, eligible: AdoptionFeatureDef[]) {
   return (FEATURE_LABELS as Record<string, string>)[key] ?? key;
 }
 
+/** Feature keys whose real (non-demo) records can be detected in the workspace DB. Reports have no rows. */
+export const DATA_DETECTABLE_FEATURES = [
+  "properties",
+  "tenants",
+  "contracts",
+  "bookings",
+  "vehicles",
+  "vehicle_rentals",
+  "payments",
+  "debts",
+  "expenses",
+  "tasks",
+] as const satisfies readonly ActivityFeatureKey[];
+export type DataDetectableFeature = (typeof DATA_DETECTABLE_FEATURES)[number];
+
+/** Data-detectable feature keys an industry's eligible features depend on (only these are queried). */
+export function dataFeaturesFor(
+  industry: unknown,
+  isPlanAvailable: (feature: UsagePlanFeature) => boolean
+): DataDetectableFeature[] {
+  const keys = new Set(
+    eligibleUsageFeatures(industryUsageFeatures(industry), isPlanAvailable).flatMap((f) => f.featureKeys)
+  );
+  return DATA_DETECTABLE_FEATURES.filter((key) => keys.has(key));
+}
+
 export function computeUsageAnalytics(input: {
   period: UsagePeriod;
   industry: unknown;
+  /** Activity events inside the selected period, grouped by action/actor/feature. */
   rows: ActivityGroupRow[];
+  /** Feature keys with at least one successful activity event, any time. */
+  eventFeatureKeys: Iterable<string>;
+  /** Feature keys with real, non-demo records in the workspace DB. */
+  dataFeatureKeys: Iterable<string>;
   isPlanAvailable: (feature: UsagePlanFeature) => boolean;
 }): UsageAnalytics {
   const eligible = eligibleUsageFeatures(industryUsageFeatures(input.industry), input.isPlanAvailable);
+  const fromEvents = new Set(input.eventFeatureKeys);
+  const fromData = new Set(input.dataFeatureKeys);
 
-  const byFeatureKey = new Map<string, number>();
   const breakdown = new Map<string, { human: number; ai: number; automation: number }>();
   let human = 0;
   let ai = 0;
@@ -285,7 +320,6 @@ export function computeUsageAnalytics(input: {
   for (const row of input.rows) {
     const count = Math.max(0, Math.trunc(row.count));
     if (count === 0) continue;
-    byFeatureKey.set(row.featureKey, (byFeatureKey.get(row.featureKey) ?? 0) + count);
 
     const def = actionDef(row.actionType);
     if (def && !def.work) continue;
@@ -306,8 +340,10 @@ export function computeUsageAnalytics(input: {
   }
 
   const features = eligible.map((feature) => {
-    const count = feature.featureKeys.reduce((sum, key) => sum + (byFeatureKey.get(key) ?? 0), 0);
-    return { key: feature.key, label: feature.label, used: count > 0, count };
+    const byEvents = feature.featureKeys.some((key) => fromEvents.has(key));
+    const byData = feature.featureKeys.some((key) => fromData.has(key));
+    const source: FeatureUsageSource | null = byEvents && byData ? "both" : byEvents ? "events" : byData ? "data" : null;
+    return { key: feature.key, label: feature.label, used: source !== null, source };
   });
   const usedFeatures = features.filter((feature) => feature.used).length;
 
@@ -319,6 +355,7 @@ export function computeUsageAnalytics(input: {
     periodDays: usagePeriodDays(input.period),
     collecting: total === 0 && usedFeatures === 0,
     platformUsage: {
+      scope: "ALL_TIME",
       usedFeatures,
       eligibleFeatures: eligible.length,
       percentage: usagePercentage(usedFeatures, eligible.length),
@@ -347,7 +384,11 @@ export const WORK_SHARE_LABELS = {
   automation: "⚙️ Avtomatika",
 } as const;
 
-export function usageSubtitle(data: Pick<UsageAnalytics, "periodDays" | "platformUsage">) {
+export function usageSubtitle(data: Pick<UsageAnalytics, "platformUsage">) {
   const { usedFeatures, eligibleFeatures } = data.platformUsage;
-  return `Oxirgi ${data.periodDays} kunda ${eligibleFeatures} ta asosiy funksiyadan ${usedFeatures} tasi ishlatilgan`;
+  return `Barcha vaqt bo‘yicha ${eligibleFeatures} ta asosiy funksiyadan ${usedFeatures} tasi ishlatilgan`;
+}
+
+export function periodLabel(periodDays: number) {
+  return `Oxirgi ${periodDays} kun`;
 }

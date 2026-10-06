@@ -4,10 +4,12 @@ import { describe, it } from "node:test";
 import {
   ACTIVITY_ACTIONS,
   computeUsageAnalytics,
+  dataFeaturesFor,
   eligibleUsageFeatures,
   industryUsageFeatures,
   normalizePercentages,
   parseUsagePeriod,
+  periodLabel,
   usagePeriodDays,
   usagePeriodStart,
   usageSubtitle,
@@ -23,8 +25,20 @@ const row = (actionType: keyof typeof ACTIVITY_ACTIONS, count: number): Activity
   featureKey: ACTIVITY_ACTIONS[actionType].feature,
   count,
 });
-const compute = (industry: string, rows: ActivityGroupRow[], isPlanAvailable: (f: UsagePlanFeature) => boolean = allPlan) =>
-  computeUsageAnalytics({ period: "30d", industry, rows, isPlanAvailable });
+const compute = (
+  industry: string,
+  rows: ActivityGroupRow[],
+  isPlanAvailable: (f: UsagePlanFeature) => boolean = allPlan,
+  dataFeatureKeys: string[] = []
+) =>
+  computeUsageAnalytics({
+    period: "30d",
+    industry,
+    rows,
+    eventFeatureKeys: rows.map((r) => r.featureKey),
+    dataFeatureKeys,
+    isPlanAvailable,
+  });
 
 describe("usage analytics: periods", () => {
   it("accepts only 7d / 30d / 90d, defaults to 30d", () => {
@@ -41,7 +55,17 @@ describe("usage analytics: periods", () => {
       const now = new Date("2026-10-06T12:00:00Z");
       assert.equal(usagePeriodDays(period), days);
       assert.equal(now.getTime() - usagePeriodStart(period, now).getTime(), days * 86_400_000);
-      assert.equal(computeUsageAnalytics({ period, industry: "OFFICE_RENTAL", rows: [], isPlanAvailable: allPlan }).periodDays, days);
+      assert.equal(
+        computeUsageAnalytics({
+          period,
+          industry: "OFFICE_RENTAL",
+          rows: [],
+          eventFeatureKeys: [],
+          dataFeatureKeys: [],
+          isPlanAvailable: allPlan,
+        }).periodDays,
+        days
+      );
     });
   }
 });
@@ -116,7 +140,74 @@ describe("usage analytics: feature adoption", () => {
     assert.equal(res.platformUsage.usedFeatures, 2);
     assert.equal(res.platformUsage.eligibleFeatures, 8);
     assert.equal(res.platformUsage.percentage, 25);
-    assert.equal(res.features.find((f) => f.key === "payments")?.count, 40);
+    assert.equal(res.features.find((f) => f.key === "payments")?.source, "events");
+  });
+
+  it("old real records count as used with zero events (all-time adoption)", () => {
+    const res = compute("OFFICE_RENTAL", [], allPlan, ["properties", "tenants", "contracts", "payments"]);
+    assert.equal(res.platformUsage.scope, "ALL_TIME");
+    assert.equal(res.platformUsage.usedFeatures, 4);
+    assert.equal(res.platformUsage.percentage, 50);
+    assert.equal(res.collecting, false);
+    assert.equal(res.workShare.total, 0);
+    for (const key of ["properties", "tenants", "contracts", "payments"]) {
+      assert.equal(res.features.find((f) => f.key === key)?.source, "data", key);
+    }
+  });
+
+  it("an event with no current row still counts as used", () => {
+    const res = computeUsageAnalytics({
+      period: "7d",
+      industry: "OFFICE_RENTAL",
+      rows: [],
+      eventFeatureKeys: ["expenses"],
+      dataFeatureKeys: [],
+      isPlanAvailable: allPlan,
+    });
+    assert.equal(res.features.find((f) => f.key === "expenses")?.used, true);
+    assert.equal(res.platformUsage.usedFeatures, 1);
+  });
+
+  it("reports are used only via events, never from data keys", () => {
+    const res = compute("OFFICE_RENTAL", [], allPlan, ["properties"]);
+    assert.equal(res.features.find((f) => f.key === "reports")?.used, false);
+  });
+
+  it("event + data on the same feature is counted once with source 'both'", () => {
+    const res = compute("OFFICE_RENTAL", [row("PAYMENT_CREATE", 2)], allPlan, ["payments"]);
+    assert.equal(res.platformUsage.usedFeatures, 1);
+    assert.equal(res.features.find((f) => f.key === "payments")?.source, "both");
+  });
+
+  it("period selector changes actor counts but never platform usage %", () => {
+    const allTime = { eventFeatureKeys: ["payments", "ai_customer_chat"], dataFeatureKeys: ["properties", "tenants"] };
+    const byPeriod = {
+      "7d": [row("PAYMENT_CREATE", 1)],
+      "30d": [row("PAYMENT_CREATE", 4), row("AI_CUSTOMER_RESPONSE", 2)],
+      "90d": [row("PAYMENT_CREATE", 9), row("AI_CUSTOMER_RESPONSE", 5), row("DEBT_REMINDER_SENT", 3)],
+    } as const;
+    const results = (["7d", "30d", "90d"] as const).map((period) =>
+      computeUsageAnalytics({ period, industry: "OFFICE_RENTAL", rows: [...byPeriod[period]], ...allTime, isPlanAvailable: allPlan })
+    );
+    assert.deepEqual(results.map((r) => r.platformUsage), Array(3).fill({ scope: "ALL_TIME", usedFeatures: 3, eligibleFeatures: 8, percentage: 38 }));
+    assert.deepEqual(results.map((r) => [r.workShare.human.count, r.workShare.ai.count, r.workShare.automation.count]), [
+      [1, 0, 0],
+      [4, 2, 0],
+      [9, 5, 3],
+    ]);
+  });
+
+  it("dataFeaturesFor queries only DB-detectable keys of the industry", () => {
+    assert.deepEqual(dataFeaturesFor("OFFICE_RENTAL", allPlan), [
+      "properties", "tenants", "contracts", "payments", "debts", "expenses", "tasks",
+    ]);
+    assert.deepEqual(dataFeaturesFor("HOTEL_HOSTEL", allPlan), [
+      "properties", "tenants", "bookings", "payments", "debts", "expenses", "tasks",
+    ]);
+    assert.deepEqual(dataFeaturesFor("CAR_RENTAL", allPlan), [
+      "tenants", "contracts", "vehicles", "vehicle_rentals", "payments", "expenses", "tasks",
+    ]);
+    assert.ok(!dataFeaturesFor("OFFICE_RENTAL", (f) => f !== "tasks").includes("tasks"));
   });
 
   it("plan-disabled features leave the denominator", () => {
@@ -186,8 +277,9 @@ describe("usage analytics: labels", () => {
   it("work share labels and subtitle", () => {
     assert.deepEqual(WORK_SHARE_LABELS, { human: "👤 Odam", ai: "🤖 AI", automation: "⚙️ Avtomatika" });
     assert.equal(
-      usageSubtitle({ periodDays: 30, platformUsage: { usedFeatures: 6, eligibleFeatures: 8, percentage: 75 } }),
-      "Oxirgi 30 kunda 8 ta asosiy funksiyadan 6 tasi ishlatilgan"
+      usageSubtitle({ platformUsage: { scope: "ALL_TIME", usedFeatures: 6, eligibleFeatures: 8, percentage: 75 } }),
+      "Barcha vaqt bo‘yicha 8 ta asosiy funksiyadan 6 tasi ishlatilgan"
     );
+    assert.equal(periodLabel(30), "Oxirgi 30 kun");
   });
 });

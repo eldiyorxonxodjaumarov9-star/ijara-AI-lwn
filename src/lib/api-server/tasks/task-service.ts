@@ -227,6 +227,18 @@ export function taskActionKeyboard(status: WorkTaskStatus, taskId: string) {
 }
 
 export async function notifyEmployeeTaskAssigned(taskId: string) {
+  // Prefer independent attendance bot → group (does not use TELEGRAM_BOT_TOKEN).
+  const { isAttendanceBotConfigured, attendanceGroupId } = await import(
+    "@/lib/api-server/attendance-bot/config"
+  );
+  if (isAttendanceBotConfigured() && attendanceGroupId()) {
+    const { notifyTaskViaAttendanceGroup } = await import(
+      "@/lib/api-server/attendance-bot/task-notify"
+    );
+    return notifyTaskViaAttendanceGroup(taskId);
+  }
+
+  // Legacy personal-chat delivery via main Ijara AI bot only when attendance is off.
   const task = await getTaskById(taskId);
   if (!task) return { ok: false, error: "Vazifa topilmadi" };
   const chatId = task.assignedEmployee.telegramChatId;

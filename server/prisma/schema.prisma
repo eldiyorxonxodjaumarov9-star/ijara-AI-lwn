@@ -1,4 +1,4 @@
-// ArendaHub — Enterprise Property Management SaaS
+﻿// ArendaHub — Enterprise Property Management SaaS
 // Prisma schema (PostgreSQL)
 
 generator client {
@@ -271,6 +271,7 @@ model User {
   auditLogs            AuditLog[]
   telegramAdminDevices TelegramAdminDevice[]
   tasksCreated         WorkTask[]             @relation("TaskCreatedBy")
+  tasksDeleted         WorkTask[]             @relation("TaskDeletedBy")
   taskReviews          WorkTaskReport[]       @relation("TaskReportReviewedBy")
   taskStatusEvents     WorkTaskStatusEvent[]  @relation("TaskStatusActor")
   ttlockConnections    TtlockConnection[]
@@ -1484,6 +1485,9 @@ model WorkTask {
   failureReason       String?
   cancelledAt         DateTime?
   cancelReason        String?
+  /// Soft-delete: hidden from active lists; status history kept for audit.
+  deletedAt           DateTime?
+  deletedByUserId     String?
   telegramDelivery    WorkTaskTelegramDelivery @default(PENDING)
   telegramLastError   String?
   telegramMessageId   String?
@@ -1493,6 +1497,7 @@ model WorkTask {
   workspace        Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   assignedEmployee Employee              @relation(fields: [assignedEmployeeId], references: [id], onDelete: Restrict)
   createdBy        User                  @relation("TaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  deletedBy        User?                 @relation("TaskDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
   reports          WorkTaskReport[]
   statusEvents     WorkTaskStatusEvent[]
 
@@ -1505,6 +1510,7 @@ model WorkTask {
   @@index([priority])
   @@index([telegramDelivery])
   @@index([createdAt])
+  @@index([deletedAt])
   @@map("work_tasks")
 }
 

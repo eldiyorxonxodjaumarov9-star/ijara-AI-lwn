@@ -53,7 +53,9 @@ export const ACTIVITY_ACTIONS = {
   DEBT_WRITE_OFF: { actor: "HUMAN", feature: "debts", work: true },
   EXPENSE_CREATE: { actor: "HUMAN", feature: "expenses", work: true },
   TASK_CREATE: { actor: "HUMAN", feature: "tasks", work: true },
+  TASK_UPDATE: { actor: "HUMAN", feature: "tasks", work: true },
   TASK_COMPLETE: { actor: "HUMAN", feature: "tasks", work: true },
+  TASK_DELETE: { actor: "HUMAN", feature: "tasks", work: true },
   REPORT_VIEW: { actor: "HUMAN", feature: "reports", work: false },
 
   AI_CUSTOMER_RESPONSE: { actor: "AI", feature: "ai_customer_chat", work: true },

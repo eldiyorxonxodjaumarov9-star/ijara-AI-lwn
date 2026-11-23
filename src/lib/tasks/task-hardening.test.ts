@@ -35,7 +35,10 @@ describe("task status transitions", () => {
     ["IN_PROGRESS", "CANCELLED", "USER"],
     ["SUBMITTED", "COMPLETED", "USER"],
     ["SUBMITTED", "IN_PROGRESS", "USER"],
+    ["SUBMITTED", "CANCELLED", "USER"],
     ["NOT_COMPLETED", "IN_PROGRESS", "USER"],
+    ["NOT_COMPLETED", "CANCELLED", "USER"],
+    ["CANCELLED", "IN_PROGRESS", "USER"],
   ];
 
   for (const [from, to, actor] of okPairs) {
@@ -60,11 +63,21 @@ describe("task status transitions", () => {
     );
   });
 
-  it("blocks CANCELLED employee changes", () => {
+  it("blocks CANCELLED employee reopen", () => {
     assert.throws(() =>
       assertTaskTransition({
         from: "CANCELLED",
         to: "IN_PROGRESS",
+        actor: "EMPLOYEE",
+      })
+    );
+  });
+
+  it("blocks employee cancel", () => {
+    assert.throws(() =>
+      assertTaskTransition({
+        from: "NEW",
+        to: "CANCELLED",
         actor: "EMPLOYEE",
       })
     );

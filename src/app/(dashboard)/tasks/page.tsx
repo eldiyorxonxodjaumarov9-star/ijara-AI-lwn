@@ -5,11 +5,14 @@ import {
   CheckCircle2,
   ClipboardList,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
   Send,
+  Trash2,
+  UserRound,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +21,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/pagination";
 import { TaskDialog } from "@/components/tasks/task-dialog";
+import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -39,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/context/auth-context";
 import { useCollection } from "@/hooks/use-collection";
 import { apiFetch, apiFetchBlob, isApiConfigured } from "@/lib/api/client";
 import type { Employee, WorkTask, WorkTaskStatus } from "@/types";
@@ -55,6 +61,8 @@ type ListResponse = {
 };
 
 export default function TasksPage() {
+  const { user } = useAuth();
+  const canSoftDelete = user?.role === "admin";
   const { data: employees } = useCollection<Employee>("employees");
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<WorkTask[]>([]);
@@ -72,6 +80,8 @@ export default function TasksPage() {
   const [selected, setSelected] = useState<WorkTask | null>(null);
   const [returnComment, setReturnComment] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [editMode, setEditMode] = useState<"edit" | "reassign" | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!isApiConfigured) {
@@ -117,23 +127,73 @@ export default function TasksPage() {
 
   async function runAction(
     taskId: string,
-    action: "approve" | "return" | "cancel" | "resend_telegram",
+    action: "approve" | "return" | "cancel" | "resend_telegram" | "reopen",
     extra?: { comment?: string; reason?: string }
   ) {
     setActionLoading(true);
     try {
-      const res = await apiFetch<WorkTask | { task?: WorkTask }>(
-        `/tasks/${taskId}`,
-        {
-          method: "POST",
-          body: JSON.stringify({ action, ...extra }),
+      // apiFetch already JSON.stringifies the body — do not pre-stringify.
+      const res = await apiFetch<
+        WorkTask | { task?: WorkTask; telegramDelivery?: string; telegramError?: string | null }
+      >(`/tasks/${taskId}`, {
+        method: "POST",
+        body: { action, ...extra },
+      });
+      if (action === "resend_telegram") {
+        const delivery =
+          res && typeof res === "object" && "telegramDelivery" in res
+            ? res.telegramDelivery
+            : null;
+        const errMsg =
+          res && typeof res === "object" && "telegramError" in res
+            ? res.telegramError
+            : null;
+        if (delivery === "FAILED") {
+          toast.warning(
+            errMsg
+              ? `Telegramga yuborilmadi: ${errMsg}`
+              : "Telegramga yuborilmadi"
+          );
+        } else {
+          toast.success("Telegramga yuborildi");
         }
+        const task =
+          res && typeof res === "object" && "task" in res && res.task
+            ? res.task
+            : null;
+        if (task) setSelected(task);
+        await load();
+        return;
+      }
+      toast.success(
+        action === "cancel"
+          ? "Vazifa bekor qilindi"
+          : action === "reopen"
+            ? "Vazifa qayta ochildi"
+            : "Saqlandi"
       );
-      toast.success("Saqlandi");
       setSelected(null);
       setReturnComment("");
       await load();
-      void res;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Xatolik");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function confirmSoftDelete() {
+    if (!selected) return;
+    setActionLoading(true);
+    try {
+      await apiFetch(`/tasks/${selected.id}`, {
+        method: "DELETE",
+        body: { reason: "Admin soft-delete" },
+      });
+      toast.success("Vazifa o‘chirildi");
+      setDeleteConfirmOpen(false);
+      setSelected(null);
+      await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Xatolik");
     } finally {
@@ -402,9 +462,15 @@ export default function TasksPage() {
                   </p>
                 ) : null}
                 {selected.telegramDelivery === "FAILED" ? (
-                  <p className="text-destructive">
-                    Telegramga yuborilmadi: {selected.telegramLastError}
-                  </p>
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-destructive">
+                    <p className="font-medium">Telegramga yuborilmadi</p>
+                    <p className="mt-1 text-xs">
+                      {selected.telegramLastError || "Xodim Telegramga bog‘lanmagan"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Bu vazifa saqlangan — Telegram xatosi amallarni to‘xtatmaydi.
+                    </p>
+                  </div>
                 ) : null}
 
                 {selected.reports?.[0] ? (
@@ -442,12 +508,17 @@ export default function TasksPage() {
 
                 <div className="space-y-1">
                   <p className="font-medium">Tarix</p>
-                  {(selected.statusEvents ?? []).slice(0, 10).map((ev) => (
-                    <p key={ev.id} className="text-xs text-muted-foreground">
-                      {ev.fromStatus ?? "—"} → {ev.toStatus}
-                      {ev.comment ? ` · ${ev.comment}` : ""} · {ev.source}
-                    </p>
-                  ))}
+                  {(selected.statusEvents ?? []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Tarix yo‘q</p>
+                  ) : (
+                    (selected.statusEvents ?? []).map((ev) => (
+                      <p key={ev.id} className="text-xs text-muted-foreground">
+                        {new Date(ev.createdAt).toLocaleString("uz-UZ")} ·{" "}
+                        {ev.fromStatus ?? "—"} → {ev.toStatus}
+                        {ev.comment ? ` · ${ev.comment}` : ""} · {ev.source}
+                      </p>
+                    ))
+                  )}
                 </div>
 
                 {selected.status === "SUBMITTED" ? (
@@ -483,7 +554,27 @@ export default function TasksPage() {
                   </div>
                 ) : null}
 
-                <DialogFooter className="flex-wrap gap-2 sm:justify-start">
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-start">
+                  {selected.status !== "COMPLETED" ? (
+                    <Button
+                      variant="outline"
+                      disabled={actionLoading}
+                      onClick={() => setEditMode("edit")}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Tahrirlash
+                    </Button>
+                  ) : null}
+                  {selected.status !== "COMPLETED" ? (
+                    <Button
+                      variant="outline"
+                      disabled={actionLoading}
+                      onClick={() => setEditMode("reassign")}
+                    >
+                      <UserRound className="mr-2 h-4 w-4" />
+                      Boshqa xodimga berish
+                    </Button>
+                  ) : null}
                   {selected.telegramDelivery === "FAILED" ||
                   selected.telegramDelivery === "PENDING" ? (
                     <Button
@@ -495,6 +586,17 @@ export default function TasksPage() {
                     >
                       <Send className="mr-2 h-4 w-4" />
                       Telegramga qayta yuborish
+                    </Button>
+                  ) : null}
+                  {selected.status === "CANCELLED" ||
+                  selected.status === "NOT_COMPLETED" ? (
+                    <Button
+                      variant="secondary"
+                      disabled={actionLoading}
+                      onClick={() => void runAction(selected.id, "reopen")}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Qayta ochish
                     </Button>
                   ) : null}
                   {selected.status !== "COMPLETED" &&
@@ -512,10 +614,67 @@ export default function TasksPage() {
                       Bekor qilish
                     </Button>
                   ) : null}
+                  {canSoftDelete ? (
+                    <Button
+                      variant="destructive"
+                      disabled={actionLoading}
+                      onClick={() => setDeleteConfirmOpen(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      O‘chirish
+                    </Button>
+                  ) : null}
                 </DialogFooter>
               </div>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <TaskEditDialog
+        open={Boolean(editMode && selected)}
+        onOpenChange={(o) => {
+          if (!o) setEditMode(null);
+        }}
+        task={selected}
+        employees={activeEmployees}
+        mode={editMode ?? "edit"}
+        onSaved={(task) => {
+          setSelected(task);
+          void load();
+        }}
+      />
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vazifani o‘chirish</DialogTitle>
+            <DialogDescription>
+              Vazifa aktiv ro‘yxatdan yo‘qoladi. Audit uchun soft-delete bilan
+              saqlanadi. Bekor qilishdan farqli — qayta ochish tugmasi yo‘qoladi.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={actionLoading}
+            >
+              Bekor
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={actionLoading}
+              onClick={() => void confirmSoftDelete()}
+            >
+              {actionLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Ha, o‘chirish
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

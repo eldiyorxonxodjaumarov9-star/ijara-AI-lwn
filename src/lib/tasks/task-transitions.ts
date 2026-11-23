@@ -1,13 +1,13 @@
 import type { WorkTaskStatus } from "@prisma/client";
 
-/** Allowed status transitions. Admin reopen: NOT_COMPLETED → IN_PROGRESS */
+/** Allowed status transitions. Admin reopen: NOT_COMPLETED/CANCELLED → IN_PROGRESS */
 const ALLOWED: Record<WorkTaskStatus, WorkTaskStatus[]> = {
   NEW: ["IN_PROGRESS", "NOT_COMPLETED", "CANCELLED"],
   IN_PROGRESS: ["SUBMITTED", "NOT_COMPLETED", "CANCELLED"],
-  SUBMITTED: ["COMPLETED", "IN_PROGRESS"],
+  SUBMITTED: ["COMPLETED", "IN_PROGRESS", "CANCELLED"],
   COMPLETED: [],
-  NOT_COMPLETED: ["IN_PROGRESS"],
-  CANCELLED: [],
+  NOT_COMPLETED: ["IN_PROGRESS", "CANCELLED"],
+  CANCELLED: ["IN_PROGRESS"],
 };
 
 export function assertTaskTransition(opts: {
@@ -22,13 +22,21 @@ export function assertTaskTransition(opts: {
       { status: 400 }
     );
   }
-  if (opts.from === "NOT_COMPLETED" && opts.to === "IN_PROGRESS") {
+  if (
+    (opts.from === "NOT_COMPLETED" || opts.from === "CANCELLED") &&
+    opts.to === "IN_PROGRESS"
+  ) {
     if (opts.actor !== "USER") {
       throw Object.assign(
         new Error("Faqat admin/menejer vazifani qayta ochishi mumkin"),
         { status: 403 }
       );
     }
+  }
+  if (opts.to === "CANCELLED" && opts.actor === "EMPLOYEE") {
+    throw Object.assign(new Error("Faqat admin/menejer bekor qilishi mumkin"), {
+      status: 403,
+    });
   }
   if (
     (opts.from === "COMPLETED" || opts.from === "CANCELLED") &&

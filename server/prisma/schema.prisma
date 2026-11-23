@@ -353,6 +353,9 @@ model Workspace {
   agentRuns          AgentRun[]
   agentActionAudits  AgentActionAudit[]
   agentSettings      AgentSettings?
+  attendanceBotLinks AttendanceBotLink[]
+  attendanceCheckIns AttendanceCheckIn[]
+  attendanceAuditLogs AttendanceAuditLog[]
 
   @@index([isInternal])
   @@map("workspaces")
@@ -869,6 +872,8 @@ model Employee {
   expenses Expense[]
   tasks    WorkTask[]
   taskReports WorkTaskReport[]
+  attendanceLinks    AttendanceBotLink[]
+  attendanceCheckIns AttendanceCheckIn[]
 
   @@unique([phone])
   @@index([workspaceId])
@@ -2214,4 +2219,117 @@ model PlatformAdmin {
   updatedAt    DateTime  @updatedAt
 
   @@map("platform_admins")
+}
+
+// ===================== Ijara Attendance Bot (MUSTAQIL — asosiy Telegram botdan alohida) =====================
+
+enum AttendanceCheckInStatus {
+  KELDI
+  KETDI
+}
+
+/** Admin tasdiqlamaguncha Telegramdan avtomatik yaratilgan profil. */
+enum AttendanceProfileStatus {
+  UNVERIFIED
+  VERIFIED
+  REJECTED
+}
+
+/**
+ * Davomat botiga biriktirilgan xodim.
+ * Employee.telegramChatId (asosiy bot) ga tegmaydi — alohida chatId.
+ * Telefon/kontakt talab qilinmaydi: guruh selfisi orqali avtomatik ulanadi.
+ */
+model AttendanceBotLink {
+  id                  String                  @id @default(uuid())
+  workspaceId         String
+  employeeId          String
+  telegramUserId      String                  @unique
+  telegramChatId      String
+  telegramUsername    String?
+  telegramDisplayName String?
+  /** UNVERIFIED = faqat Telegram profili; VERIFIED = admin employee bilan birlashtirgan */
+  profileStatus       AttendanceProfileStatus @default(UNVERIFIED)
+  phone               String?
+  verifiedAt          DateTime?
+  verifiedByUserId    String?
+  rejectedAt          DateTime?
+  rejectedByUserId    String?
+  rejectReason        String?
+  registeredAt        DateTime                @default(now())
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  checkIns  AttendanceCheckIn[]
+
+  @@unique([employeeId, workspaceId])
+  @@index([workspaceId])
+  @@index([telegramChatId])
+  @@index([profileStatus])
+  @@map("attendance_bot_links")
+}
+
+model AttendanceCheckIn {
+  id                 String                   @id @default(uuid())
+  workspaceId        String
+  employeeId         String
+  linkId             String
+  /** Toshkent kalendar kuni YYYY-MM-DD */
+  workDate           String
+  status             AttendanceCheckInStatus  @default(KELDI)
+  /** Profil VERIFIED bo‘lmaguncha UNVERIFIED */
+  verificationStatus AttendanceProfileStatus  @default(UNVERIFIED)
+  selfieFileId       String
+  selfieUniqueId     String?
+  telegramMessageId  String?
+  /** Private storage key (Blob pathname or local relative path). Never a Telegram URL. */
+  selfieStorageKey   String?
+  /** Private Blob URL (server-only). Never returned to clients. */
+  selfieStorageUrl   String?
+  selfieMimeType     String?
+  selfieByteSize     Int?
+  selfieFetchedAt    DateTime?
+  /** Asia/Tashkent ketish vaqti (status=KETDI) */
+  leftAt             DateTime?
+  notes              String?
+  createdAt          DateTime                 @default(now())
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  employee  Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  link      AttendanceBotLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, workDate])
+  @@index([workspaceId, workDate])
+  @@index([linkId])
+  @@index([verificationStatus])
+  @@index([createdAt])
+  @@map("attendance_check_ins")
+}
+
+model AttendanceAuditLog {
+  id          String   @id @default(uuid())
+  workspaceId String
+  actorUserId String?
+  action      String
+  linkId      String?
+  employeeId  String?
+  checkInId   String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([linkId])
+  @@map("attendance_audit_logs")
+}
+
+/** Idempotent update processing for the attendance bot only. */
+model AttendanceBotProcessedUpdate {
+  updateId  BigInt   @id
+  createdAt DateTime @default(now())
+
+  @@map("attendance_bot_processed_updates")
 }

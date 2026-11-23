@@ -10,7 +10,7 @@
  *   - Mutate allowed on operational resources: tenants, contracts, maintenance,
  *     notifications, properties, clients, vehicles, bookings (POST/PATCH/PUT/DELETE)
  *   - NO finance mutate: payments & expenses — GET only (no POST/PATCH/PUT/DELETE)
- *   - NO employees resource (any method)
+ *   - NO employees or attendance resources (any method)
  *   - tasks: GET only (managers/admins manage tasks)
  */
 import type { Role, User } from "@prisma/client";
@@ -48,6 +48,7 @@ export type RbacResource =
   | "notifications"
   | "properties"
   | "employees"
+  | "attendance"
   | "clients"
   | "tasks"
   | "vehicles"
@@ -64,6 +65,7 @@ const ALL_RESOURCES: readonly RbacResource[] = [
   "notifications",
   "properties",
   "employees",
+  "attendance",
   "clients",
   "tasks",
   "vehicles",
@@ -168,8 +170,8 @@ export function canAccessResource(
 
   if (role !== "EMPLOYEE") return false;
 
-  // EMPLOYEE: no employees resource at all
-  if (resource === "employees") return false;
+  // EMPLOYEE: no employees / attendance resources at all
+  if (resource === "employees" || resource === "attendance") return false;
 
   if (method === "GET") {
     return EMPLOYEE_GET_RESOURCES.has(resource);

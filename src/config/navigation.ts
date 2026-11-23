@@ -5,6 +5,7 @@ import {
   Bell,
   Bot,
   Building2,
+  ClipboardCheck,
   ClipboardList,
   DoorOpen,
   FileText,
@@ -103,6 +104,12 @@ export const navigation: NavSection[] = [
         titleKey: "nav.tasks",
         href: "/tasks",
         icon: ClipboardList,
+        roles: ["admin", "manager"],
+      },
+      {
+        titleKey: "nav.attendance",
+        href: "/attendance",
+        icon: ClipboardCheck,
         roles: ["admin", "manager"],
       },
       {

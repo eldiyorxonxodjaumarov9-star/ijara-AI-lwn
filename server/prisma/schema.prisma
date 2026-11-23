@@ -1,4 +1,4 @@
-﻿// ArendaHub — Enterprise Property Management SaaS
+// ArendaHub — Enterprise Property Management SaaS
 // Prisma schema (PostgreSQL)
 
 generator client {

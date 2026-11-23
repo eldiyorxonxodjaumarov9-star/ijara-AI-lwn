@@ -103,7 +103,7 @@ export function TaskDialog({
         telegramError?: string | null;
       }>("/tasks", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           title: values.title,
           description: values.description || null,
           unit: values.unit,
@@ -111,7 +111,7 @@ export function TaskDialog({
           priority: values.priority,
           dueAt: values.dueAt || null,
           notifyTelegram: values.notifyTelegram,
-        }),
+        },
       });
       if (res.telegramDelivery === "FAILED") {
         toast.warning(

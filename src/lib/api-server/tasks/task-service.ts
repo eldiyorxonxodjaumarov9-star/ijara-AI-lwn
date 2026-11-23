@@ -92,9 +92,19 @@ async function writeStatusEvent(opts: {
   });
 }
 
-export async function getTaskById(id: string, workspaceId?: string) {
-  return prisma.workTask.findUnique({
-    where: { id, ...(workspaceId ? { workspaceId } : {}) },
+const notDeleted = { deletedAt: null } as const;
+
+export async function getTaskById(
+  id: string,
+  workspaceId?: string,
+  opts?: { includeDeleted?: boolean }
+) {
+  return prisma.workTask.findFirst({
+    where: {
+      id,
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(opts?.includeDeleted ? {} : notDeleted),
+    },
     include: taskInclude,
   });
 }
@@ -271,7 +281,7 @@ export async function listTasks(opts: {
   overdueOnly?: boolean;
   assignedEmployeeId?: string;
 }) {
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { ...notDeleted };
   if (opts.workspaceId) where.workspaceId = opts.workspaceId;
   if (opts.unit) where.unit = opts.unit;
   if (opts.status) where.status = opts.status;
@@ -312,7 +322,10 @@ export async function listTasks(opts: {
 }
 
 export async function getTaskStats(workspaceId?: string) {
-  const wsFilter = workspaceId ? { workspaceId } : {};
+  const wsFilter = {
+    ...notDeleted,
+    ...(workspaceId ? { workspaceId } : {}),
+  };
   const groups = await prisma.workTask.groupBy({
     by: ["status"],
     where: wsFilter,
@@ -648,7 +661,9 @@ export async function cancelTask(opts: {
   reason?: string | null;
   source: WorkTaskSource;
 }) {
-  const task = await prisma.workTask.findUnique({ where: { id: opts.taskId } });
+  const task = await prisma.workTask.findFirst({
+    where: { id: opts.taskId, ...notDeleted },
+  });
   if (!task) throw Object.assign(new Error("Vazifa topilmadi"), { status: 404 });
   assertTaskTransition({
     from: task.status,
@@ -681,14 +696,16 @@ export async function cancelTask(opts: {
   return mapTask(await getTaskById(opts.taskId));
 }
 
-/** Admin/menejer: NOT_COMPLETED → IN_PROGRESS */
+/** Admin/menejer: NOT_COMPLETED | CANCELLED → IN_PROGRESS */
 export async function reopenTask(opts: {
   taskId: string;
   userId: string;
   source: WorkTaskSource;
   comment?: string | null;
 }) {
-  const task = await prisma.workTask.findUnique({ where: { id: opts.taskId } });
+  const task = await prisma.workTask.findFirst({
+    where: { id: opts.taskId, ...notDeleted },
+  });
   if (!task) throw Object.assign(new Error("Vazifa topilmadi"), { status: 404 });
   assertTaskTransition({
     from: task.status,
@@ -703,6 +720,8 @@ export async function reopenTask(opts: {
         status: "IN_PROGRESS",
         notCompletedAt: null,
         failureReason: null,
+        cancelledAt: null,
+        cancelReason: null,
         startedAt: task.startedAt ?? new Date(),
       },
     });
@@ -722,4 +741,161 @@ export async function reopenTask(opts: {
   return mapTask(await getTaskById(opts.taskId));
 }
 
-export { mapTask, writeStatusEvent };
+/** Edit title/description/priority/dueAt and/or reassign employee. Telegram is never a blocker. */
+export async function updateTask(opts: {
+  taskId: string;
+  userId: string;
+  source: WorkTaskSource;
+  workspaceId: string;
+  title?: string;
+  description?: string | null;
+  priority?: WorkTaskPriority;
+  dueAt?: Date | string | null;
+  assignedEmployeeId?: string;
+  notifyTelegram?: boolean;
+}) {
+  const task = await prisma.workTask.findFirst({
+    where: { id: opts.taskId, workspaceId: opts.workspaceId, ...notDeleted },
+  });
+  if (!task) throw Object.assign(new Error("Vazifa topilmadi"), { status: 404 });
+  if (task.status === "COMPLETED") {
+    throw Object.assign(new Error("Bajarilgan vazifani tahrirlab bo‘lmaydi"), {
+      status: 400,
+    });
+  }
+
+  const data: Record<string, unknown> = {};
+  const notes: string[] = [];
+
+  if (opts.title !== undefined) {
+    const title = opts.title.trim();
+    if (title.length < 2) {
+      throw Object.assign(new Error("Sarlavha juda qisqa"), { status: 400 });
+    }
+    if (title !== task.title) {
+      data.title = title;
+      notes.push("sarlavha");
+    }
+  }
+  if (opts.description !== undefined) {
+    const description = opts.description?.trim() || null;
+    if (description !== task.description) {
+      data.description = description;
+      notes.push("tavsif");
+    }
+  }
+  if (opts.priority !== undefined && opts.priority !== task.priority) {
+    data.priority = opts.priority;
+    notes.push("ustuvorlik");
+  }
+  if (opts.dueAt !== undefined) {
+    const dueAt = assertValidTaskDueDate(opts.dueAt ?? null);
+    const prev = task.dueAt?.getTime() ?? null;
+    const next = dueAt?.getTime() ?? null;
+    if (prev !== next) {
+      data.dueAt = dueAt;
+      notes.push("muddat");
+    }
+  }
+
+  let reassigned = false;
+  if (
+    opts.assignedEmployeeId !== undefined &&
+    opts.assignedEmployeeId !== task.assignedEmployeeId
+  ) {
+    const employee = await prisma.employee.findUnique({
+      where: { id: opts.assignedEmployeeId },
+    });
+    if (
+      !employee ||
+      !employee.active ||
+      (employee.workspaceId != null && employee.workspaceId !== opts.workspaceId)
+    ) {
+      throw Object.assign(new Error("Faol xodim topilmadi"), { status: 400 });
+    }
+    data.assignedEmployeeId = opts.assignedEmployeeId;
+    data.telegramDelivery = "PENDING";
+    data.telegramLastError = null;
+    data.telegramMessageId = null;
+    reassigned = true;
+    notes.push("xodim");
+  }
+
+  if (Object.keys(data).length === 0) {
+    return {
+      task: mapTask(await getTaskById(opts.taskId)),
+      telegramDelivery: null as "SENT" | "FAILED" | "PENDING" | null,
+      telegramError: null as string | null,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workTask.update({ where: { id: opts.taskId }, data });
+    await tx.workTaskStatusEvent.create({
+      data: {
+        taskId: opts.taskId,
+        fromStatus: task.status,
+        toStatus: task.status,
+        actorUserId: opts.userId,
+        actorKind: "USER",
+        source: opts.source,
+        comment: reassigned
+          ? `Yangilandi (${notes.join(", ")}); xodim almashtirildi`
+          : `Yangilandi: ${notes.join(", ")}`,
+      },
+    });
+  });
+
+  let telegramDelivery: "SENT" | "FAILED" | "PENDING" | null = null;
+  let telegramError: string | null = null;
+  if (reassigned && opts.notifyTelegram !== false) {
+    const result = await notifyEmployeeTaskAssigned(opts.taskId);
+    telegramDelivery = result.ok ? "SENT" : "FAILED";
+    telegramError = result.error ?? null;
+  }
+
+  return {
+    task: mapTask(await getTaskById(opts.taskId)),
+    telegramDelivery,
+    telegramError,
+  };
+}
+
+/** Soft-delete: hide from active lists; keep rows for audit. Admin only (caller enforces). */
+export async function softDeleteTask(opts: {
+  taskId: string;
+  userId: string;
+  workspaceId: string;
+  source: WorkTaskSource;
+  reason?: string | null;
+}) {
+  const task = await prisma.workTask.findFirst({
+    where: { id: opts.taskId, workspaceId: opts.workspaceId, ...notDeleted },
+  });
+  if (!task) throw Object.assign(new Error("Vazifa topilmadi"), { status: 404 });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workTask.update({
+      where: { id: opts.taskId },
+      data: {
+        deletedAt: new Date(),
+        deletedByUserId: opts.userId,
+      },
+    });
+    await tx.workTaskStatusEvent.create({
+      data: {
+        taskId: opts.taskId,
+        fromStatus: task.status,
+        toStatus: task.status,
+        actorUserId: opts.userId,
+        actorKind: "USER",
+        source: opts.source,
+        comment: opts.reason?.trim() || "Soft-delete: o‘chirildi",
+      },
+    });
+  });
+
+  return { ok: true as const, id: opts.taskId };
+}
+
+export { mapTask, writeStatusEvent, notDeleted };

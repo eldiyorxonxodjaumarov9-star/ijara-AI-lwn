@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   CheckCircle2,
   Download,
@@ -67,36 +67,26 @@ function PropertyContractsPage() {
   const { remove, update } = useCollectionActions<Contract>("contracts");
   const { update: updateProperty } = useCollectionActions<Property>("properties");
   const [syncing, setSyncing] = useState(false);
-  const autoSynced = useRef(false);
   const [finishId, setFinishId] = useState<string | null>(null);
 
-  const runSync = async (silent = false) => {
+  /** Manual only — auto-sync on empty list previously created phantom ACTIVE contracts. */
+  const runSync = async () => {
     if (!isApiConfigured) return;
     setSyncing(true);
     try {
       const count = await syncContractsFromTenantsApi();
       await api.list();
-      if (!silent) {
-        toast.success(
-          count > 0
-            ? `${count} ta shartnoma arendatorlardan yuklandi`
-            : "Shartnomalar yangilandi"
-        );
-      }
+      toast.success(
+        count > 0
+          ? `${count} ta ochiq shartnoma yangilandi`
+          : "Yangilanishi kerak bo‘lgan ochiq shartnoma yo‘q"
+      );
     } catch {
-      if (!silent) toast.error("Sinxronlash xatosi");
+      toast.error("Sinxronlash xatosi");
     } finally {
       setSyncing(false);
     }
   };
-
-  useEffect(() => {
-    if (!isApiConfigured || loading || autoSynced.current) return;
-    if (data.length === 0) {
-      autoSynced.current = true;
-      void runSync(true);
-    }
-  }, [loading, data.length]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);

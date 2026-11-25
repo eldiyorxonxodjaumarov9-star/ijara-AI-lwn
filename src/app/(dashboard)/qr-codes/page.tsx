@@ -291,6 +291,38 @@ export default function QrCodesPage() {
     }
   }
 
+  async function svgBlobToPngBlob(svgBlob: Blob) {
+    const svgText = await svgBlob.text();
+    const svgUrl = URL.createObjectURL(
+      new Blob([svgText], { type: "image/svg+xml;charset=utf-8" })
+    );
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("SVG render xato"));
+        el.src = svgUrl;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || 1240;
+      canvas.height = img.naturalHeight || 1748;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas mavjud emas");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      const png = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("PNG yaratilmadi"))),
+          "image/png"
+        );
+      });
+      return png;
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
+  }
+
   async function downloadOne(
     qr: QrItem,
     format: "png" | "svg" | "raw-png" | "raw-svg"
@@ -300,8 +332,11 @@ export default function QrCodesPage() {
       return;
     }
     try {
-      const blob = await apiFetchBlob(`/qr-codes/${qr.id}?format=${format}`);
-      const url = URL.createObjectURL(blob);
+      const apiFormat = format === "png" ? "svg" : format;
+      const blob = await apiFetchBlob(`/qr-codes/${qr.id}?format=${apiFormat}`);
+      const outBlob =
+        format === "png" ? await svgBlobToPngBlob(blob) : blob;
+      const url = URL.createObjectURL(outBlob);
       const a = document.createElement("a");
       a.href = url;
       const suffix =
@@ -329,7 +364,8 @@ export default function QrCodesPage() {
     try {
       const zip = new JSZip();
       for (const qr of codes) {
-        const blob = await apiFetchBlob(`/qr-codes/${qr.id}?format=png`);
+        const svgBlob = await apiFetchBlob(`/qr-codes/${qr.id}?format=svg`);
+        const pngBlob = await svgBlobToPngBlob(svgBlob);
         const room = resolveQrRoomLabel({
           roomNumber: qr.roomNumber,
           locationLabel: qr.locationLabel,
@@ -337,7 +373,7 @@ export default function QrCodesPage() {
         }).replace(/[^\w.-]+/g, "_");
         zip.file(
           `${String(qr.codeIndex).padStart(2, "0")}_${room}_print.png`,
-          blob
+          pngBlob
         );
       }
       const out = await zip.generateAsync({ type: "blob" });

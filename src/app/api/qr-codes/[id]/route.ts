@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 
 import {
-  generatePrintCardPng,
-  generatePrintCardSvg,
-  generateRawQrPng,
-  generateRawQrSvg,
+  buildPrintCardSvg,
+  buildRawQrPng,
+  buildRawQrSvg,
+} from "@/lib/api-server/qr-feedback/print-card";
+import {
   mapQrForAdmin,
   updateQrCode,
 } from "@/lib/api-server/qr-feedback/service";
@@ -85,20 +86,23 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const base = safeFileBase(row.name);
 
   try {
-    if (format === "svg" || format === "print-svg") {
-      const svg = await generatePrintCardSvg(fields);
+    if (format === "svg" || format === "print-svg" || format === "png" || format === "print-png") {
+      // Print PNG is produced client-side from this SVG (avoids sharp on Vercel).
+      const svg = await buildPrintCardSvg(fields);
+      const asPngHint = format === "png" || format === "print-png";
       return new Response(svg, {
         status: 200,
         headers: {
           "Content-Type": "image/svg+xml; charset=utf-8",
           "Cache-Control": "private, max-age=30",
+          "X-Ijara-Print-Format": asPngHint ? "svg-for-png" : "svg",
           "Content-Disposition": `attachment; filename="${base}_print.svg"`,
         },
       });
     }
 
     if (format === "raw-svg") {
-      const svg = await generateRawQrSvg(row.publicToken);
+      const svg = await buildRawQrSvg(row.publicToken);
       return new Response(svg, {
         status: 200,
         headers: {
@@ -110,7 +114,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     }
 
     if (format === "raw" || format === "raw-png") {
-      const bytes = await generateRawQrPng(row.publicToken);
+      const bytes = await buildRawQrPng(row.publicToken);
       return new Response(new Uint8Array(bytes), {
         status: 200,
         headers: {
@@ -121,15 +125,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       });
     }
 
-    const bytes = await generatePrintCardPng(fields);
-    return new Response(new Uint8Array(bytes), {
-      status: 200,
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "private, max-age=30",
-        "Content-Disposition": `attachment; filename="${base}_print.png"`,
-      },
-    });
+    return fail("Noto‘g‘ri format", 400);
   } catch (err) {
     const status =
       err && typeof err === "object" && "status" in err

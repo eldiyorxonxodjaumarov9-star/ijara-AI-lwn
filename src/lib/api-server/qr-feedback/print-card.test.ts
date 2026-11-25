@@ -12,11 +12,8 @@ import {
   resolveQrRoomLabel,
   defaultQrName,
 } from "./constants";
-import {
-  buildPrintCardPng,
-  buildPrintCardSvg,
-  wrapPrintText,
-} from "./print-card";
+import { buildPrintCardPng } from "./print-card-png";
+import { buildPrintCardSvg, wrapPrintText } from "./print-card";
 
 describe("resolveQrRoomLabel", () => {
   it("prefers roomNumber over location and name", () => {

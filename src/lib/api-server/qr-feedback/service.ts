@@ -18,12 +18,6 @@ import {
   persistFeedbackPhoto,
 } from "@/lib/api-server/qr-feedback/media";
 import {
-  buildPrintCardPng,
-  buildPrintCardSvg,
-  buildRawQrPng,
-  buildRawQrSvg,
-} from "@/lib/api-server/qr-feedback/print-card";
-import {
   feedbackPublicUrlForToken,
   inspectQrPublicOrigin,
 } from "@/lib/api-server/qr-feedback/public-origin";
@@ -112,34 +106,6 @@ export async function updateQrCode(opts: {
       ...(opts.active !== undefined ? { active: opts.active } : {}),
     },
   });
-}
-
-export async function generatePrintCardPng(fields: {
-  publicToken: string;
-  name: string;
-  roomNumber?: string | null;
-  locationLabel?: string | null;
-  printInstruction?: string | null;
-}) {
-  return buildPrintCardPng(fields);
-}
-
-export async function generatePrintCardSvg(fields: {
-  publicToken: string;
-  name: string;
-  roomNumber?: string | null;
-  locationLabel?: string | null;
-  printInstruction?: string | null;
-}) {
-  return buildPrintCardSvg(fields);
-}
-
-export async function generateRawQrPng(token: string) {
-  return buildRawQrPng(token);
-}
-
-export async function generateRawQrSvg(token: string) {
-  return buildRawQrSvg(token);
 }
 
 export async function getQrDashboardStats(workspaceId: string) {

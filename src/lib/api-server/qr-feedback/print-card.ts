@@ -1,9 +1,9 @@
 /**
- * Print-ready A6 QR card (SVG + PNG via sharp).
+ * Print-ready A6 QR card (SVG + raw QR).
+ * Sharp is intentionally NOT imported here so public feedback routes stay light.
  * Tokens / public URLs are never modified here.
  */
 import QRCode from "qrcode";
-import sharp from "sharp";
 
 import {
   DEFAULT_PRINT_INSTRUCTION,
@@ -129,11 +129,4 @@ export async function buildPrintCardSvg(fields: QrPrintFields) {
   <text text-anchor="middle" font-family="Segoe UI, Arial, DejaVu Sans, sans-serif" font-size="40" font-weight="600" fill="${MUTED}">${instructionTspans}</text>
   <text x="${w / 2}" y="${h - 110}" text-anchor="middle" font-family="Segoe UI, Arial, DejaVu Sans, sans-serif" font-size="28" fill="${MUTED}">${escapeXml(PRINT_CARD_FOOTER)}</text>
 </svg>`;
-}
-
-export async function buildPrintCardPng(fields: QrPrintFields) {
-  const svg = await buildPrintCardSvg(fields);
-  return sharp(Buffer.from(svg, "utf8"), { density: 300 })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
 }

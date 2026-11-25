@@ -20,6 +20,8 @@ const NEST_API_SEGMENTS = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Allow phone / LAN QR testing against this machine's Wi‑Fi IP in `next dev`.
+  allowedDevOrigins: ["192.168.0.109", "127.0.0.1", "localhost"],
   images: {
     remotePatterns: [
       {

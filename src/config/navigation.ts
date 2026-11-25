@@ -11,6 +11,7 @@ import {
   FileText,
   LayoutDashboard,
   MessageSquareText,
+  QrCode,
   Receipt,
   Settings,
   UserCog,
@@ -110,6 +111,12 @@ export const navigation: NavSection[] = [
         titleKey: "nav.attendance",
         href: "/attendance",
         icon: ClipboardCheck,
+        roles: ["admin", "manager"],
+      },
+      {
+        titleKey: "nav.qrCodes",
+        href: "/qr-codes",
+        icon: QrCode,
         roles: ["admin", "manager"],
       },
       {

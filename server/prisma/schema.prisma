@@ -356,6 +356,8 @@ model Workspace {
   attendanceBotLinks AttendanceBotLink[]
   attendanceCheckIns AttendanceCheckIn[]
   attendanceAuditLogs AttendanceAuditLog[]
+  feedbackQrCodes     FeedbackQrCode[]
+  cleanlinessFeedbacks CleanlinessFeedback[]
 
   @@index([isInternal])
   @@map("workspaces")
@@ -2332,4 +2334,108 @@ model AttendanceBotProcessedUpdate {
   createdAt DateTime @default(now())
 
   @@map("attendance_bot_processed_updates")
+}
+
+// ===================== QR cleanliness feedback =====================
+
+enum CleanlinessRating {
+  VERY_BAD
+  BAD
+  AVERAGE
+  GOOD
+  EXCELLENT
+}
+
+enum CleanlinessFeedbackStatus {
+  NEW
+  IN_REVIEW
+  RESOLVED
+}
+
+enum CleanlinessFeedbackTelegramDelivery {
+  PENDING
+  SENT
+  FAILED
+}
+
+model FeedbackQrCode {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  /** Stable slot 1–32 within workspace. Tokens never rotate on re-ensure. */
+  codeIndex      Int
+  name           String
+  locationLabel  String?
+  publicToken    String   @unique
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  feedbacks CleanlinessFeedback[]
+
+  @@unique([workspaceId, codeIndex])
+  @@index([workspaceId, active])
+  @@map("feedback_qr_codes")
+}
+
+model CleanlinessFeedback {
+  id           String                     @id @default(uuid())
+  workspaceId  String
+  qrCodeId     String
+  rating       CleanlinessRating
+  ratingValue  Int
+  comment      String?
+  status       CleanlinessFeedbackStatus  @default(NEW)
+  clientIpHash String?
+  userAgent    String?
+  /** Telegram group delivery — independent of form success. */
+  telegramDelivery   CleanlinessFeedbackTelegramDelivery @default(PENDING)
+  telegramMessageId  String?
+  telegramLastError  String?
+  telegramNotifiedAt DateTime?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  workspace Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  qrCode    FeedbackQrCode             @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  photos    CleanlinessFeedbackPhoto[]
+  events    FeedbackStatusEvent[]
+
+  @@index([workspaceId, createdAt])
+  @@index([qrCodeId, createdAt])
+  @@index([status])
+  @@index([ratingValue])
+  @@index([telegramDelivery])
+  @@map("cleanliness_feedbacks")
+}
+
+model CleanlinessFeedbackPhoto {
+  id          String   @id @default(uuid())
+  feedbackId  String
+  storageKey  String
+  /** Private Blob URL — server-only, never returned to clients. */
+  storageUrl  String?
+  mimeType    String
+  byteSize    Int
+  createdAt   DateTime @default(now())
+
+  feedback CleanlinessFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@index([feedbackId])
+  @@map("cleanliness_feedback_photos")
+}
+
+model FeedbackStatusEvent {
+  id          String                    @id @default(uuid())
+  feedbackId  String
+  fromStatus  CleanlinessFeedbackStatus?
+  toStatus    CleanlinessFeedbackStatus
+  actorUserId String?
+  comment     String?
+  createdAt   DateTime                  @default(now())
+
+  feedback CleanlinessFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@index([feedbackId, createdAt])
+  @@map("feedback_status_events")
 }

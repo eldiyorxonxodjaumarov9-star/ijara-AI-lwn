@@ -27,6 +27,10 @@
     {
       "path": "/api/cron/ai-employees-daily",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/qr-feedback-telegram",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

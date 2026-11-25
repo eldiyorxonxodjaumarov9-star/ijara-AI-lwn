@@ -36,14 +36,117 @@ export async function attendanceSendMessage(
   text: string,
   extra?: Record<string, unknown>
 ) {
-  if (!isAttendanceBotConfigured()) return false;
-  await request("sendMessage", {
+  if (!isAttendanceBotConfigured()) return null;
+  const result = await request<{ message_id: number }>("sendMessage", {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
     ...extra,
   });
-  return true;
+  return result;
+}
+
+/** Multipart sendPhoto — token never logged. */
+export async function attendanceSendPhotoBuffer(opts: {
+  chatId: string | number;
+  buffer: Buffer;
+  mimeType: string;
+  filename?: string;
+  caption?: string;
+}) {
+  if (!isAttendanceBotConfigured()) return null;
+  const form = new FormData();
+  form.append("chat_id", String(opts.chatId));
+  if (opts.caption) {
+    form.append("caption", opts.caption.slice(0, 1024));
+    form.append("parse_mode", "HTML");
+  }
+  const ext =
+    opts.mimeType === "image/png"
+      ? "png"
+      : opts.mimeType === "image/webp"
+        ? "webp"
+        : "jpg";
+  form.append(
+    "photo",
+    new Blob([new Uint8Array(opts.buffer)], { type: opts.mimeType }),
+    opts.filename || `photo.${ext}`
+  );
+  const res = await fetch(
+    `${TELEGRAM_API}/bot${requireToken()}/sendPhoto`,
+    { method: "POST", body: form }
+  );
+  const data = (await res.json()) as {
+    ok: boolean;
+    description?: string;
+    result?: { message_id: number };
+  };
+  if (!data.ok) {
+    throw new Error(data.description ?? "Attendance sendPhoto xatosi");
+  }
+  return data.result ?? null;
+}
+
+/** Media group (2–10 photos). Caption on the first item only. */
+export async function attendanceSendPhotoGroup(opts: {
+  chatId: string | number;
+  photos: Array<{ buffer: Buffer; mimeType: string; filename?: string }>;
+  caption?: string;
+}) {
+  if (!isAttendanceBotConfigured()) return [];
+  if (opts.photos.length === 0) return [];
+  if (opts.photos.length === 1) {
+    const one = await attendanceSendPhotoBuffer({
+      chatId: opts.chatId,
+      buffer: opts.photos[0].buffer,
+      mimeType: opts.photos[0].mimeType,
+      filename: opts.photos[0].filename,
+      caption: opts.caption,
+    });
+    return one ? [one.message_id] : [];
+  }
+
+  const form = new FormData();
+  form.append("chat_id", String(opts.chatId));
+  const media = opts.photos.map((p, i) => {
+    const item: Record<string, unknown> = {
+      type: "photo",
+      media: `attach://qrphoto${i}`,
+    };
+    if (i === 0 && opts.caption) {
+      item.caption = opts.caption.slice(0, 1024);
+      item.parse_mode = "HTML";
+    }
+    return item;
+  });
+  form.append("media", JSON.stringify(media));
+  opts.photos.forEach((p, i) => {
+    const ext =
+      p.mimeType === "image/png"
+        ? "png"
+        : p.mimeType === "image/webp"
+          ? "webp"
+          : "jpg";
+    form.append(
+      `qrphoto${i}`,
+      new Blob([new Uint8Array(p.buffer)], { type: p.mimeType }),
+      p.filename || `photo${i}.${ext}`
+    );
+  });
+
+  const res = await fetch(
+    `${TELEGRAM_API}/bot${requireToken()}/sendMediaGroup`,
+    { method: "POST", body: form }
+  );
+  const data = (await res.json()) as {
+    ok: boolean;
+    description?: string;
+    result?: Array<{ message_id: number }>;
+  };
+  if (!data.ok) {
+    throw new Error(data.description ?? "Attendance sendMediaGroup xatosi");
+  }
+  return (data.result ?? []).map((m) => m.message_id);
 }
 
 export async function attendanceAnswerCallback(
@@ -123,6 +226,7 @@ export type AttendanceUpdate = {
     chat: { id: number; type: string };
     from?: {
       id: number;
+      is_bot?: boolean;
       first_name?: string;
       last_name?: string;
       username?: string;

@@ -124,8 +124,19 @@ export async function handleAttendanceUpdate(update: AttendanceUpdate) {
 
   const msg = update.message;
   if (!msg?.chat?.id || !msg.from?.id) return;
+  // Botning o‘z xabarlari (QR feedback foto/matn) davomat selfisi emas
+  if (msg.from.is_bot) return;
   const chatId = msg.chat.id;
   const userId = String(msg.from.id);
+
+  // QR tozalik xabarlari (caption/text) — selfi oqimiga tushmasin
+  const echoText = `${msg.text || ""}\n${msg.caption || ""}`;
+  if (
+    echoText.includes("YANGI TOZALIK BAHOSI") ||
+    echoText.includes("🧹")
+  ) {
+    return;
+  }
 
   // Shaxsiy chat: registratsiya yo‘q — faqat guruhga yo‘naltirish
   if (msg.chat.type === "private") {

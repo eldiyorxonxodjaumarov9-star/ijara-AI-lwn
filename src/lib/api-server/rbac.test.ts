@@ -47,6 +47,9 @@ describe("canAccessResource matrix", () => {
     assert.equal(canAccessResource("EMPLOYEE", "attendance", "GET"), false);
     assert.equal(canAccessResource("MANAGER", "attendance", "GET"), true);
     assert.equal(canAccessResource("ADMIN", "attendance", "POST"), true);
+    assert.equal(canAccessResource("EMPLOYEE", "qr-codes", "GET"), false);
+    assert.equal(canAccessResource("MANAGER", "qr-codes", "GET"), true);
+    assert.equal(canAccessResource("ADMIN", "qr-codes", "POST"), true);
   });
 
   it("EMPLOYEE can GET payments but not mutate finance", () => {

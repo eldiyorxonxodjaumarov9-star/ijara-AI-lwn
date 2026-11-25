@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/qr-feedback-telegram",
-      "schedule": "*/5 * * * *"
+      "schedule": "20 3 * * *"
     }
   ]
 }

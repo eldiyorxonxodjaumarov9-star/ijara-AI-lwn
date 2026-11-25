@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 
 import {
-  generateQrPngDataUrl,
-  generateQrSvg,
+  generatePrintCardPng,
+  generatePrintCardSvg,
+  generateRawQrPng,
+  generateRawQrSvg,
+  mapQrForAdmin,
   updateQrCode,
 } from "@/lib/api-server/qr-feedback/service";
 import { requireResourceAccess } from "@/lib/api-server/rbac";
@@ -11,6 +14,10 @@ import { isDatabaseConfigured, prisma } from "@/lib/api-server/prisma";
 import { resolveUserWorkspaceContext } from "@/lib/api-server/workspace";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+function safeFileBase(name: string) {
+  return name.replace(/[^\w.-]+/g, "_") || "qr";
+}
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!isDatabaseConfigured()) return fail("DATABASE_URL sozlanmagan", 501);
@@ -24,17 +31,26 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const body = (await req.json().catch(() => ({}))) as {
     name?: string;
     locationLabel?: string | null;
+    roomNumber?: string | null;
+    printInstruction?: string | null;
     active?: boolean;
   };
   try {
-    const row = await updateQrCode({
+    await updateQrCode({
       workspaceId: wsCtx.workspace.id,
       id,
       name: body.name,
       locationLabel: body.locationLabel,
+      roomNumber: body.roomNumber,
+      printInstruction: body.printInstruction,
       active: body.active,
     });
-    return ok(row);
+    const row = await prisma.feedbackQrCode.findFirst({
+      where: { id, workspaceId: wsCtx.workspace.id },
+      include: { _count: { select: { feedbacks: true } } },
+    });
+    if (!row) return fail("QR topilmadi", 404);
+    return ok(mapQrForAdmin(row));
   } catch (err) {
     const status =
       err && typeof err === "object" && "status" in err
@@ -53,34 +69,65 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     return fail("Obuna talab qilinadi", 402, "SUBSCRIPTION_REQUIRED");
   }
   const { id } = await ctx.params;
-  const format = new URL(req.url).searchParams.get("format") || "png";
+  const format = (new URL(req.url).searchParams.get("format") || "png").toLowerCase();
   const row = await prisma.feedbackQrCode.findFirst({
     where: { id, workspaceId: wsCtx.workspace.id },
   });
   if (!row) return fail("QR topilmadi", 404);
 
+  const fields = {
+    publicToken: row.publicToken,
+    name: row.name,
+    roomNumber: row.roomNumber,
+    locationLabel: row.locationLabel,
+    printInstruction: row.printInstruction,
+  };
+  const base = safeFileBase(row.name);
+
   try {
-    if (format === "svg") {
-      const svg = await generateQrSvg(row.publicToken);
+    if (format === "svg" || format === "print-svg") {
+      const svg = await generatePrintCardSvg(fields);
       return new Response(svg, {
         status: 200,
         headers: {
           "Content-Type": "image/svg+xml; charset=utf-8",
-          "Cache-Control": "private, max-age=60",
-          "Content-Disposition": `attachment; filename="${row.name.replace(/[^\w.-]+/g, "_")}.svg"`,
+          "Cache-Control": "private, max-age=30",
+          "Content-Disposition": `attachment; filename="${base}_print.svg"`,
         },
       });
     }
 
-    const dataUrl = await generateQrPngDataUrl(row.publicToken);
-    const base64 = dataUrl.split(",")[1] || "";
-    const bytes = Buffer.from(base64, "base64");
-    return new Response(bytes, {
+    if (format === "raw-svg") {
+      const svg = await generateRawQrSvg(row.publicToken);
+      return new Response(svg, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml; charset=utf-8",
+          "Cache-Control": "private, max-age=30",
+          "Content-Disposition": `attachment; filename="${base}_raw.svg"`,
+        },
+      });
+    }
+
+    if (format === "raw" || format === "raw-png") {
+      const bytes = await generateRawQrPng(row.publicToken);
+      return new Response(new Uint8Array(bytes), {
+        status: 200,
+        headers: {
+          "Content-Type": "image/png",
+          "Cache-Control": "private, max-age=30",
+          "Content-Disposition": `attachment; filename="${base}_raw.png"`,
+        },
+      });
+    }
+
+    const bytes = await generatePrintCardPng(fields);
+    return new Response(new Uint8Array(bytes), {
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "private, max-age=60",
-        "Content-Disposition": `attachment; filename="${row.name.replace(/[^\w.-]+/g, "_")}.png"`,
+        "Cache-Control": "private, max-age=30",
+        "Content-Disposition": `attachment; filename="${base}_print.png"`,
       },
     });
   } catch (err) {

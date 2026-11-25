@@ -46,6 +46,25 @@ export function defaultQrName(index: number) {
   return `QR ${String(index).padStart(2, "0")}`;
 }
 
+export const DEFAULT_PRINT_INSTRUCTION =
+  "Tozalik va kamchiliklar rasmini jo‘nating";
+
+export const PRINT_CARD_FOOTER =
+  "QR kodni skanerlang va fikringizni bildiring.";
+
 export function publicFeedbackPath(token: string) {
   return `/f/${token}`;
+}
+
+export function resolveQrRoomLabel(opts: {
+  roomNumber?: string | null;
+  locationLabel?: string | null;
+  name: string;
+}) {
+  return (
+    opts.roomNumber?.trim() ||
+    opts.locationLabel?.trim() ||
+    opts.name.trim() ||
+    "QR"
+  );
 }

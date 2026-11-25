@@ -158,5 +158,21 @@ describe("QR feedback source wiring", () => {
     ]) {
       assert.match(schema, new RegExp(`model ${model}\\b`));
     }
+    assert.match(schema, /roomNumber\s+String\?/);
+    assert.match(schema, /printInstruction\s+String/);
+  });
+
+  it("print card module and additive migration exist", () => {
+    assert.ok(
+      existsSync(join(root, "src/lib/api-server/qr-feedback/print-card.ts"))
+    );
+    assert.ok(
+      existsSync(
+        join(
+          root,
+          "server/prisma/migrations/20261125193000_qr_print_labels/migration.sql"
+        )
+      )
+    );
   });
 });

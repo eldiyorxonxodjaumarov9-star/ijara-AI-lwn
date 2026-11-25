@@ -23,6 +23,9 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   return ok({
     name: qr.name,
     locationLabel: qr.locationLabel,
+    roomNumber: qr.roomNumber,
+    roomLabel: qr.roomLabel,
+    printInstruction: qr.printInstruction,
     brandName: qr.brandName,
     ratings: Object.entries(RATING_META).map(([key, meta]) => ({
       key,

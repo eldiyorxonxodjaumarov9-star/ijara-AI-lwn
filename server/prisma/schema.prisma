@@ -2365,6 +2365,10 @@ model FeedbackQrCode {
   codeIndex      Int
   name           String
   locationLabel  String?
+  /** Print card room/area headline (editable). */
+  roomNumber     String?
+  /** Text printed under the QR on the downloadable card. */
+  printInstruction String @default("Tozalik va kamchiliklar rasmini jo‘nating")
   publicToken    String   @unique
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())

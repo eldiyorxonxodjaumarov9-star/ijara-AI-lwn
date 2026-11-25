@@ -9,6 +9,9 @@ type RatingOpt = { key: string; value: number; emoji: string; label: string };
 type PublicView = {
   name: string;
   locationLabel: string | null;
+  roomNumber?: string | null;
+  roomLabel?: string;
+  printInstruction?: string | null;
   brandName: string;
   ratings: RatingOpt[];
 };
@@ -158,10 +161,10 @@ export default function PublicFeedbackPage({
             {view.brandName}
           </p>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
-            Tozalikni baholang
+            {view.roomLabel || view.locationLabel || view.name}
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            {view.locationLabel || view.name}
+            {view.printInstruction || "Tozalikni baholang"}
           </p>
 
           <div className="mt-6 grid grid-cols-5 gap-2">

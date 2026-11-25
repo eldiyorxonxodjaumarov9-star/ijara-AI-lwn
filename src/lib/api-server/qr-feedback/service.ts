@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { CleanlinessFeedbackStatus, Prisma } from "@prisma/client";
-import QRCode from "qrcode";
 
 import {
+  DEFAULT_PRINT_INSTRUCTION,
   defaultQrName,
   FEEDBACK_MAX_PHOTOS,
   FEEDBACK_RATE_LIMIT_MAX,
@@ -11,11 +11,18 @@ import {
   QR_CODE_SLOT_COUNT,
   RATING_BY_VALUE,
   RATING_META,
+  resolveQrRoomLabel,
 } from "@/lib/api-server/qr-feedback/constants";
 import {
   hashClientIp,
   persistFeedbackPhoto,
 } from "@/lib/api-server/qr-feedback/media";
+import {
+  buildPrintCardPng,
+  buildPrintCardSvg,
+  buildRawQrPng,
+  buildRawQrSvg,
+} from "@/lib/api-server/qr-feedback/print-card";
 import {
   feedbackPublicUrlForToken,
   inspectQrPublicOrigin,
@@ -50,6 +57,7 @@ export async function ensureWorkspaceQrCodes(workspaceId: string) {
       workspaceId,
       codeIndex: i,
       name: defaultQrName(i),
+      printInstruction: DEFAULT_PRINT_INSTRUCTION,
       publicToken: newPublicToken(),
       active: true,
     });
@@ -75,6 +83,8 @@ export async function updateQrCode(opts: {
   id: string;
   name?: string;
   locationLabel?: string | null;
+  roomNumber?: string | null;
+  printInstruction?: string | null;
   active?: boolean;
 }) {
   const row = await prisma.feedbackQrCode.findFirst({
@@ -89,29 +99,47 @@ export async function updateQrCode(opts: {
       ...(opts.locationLabel !== undefined
         ? { locationLabel: opts.locationLabel?.trim().slice(0, 120) || null }
         : {}),
+      ...(opts.roomNumber !== undefined
+        ? { roomNumber: opts.roomNumber?.trim().slice(0, 80) || null }
+        : {}),
+      ...(opts.printInstruction !== undefined
+        ? {
+            printInstruction:
+              opts.printInstruction?.trim().slice(0, 240) ||
+              DEFAULT_PRINT_INSTRUCTION,
+          }
+        : {}),
       ...(opts.active !== undefined ? { active: opts.active } : {}),
     },
   });
 }
 
-export async function generateQrPngDataUrl(token: string) {
-  const url = feedbackPublicUrl(token);
-  return QRCode.toDataURL(url, {
-    errorCorrectionLevel: "M",
-    margin: 2,
-    width: 512,
-    color: { dark: "#0f172a", light: "#ffffff" },
-  });
+export async function generatePrintCardPng(fields: {
+  publicToken: string;
+  name: string;
+  roomNumber?: string | null;
+  locationLabel?: string | null;
+  printInstruction?: string | null;
+}) {
+  return buildPrintCardPng(fields);
 }
 
-export async function generateQrSvg(token: string) {
-  const url = feedbackPublicUrl(token);
-  return QRCode.toString(url, {
-    type: "svg",
-    errorCorrectionLevel: "M",
-    margin: 2,
-    color: { dark: "#0f172a", light: "#ffffff" },
-  });
+export async function generatePrintCardSvg(fields: {
+  publicToken: string;
+  name: string;
+  roomNumber?: string | null;
+  locationLabel?: string | null;
+  printInstruction?: string | null;
+}) {
+  return buildPrintCardSvg(fields);
+}
+
+export async function generateRawQrPng(token: string) {
+  return buildRawQrPng(token);
+}
+
+export async function generateRawQrSvg(token: string) {
+  return buildRawQrSvg(token);
 }
 
 export async function getQrDashboardStats(workspaceId: string) {
@@ -148,6 +176,13 @@ export async function getPublicQrByToken(token: string) {
     token: qr.publicToken,
     name: qr.name,
     locationLabel: qr.locationLabel,
+    roomNumber: qr.roomNumber,
+    roomLabel: resolveQrRoomLabel({
+      roomNumber: qr.roomNumber,
+      locationLabel: qr.locationLabel,
+      name: qr.name,
+    }),
+    printInstruction: qr.printInstruction || DEFAULT_PRINT_INSTRUCTION,
     brandName: qr.workspace.name || "Ijara AI",
     workspaceId: qr.workspaceId,
     qrCodeId: qr.id,
@@ -370,6 +405,13 @@ export function mapQrForAdmin(
     codeIndex: qr.codeIndex,
     name: qr.name,
     locationLabel: qr.locationLabel,
+    roomNumber: qr.roomNumber,
+    printInstruction: qr.printInstruction || DEFAULT_PRINT_INSTRUCTION,
+    roomLabel: resolveQrRoomLabel({
+      roomNumber: qr.roomNumber,
+      locationLabel: qr.locationLabel,
+      name: qr.name,
+    }),
     publicToken: qr.publicToken,
     publicUrl: origin.ok
       ? `${origin.origin}${publicFeedbackPath(qr.publicToken)}`

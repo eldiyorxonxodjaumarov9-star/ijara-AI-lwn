@@ -297,6 +297,7 @@ export async function listFeedbacks(opts: {
       include: {
         qrCode: true,
         photos: { select: { id: true, mimeType: true, byteSize: true } },
+        events: { orderBy: { createdAt: "desc" }, take: 20 },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
@@ -304,6 +305,22 @@ export async function listFeedbacks(opts: {
     }),
     prisma.cleanlinessFeedback.count({ where }),
   ]);
+
+  const actorIds = [
+    ...new Set(
+      rows.flatMap((r) =>
+        r.events.map((e) => e.actorUserId).filter((id): id is string => Boolean(id))
+      )
+    ),
+  ];
+  const actors =
+    actorIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, fullName: true, email: true },
+        })
+      : [];
+  const actorById = new Map(actors.map((a) => [a.id, a]));
 
   return {
     total,
@@ -327,9 +344,29 @@ export async function listFeedbacks(opts: {
       createdAt: r.createdAt.toISOString(),
       dateDisplay: formatKeldiDateDisplay(r.createdAt),
       timeDisplay: formatKeldiTimeDisplay(r.createdAt),
+      statusHistory: r.events.map((e) => {
+        const actor = e.actorUserId ? actorById.get(e.actorUserId) : null;
+        return {
+          id: e.id,
+          fromStatus: e.fromStatus,
+          toStatus: e.toStatus,
+          actorUserId: e.actorUserId,
+          actorName: actor?.fullName || actor?.email || null,
+          comment: e.comment,
+          createdAt: e.createdAt.toISOString(),
+          dateDisplay: formatKeldiDateDisplay(e.createdAt),
+          timeDisplay: formatKeldiTimeDisplay(e.createdAt),
+        };
+      }),
     })),
   };
 }
+
+const FEEDBACK_STATUSES = new Set<CleanlinessFeedbackStatus>([
+  "NEW",
+  "IN_REVIEW",
+  "RESOLVED",
+]);
 
 export async function updateFeedbackStatus(opts: {
   workspaceId: string;
@@ -338,6 +375,9 @@ export async function updateFeedbackStatus(opts: {
   actorUserId: string;
   comment?: string | null;
 }) {
+  if (!FEEDBACK_STATUSES.has(opts.status)) {
+    throw Object.assign(new Error("Noto‘g‘ri status"), { status: 400 });
+  }
   const row = await prisma.cleanlinessFeedback.findFirst({
     where: { id: opts.feedbackId, workspaceId: opts.workspaceId },
   });

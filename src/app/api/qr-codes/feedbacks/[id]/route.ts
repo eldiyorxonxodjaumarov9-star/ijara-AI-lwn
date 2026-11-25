@@ -31,7 +31,12 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   });
   if (!owned) return fail("Fikr topilmadi", 404);
 
-  if (body.retryTelegram) {
+  // Body must be a JSON object (apiFetch already stringifies once on the client).
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return fail("status yoki retryTelegram majburiy", 400);
+  }
+
+  if (body.retryTelegram === true) {
     const result = await notifyCleanlinessFeedbackTelegram(id, {
       forceRetry: true,
     });

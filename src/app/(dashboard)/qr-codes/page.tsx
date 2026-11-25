@@ -56,13 +56,24 @@ type Stats = {
   negativeCount: number;
 };
 
+type FeedbackStatusKey = keyof typeof FEEDBACK_STATUS_LABELS;
+
+type FeedbackStatusEventItem = {
+  id: string;
+  fromStatus: FeedbackStatusKey | null;
+  toStatus: FeedbackStatusKey;
+  actorName: string | null;
+  dateDisplay: string;
+  timeDisplay: string;
+};
+
 type FeedbackItem = {
   id: string;
   ratingValue: number;
   emoji: string;
   label: string;
   comment: string | null;
-  status: keyof typeof FEEDBACK_STATUS_LABELS;
+  status: FeedbackStatusKey;
   telegramDelivery?: "PENDING" | "SENT" | "FAILED";
   telegramLastError?: string | null;
   qrCodeId: string;
@@ -71,6 +82,7 @@ type FeedbackItem = {
   photoIds: string[];
   dateDisplay: string;
   timeDisplay: string;
+  statusHistory?: FeedbackStatusEventItem[];
 };
 
 function QrThumb({
@@ -176,6 +188,8 @@ export default function QrCodesPage() {
   const [ensuring, setEnsuring] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
+  const [telegramBusyId, setTelegramBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<QrItem | null>(null);
   const [editName, setEditName] = useState("");
   const [editRoom, setEditRoom] = useState("");
@@ -241,7 +255,7 @@ export default function QrCodesPage() {
         };
       }>("/qr-codes", {
         method: "POST",
-        body: JSON.stringify({ action: "ensure" }),
+        body: { action: "ensure" },
       });
       setStats(res.stats);
       setCodes(res.codes);
@@ -260,13 +274,13 @@ export default function QrCodesPage() {
     try {
       const updated = await apiFetch<QrItem>(`/qr-codes/${selected.id}`, {
         method: "PATCH",
-        body: JSON.stringify({
+        body: {
           name: editName,
           roomNumber: editRoom || null,
           printInstruction: editInstruction || DEFAULT_PRINT_INSTRUCTION,
           locationLabel: editLocation || null,
           active: editActive,
-        }),
+        },
       });
       toast.success("Saqlandi");
       setSelected(updated);
@@ -283,8 +297,9 @@ export default function QrCodesPage() {
     try {
       await apiFetch(`/qr-codes/${qr.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ active: !qr.active }),
+        body: { active: !qr.active },
       });
+      toast.success(qr.active ? "Noaktiv qilindi" : "Aktiv qilindi");
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Xato");
@@ -432,28 +447,37 @@ export default function QrCodesPage() {
     return () => clearTimeout(t);
   }, [selected, loadFeedbacks]);
 
-  async function setFeedbackStatus(id: string, status: string) {
+  async function setFeedbackStatus(id: string, status: FeedbackStatusKey) {
+    if (statusBusyId) return;
+    setStatusBusyId(id);
     try {
       await apiFetch(`/qr-codes/feedbacks/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: { status },
       });
+      toast.success(`Holat: ${FEEDBACK_STATUS_LABELS[status]}`);
       await loadFeedbacks();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Xato");
+    } finally {
+      setStatusBusyId(null);
     }
   }
 
   async function retryTelegram(id: string) {
+    if (telegramBusyId) return;
+    setTelegramBusyId(id);
     try {
       await apiFetch(`/qr-codes/feedbacks/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ retryTelegram: true }),
+        body: { retryTelegram: true },
       });
       toast.success("Telegram qayta yuborish urinildi");
       await loadFeedbacks();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Xato");
+    } finally {
+      setTelegramBusyId(null);
     }
   }
 
@@ -740,11 +764,68 @@ export default function QrCodesPage() {
                           ))}
                         </div>
                       ) : null}
+                      {f.statusHistory && f.statusHistory.length > 0 ? (
+                        <div className="mt-2 space-y-1 rounded-md bg-muted/40 px-2 py-2">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Holat tarixi
+                          </p>
+                          {f.statusHistory.slice(0, 5).map((ev) => (
+                            <p key={ev.id} className="text-xs text-muted-foreground">
+                              {ev.dateDisplay} {ev.timeDisplay}
+                              {" · "}
+                              {ev.actorName || "Admin"}
+                              {" · "}
+                              {ev.fromStatus
+                                ? FEEDBACK_STATUS_LABELS[ev.fromStatus]
+                                : "—"}
+                              {" → "}
+                              {FEEDBACK_STATUS_LABELS[ev.toStatus]}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap gap-1">
-                        <Button size="sm" variant="outline" onClick={() => void setFeedbackStatus(f.id, "IN_REVIEW")}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            statusBusyId === f.id || f.status === "NEW"
+                          }
+                          onClick={() => void setFeedbackStatus(f.id, "NEW")}
+                        >
+                          {statusBusyId === f.id && f.status !== "NEW" ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : null}
+                          Yangi
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            statusBusyId === f.id || f.status === "IN_REVIEW"
+                          }
+                          onClick={() =>
+                            void setFeedbackStatus(f.id, "IN_REVIEW")
+                          }
+                        >
+                          {statusBusyId === f.id ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : null}
                           Ko‘rib chiqish
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => void setFeedbackStatus(f.id, "RESOLVED")}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            statusBusyId === f.id || f.status === "RESOLVED"
+                          }
+                          onClick={() =>
+                            void setFeedbackStatus(f.id, "RESOLVED")
+                          }
+                        >
+                          {statusBusyId === f.id ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : null}
                           Hal qilindi
                         </Button>
                         {f.telegramDelivery === "FAILED" ||
@@ -752,8 +833,12 @@ export default function QrCodesPage() {
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={telegramBusyId === f.id}
                             onClick={() => void retryTelegram(f.id)}
                           >
+                            {telegramBusyId === f.id ? (
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                            ) : null}
                             Telegram qayta
                           </Button>
                         ) : null}

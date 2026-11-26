@@ -126,19 +126,31 @@ export function RobotRentApplicationForm({
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       {!embedded ? (
-        <h2 className="rr-serif text-xl font-semibold md:text-2xl">{title}</h2>
+        <h2 className="rr-serif text-xl font-semibold lg:text-2xl">{title}</h2>
       ) : null}
 
       <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden>
         <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </div>
 
-      <div className="space-y-4">
+      <div
+        className={
+          formProfile === "desktop"
+            ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
+            : "space-y-4"
+        }
+      >
         {fields.map((f) => {
           const id = `rr-${f.name}`;
+          const spanFull =
+            f.kind === "textarea" || f.kind === "checkbox" ? "sm:col-span-2" : "";
           if (f.kind === "checkbox") {
             return (
-              <label key={f.name} htmlFor={id} className="flex items-center gap-3 text-sm">
+              <label
+                key={f.name}
+                htmlFor={id}
+                className={`flex items-center gap-3 text-sm ${spanFull}`}
+              >
                 <input
                   id={id}
                   type="checkbox"
@@ -153,7 +165,7 @@ export function RobotRentApplicationForm({
           }
           if (f.kind === "textarea") {
             return (
-              <div key={f.name}>
+              <div key={f.name} className={spanFull}>
                 <label htmlFor={id} className="mb-2 block text-sm font-medium">
                   {f.label}
                 </label>

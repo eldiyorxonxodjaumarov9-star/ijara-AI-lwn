@@ -9,7 +9,6 @@ export interface FieldDef {
   label: string;
   kind: FieldKind;
   placeholder?: string;
-  profiles: FormProfile[];
 }
 
 export const FORM_TITLES: Record<RobotRentFormType, { mobile: string; desktop: string }> = {
@@ -40,122 +39,26 @@ export const PARTNER_BADGES: Record<RobotRentFormType, string> = {
 };
 
 const CUSTOMER_FIELDS: FieldDef[] = [
-  {
-    name: "companyName",
-    label: "Kompaniya",
-    kind: "text",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "city",
-    label: "Shahar",
-    kind: "text",
-    profiles: ["mobile", "desktop"],
-  },
+  { name: "companyName", label: "Kompaniya", kind: "text" },
+  { name: "city", label: "Shahar", kind: "text" },
   {
     name: "phone",
     label: "Telefon",
     kind: "tel",
     placeholder: "+998 90 123 45 67",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "objectType",
-    label: "Obyekt turi",
-    kind: "text",
-    placeholder: "Ofis, ombor, savdo markazi…",
-    profiles: ["desktop"],
-  },
-  {
-    name: "areaSqm",
-    label: "Maydon (m²)",
-    kind: "number",
-    profiles: ["desktop"],
-  },
-  {
-    name: "startDate",
-    label: "Boshlanish sanasi",
-    kind: "date",
-    profiles: ["desktop"],
   },
 ];
 
 const DISTRIBUTOR_FIELDS: FieldDef[] = [
-  {
-    name: "companyName",
-    label: "Kompaniya",
-    kind: "text",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "robotModel",
-    label: "Robot modeli",
-    kind: "text",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "phone",
-    label: "Telefon",
-    kind: "tel",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "serviceCity",
-    label: "Xizmat ko‘rsatish shahri",
-    kind: "text",
-    profiles: ["desktop"],
-  },
-  {
-    name: "hasDemoRobot",
-    label: "Demo robot mavjud",
-    kind: "checkbox",
-    profiles: ["desktop"],
-  },
-  {
-    name: "serviceCapability",
-    label: "Servis imkoniyati",
-    kind: "textarea",
-    profiles: ["desktop"],
-  },
+  { name: "companyName", label: "Kompaniya", kind: "text" },
+  { name: "robotModel", label: "Robot modeli", kind: "text" },
+  { name: "phone", label: "Telefon", kind: "tel" },
 ];
 
 const MANUFACTURER_FIELDS: FieldDef[] = [
-  {
-    name: "companyName",
-    label: "Kompaniya",
-    kind: "text",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "country",
-    label: "Mamlakat",
-    kind: "text",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "email",
-    label: "Email",
-    kind: "email",
-    profiles: ["mobile", "desktop"],
-  },
-  {
-    name: "robotModel",
-    label: "Robot modeli",
-    kind: "text",
-    profiles: ["desktop"],
-  },
-  {
-    name: "techDocumentNote",
-    label: "Texnik hujjat",
-    kind: "textarea",
-    profiles: ["desktop"],
-  },
-  {
-    name: "monthlyRentalTerms",
-    label: "Oylik ijara shartlari",
-    kind: "textarea",
-    profiles: ["desktop"],
-  },
+  { name: "companyName", label: "Kompaniya", kind: "text" },
+  { name: "country", label: "Mamlakat", kind: "text" },
+  { name: "email", label: "Email", kind: "email" },
 ];
 
 export const FIELDS_BY_TYPE: Record<RobotRentFormType, FieldDef[]> = {
@@ -164,6 +67,6 @@ export const FIELDS_BY_TYPE: Record<RobotRentFormType, FieldDef[]> = {
   MANUFACTURER: MANUFACTURER_FIELDS,
 };
 
-export function fieldsForProfile(type: RobotRentFormType, profile: FormProfile) {
-  return FIELDS_BY_TYPE[type].filter((f) => f.profiles.includes(profile));
+export function fieldsForProfile(type: RobotRentFormType, _profile?: FormProfile) {
+  return FIELDS_BY_TYPE[type];
 }

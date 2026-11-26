@@ -71,9 +71,6 @@ export async function createRobotRentApplication(input: CreateInput) {
       companyName: d.companyName,
       city: d.city,
       phone: d.phone,
-      objectType: d.objectType ?? undefined,
-      areaSqm: d.areaSqm ?? undefined,
-      startDate: d.startDate ? new Date(d.startDate) : undefined,
     });
   } else if (input.type === "DISTRIBUTOR") {
     const d = input.data as DistributorApplicationInput;
@@ -81,9 +78,7 @@ export async function createRobotRentApplication(input: CreateInput) {
       companyName: d.companyName,
       robotModel: d.robotModel,
       phone: d.phone,
-      serviceCity: d.serviceCity ?? undefined,
       hasDemoRobot: d.hasDemoRobot ?? false,
-      serviceCapability: d.serviceCapability ?? undefined,
     });
   } else {
     const d = input.data as ManufacturerApplicationInput;
@@ -91,9 +86,6 @@ export async function createRobotRentApplication(input: CreateInput) {
       companyName: d.companyName,
       country: d.country,
       email: d.email,
-      robotModel: d.robotModel ?? undefined,
-      techDocumentNote: d.techDocumentNote ?? undefined,
-      monthlyRentalTerms: d.monthlyRentalTerms ?? undefined,
     });
   }
 

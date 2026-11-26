@@ -34,15 +34,15 @@ export function RobotRentNav() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-black/10 bg-[var(--rr-bg)]/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 md:h-16 md:px-8">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 lg:h-16 lg:px-8">
         <Link
           href="/robotrent"
-          className="text-[0.95rem] font-bold tracking-tight text-[var(--rr-text)] md:text-base"
+          className="text-[0.95rem] font-bold tracking-tight text-[var(--rr-text)] lg:text-base"
         >
           {ROBOTRENT_BRAND}
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="RobotRent">
+        <nav className="hidden items-center gap-8 lg:flex" aria-label="RobotRent">
           <Link
             href="/robotrent#qanday-ishlaydi"
             className="text-sm font-medium text-[var(--rr-text)] hover:opacity-70"
@@ -53,7 +53,7 @@ export function RobotRentNav() {
 
         <button
           type="button"
-          className="inline-flex size-10 items-center justify-center text-[var(--rr-text)] md:hidden"
+          className="inline-flex size-10 items-center justify-center text-[var(--rr-text)] lg:hidden"
           aria-expanded={open}
           aria-controls={menuId}
           aria-label={open ? "Menyuni yopish" : "Menyuni ochish"}
@@ -64,7 +64,7 @@ export function RobotRentNav() {
       </div>
 
       {open ? (
-        <div id={menuId} className="border-t border-black/10 bg-[var(--rr-bg)] md:hidden">
+        <div id={menuId} className="border-t border-black/10 bg-[var(--rr-bg)] lg:hidden">
           <nav className="mx-auto flex max-w-lg flex-col px-4 py-2">
             {LINKS.map((l) => (
               <Link

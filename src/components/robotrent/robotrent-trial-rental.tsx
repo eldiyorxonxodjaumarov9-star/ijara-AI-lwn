@@ -7,24 +7,24 @@ const CARDS = [
   {
     title: `${ROBOTRENT_TRIAL_DAYS_DEFAULT} kunlik sinov taklifi`,
     points: ["Robot modeli", "Sinov zonasi", "Boshlanish sanasi"],
-    image: "/robotrent/hero-1.jpg",
+    image: "/robotrent/hero-card-1.jpg",
   },
   {
     title: "Sinov hisoboti",
     points: ["Kunlik maydon", "Xodim aralashuvi", "Xarajat izohi"],
-    image: "/robotrent/hero-9.jpg",
+    image: "/robotrent/hero-card-2.jpg",
   },
   {
     title: "Oylik ijara taklifi",
     points: ["Oylik to‘lov", "Texnik servis", "Shartlar"],
-    image: "/robotrent/hero-5.jpg",
+    image: "/robotrent/hero-card-3.jpg",
   },
 ] as const;
 
 export function RobotRentTrialRental() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 md:px-8 md:py-14">
-      <h1 className="rr-serif text-center text-3xl font-semibold text-[var(--rr-text)] md:text-4xl">
+    <div className="mx-auto max-w-6xl px-4 py-10 lg:px-8 lg:py-14">
+      <h1 className="rr-serif text-center text-3xl font-semibold text-[var(--rr-text)] lg:text-4xl">
         Sinovdan ijaragacha
       </h1>
       <p className="mx-auto mt-3 max-w-2xl text-center text-[var(--rr-muted)]">
@@ -32,7 +32,7 @@ export function RobotRentTrialRental() {
         Ma’lumot kiritilmagan maydonlarda “Ma’lumot kiritilmagan” ko‘rsatiladi.
       </p>
 
-      <div className="mt-10 grid gap-5 md:grid-cols-3">
+      <div className="mt-10 grid gap-5 lg:grid-cols-3">
         {CARDS.map((c) => (
           <article key={c.title} className="rr-card flex flex-col p-0">
             <div className="relative aspect-[16/10] w-full overflow-hidden border-b border-[var(--rr-border)] bg-[#e8e4dc]">
@@ -41,7 +41,7 @@ export function RobotRentTrialRental() {
                 alt=""
                 fill
                 className="object-cover"
-                sizes="(max-width: 768px) 100vw, 360px"
+                sizes="(max-width: 1023px) 100vw, 360px"
               />
             </div>
             <div className="flex flex-1 flex-col p-5">

@@ -12,7 +12,7 @@ export function RobotRentShell({ children }: { children: ReactNode }) {
       <RobotRentNav />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-black/10 py-5">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 text-xs text-[var(--rr-muted)] md:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 text-xs text-[var(--rr-muted)] lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <p>© {new Date().getFullYear()} {ROBOTRENT_BRAND}</p>
           <Link href="/robotrent/track" className="hover:text-[var(--rr-text)]">
             Ariza holati

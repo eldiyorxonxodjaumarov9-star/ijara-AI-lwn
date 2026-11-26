@@ -1,0 +1,29 @@
+.robotrent-root {
+  --rr-bg: #071429;
+  --rr-bg-soft: #0b1d3a;
+  --rr-card: rgba(255, 255, 255, 0.04);
+  --rr-border: rgba(255, 255, 255, 0.1);
+  --rr-text: #e6edf7;
+  --rr-muted: #93a4bf;
+  --rr-cyan: #22d3ee;
+  --rr-cyan-strong: #06b6d4;
+
+  background: var(--rr-bg);
+  color: var(--rr-text);
+}
+
+.robotrent-root ::selection {
+  background: rgba(34, 211, 238, 0.35);
+}
+
+.robotrent-card {
+  background: var(--rr-card);
+  border: 1px solid var(--rr-border);
+  border-radius: 1rem;
+}
+
+.robotrent-glow {
+  background:
+    radial-gradient(60% 60% at 20% 0%, rgba(34, 211, 238, 0.16), transparent 70%),
+    radial-gradient(50% 50% at 90% 10%, rgba(59, 130, 246, 0.18), transparent 70%);
+}

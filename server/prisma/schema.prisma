@@ -111,6 +111,20 @@ enum MaintenanceStatus {
   COMPLETED
 }
 
+enum RobotRentApplicationType {
+  CUSTOMER
+  DISTRIBUTOR
+  MANUFACTURER
+}
+
+enum RobotRentApplicationStatus {
+  RECEIVED
+  SITE_INSPECTION
+  TRIAL_OFFER
+  MONTHLY_RENTAL
+  REJECTED
+}
+
 enum NotificationType {
   INFO
   WARNING
@@ -284,6 +298,7 @@ model User {
   manualDebtsCancelled ManualDebt[]           @relation("ManualDebtCancelledBy")
   manualDebtPayments   ManualDebtPayment[]
   activityEvents       WorkspaceActivityEvent[]
+  robotRentStatusEvents RobotRentStatusEvent[] @relation("RobotRentStatusActor")
 
   @@index([phone])
   @@index([role])
@@ -2442,4 +2457,107 @@ model FeedbackStatusEvent {
 
   @@index([feedbackId, createdAt])
   @@map("feedback_status_events")
+}
+
+// ===================== ROBOTRENT GLOBAL =====================
+
+model RobotRentApplication {
+  id                 String                       @id @default(uuid())
+  trackingCode       String                       @unique
+  type               RobotRentApplicationType
+  status             RobotRentApplicationStatus   @default(RECEIVED)
+  submitIpHash       String?
+  companyName        String?
+  city               String?
+  objectType         String?
+  areaSqm            Decimal?                     @db.Decimal(12, 2)
+  phone              String?
+  startDate          DateTime?
+  serviceCity        String?
+  robotModel         String?
+  hasDemoRobot       Boolean?
+  serviceCapability  String?
+  country            String?
+  techDocumentNote   String?
+  monthlyRentalTerms String?
+  email              String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  statusEvents  RobotRentStatusEvent[]
+  trial         RobotRentTrial?
+  rentalOffers  RobotRentRentalOffer[]
+
+  @@index([type, status])
+  @@index([createdAt])
+  @@index([phone])
+  @@map("robotrent_applications")
+}
+
+model RobotRentStatusEvent {
+  id            String                     @id @default(uuid())
+  applicationId String
+  status        RobotRentApplicationStatus
+  note          String?
+  actorUserId   String?
+  createdAt     DateTime                   @default(now())
+
+  application RobotRentApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  actor       User?                @relation("RobotRentStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId, createdAt])
+  @@map("robotrent_status_events")
+}
+
+model RobotRentRobotModel {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String?
+  imageUrl    String?
+  highlights  Json?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trials RobotRentTrial[]
+
+  @@map("robotrent_robot_models")
+}
+
+model RobotRentTrial {
+  id                  String    @id @default(uuid())
+  applicationId       String    @unique
+  robotModelId        String?
+  trialZone           String?
+  startDate           DateTime?
+  trialDays           Int?
+  dailyRate           Decimal?  @db.Decimal(14, 2)
+  dailyCleanedAreaSqm Decimal?  @db.Decimal(12, 2)
+  costNotes           String?
+  reportSummary       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  application RobotRentApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  robotModel  RobotRentRobotModel? @relation(fields: [robotModelId], references: [id], onDelete: SetNull)
+
+  @@map("robotrent_trials")
+}
+
+model RobotRentRentalOffer {
+  id            String    @id @default(uuid())
+  applicationId String
+  monthlyAmount Decimal?  @db.Decimal(14, 2)
+  currency      String    @default("UZS")
+  terms         String?
+  validUntil    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  application RobotRentApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("robotrent_rental_offers")
 }

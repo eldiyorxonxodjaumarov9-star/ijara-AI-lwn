@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" fill="none" role="img" aria-label="Yer yuvish roboti">
+  <rect width="800" height="600" fill="#e8eaef"/>
+  <ellipse cx="400" cy="480" rx="280" ry="48" fill="#d1d5db"/>
+  <rect x="220" y="160" width="360" height="280" rx="48" fill="#f9fafb" stroke="#9ca3af" stroke-width="4"/>
+  <rect x="300" y="80" width="200" height="120" rx="24" fill="#f3f4f6" stroke="#9ca3af" stroke-width="4"/>
+  <circle cx="360" cy="140" r="18" fill="#2563eb"/>
+  <circle cx="440" cy="140" r="18" fill="#2563eb"/>
+  <rect x="140" y="340" width="80" height="12" rx="6" fill="#6b7280"/>
+  <rect x="580" y="340" width="80" height="12" rx="6" fill="#6b7280"/>
+</svg>

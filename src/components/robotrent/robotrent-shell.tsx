@@ -11,23 +11,12 @@ export function RobotRentShell({ children }: { children: ReactNode }) {
     <div className="robotrent-root flex min-h-screen flex-col">
       <RobotRentNav />
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-white/10 bg-[#050f20]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>
-            © {new Date().getFullYear()} {ROBOTRENT_BRAND}. Barcha huquqlar
-            himoyalangan.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <Link href="/robotrent/track" className="hover:text-cyan-300">
-              Ariza holati
-            </Link>
-            <Link href="/robotrent/katalog" className="hover:text-cyan-300">
-              Katalog
-            </Link>
-            <Link href="/" className="hover:text-cyan-300">
-              Ijara AI
-            </Link>
-          </div>
+      <footer className="border-t border-[var(--rr-border)] bg-[var(--rr-surface)]">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-5 text-xs text-[var(--rr-muted)] md:flex-row md:items-center md:justify-between md:px-8">
+          <p>© {new Date().getFullYear()} {ROBOTRENT_BRAND}</p>
+          <Link href="/robotrent/track" className="hover:text-[var(--rr-text)]">
+            Ariza holati
+          </Link>
         </div>
       </footer>
     </div>

@@ -18,6 +18,8 @@ const LANDING_NAV_KEYS = [
   { href: "#biz-haqimizda", labelKey: "navbar.nav.about" as const },
 ];
 
+const ROBOTRENT_NAV_LABEL = "RobotRent";
+
 const PORTAL_NAV_KEYS = [
   { href: "/", path: "/", labelKey: "portal.nav.home" as const },
   {
@@ -148,6 +150,16 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                 {t(link.labelKey)}
               </a>
             ))}
+            <span
+              className={cn(
+                "text-sm font-medium transition-colors",
+                onDarkHero
+                  ? "text-slate-200 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              {ROBOTRENT_NAV_LABEL}
+            </span>
           </nav>
         )}
 
@@ -244,6 +256,18 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
               </a>
             );
           })}
+          {!isPortal ? (
+            <span
+              className={cn(
+                "rounded-lg px-3 py-3 text-sm font-medium",
+                onDarkHero
+                  ? "text-slate-100 hover:bg-white/5"
+                  : "text-slate-800 hover:bg-slate-50"
+              )}
+            >
+              {ROBOTRENT_NAV_LABEL}
+            </span>
+          ) : null}
           <div
             className={cn(
               "mt-1 flex items-center justify-between rounded-lg px-3 py-2",

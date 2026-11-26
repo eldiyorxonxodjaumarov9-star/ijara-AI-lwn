@@ -125,6 +125,13 @@ export const navigation: NavSection[] = [
         icon: Store,
         roles: ["admin", "manager"],
       },
+      {
+        titleKey: "nav.platformRental",
+        label: "RobotRent CRM",
+        href: "/robotrent-crm",
+        icon: Bot,
+        roles: ["admin", "manager"],
+      },
       { titleKey: "nav.notifications", href: "/notifications", icon: Bell },
       {
         titleKey: "nav.telegramBotUsers",

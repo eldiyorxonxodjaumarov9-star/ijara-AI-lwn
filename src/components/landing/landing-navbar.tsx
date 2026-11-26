@@ -19,8 +19,6 @@ const LANDING_NAV_KEYS = [
 ];
 
 const ROBOTRENT_NAV_LABEL = "RobotRent";
-const ROBOTRENT_FIGMA_URL =
-  "https://www.figma.com/design/K00LUEPn2kal8EcVmiyB30/RobotRent-Global";
 
 const PORTAL_NAV_KEYS = [
   { href: "/", path: "/", labelKey: "portal.nav.home" as const },
@@ -152,10 +150,8 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                 {t(link.labelKey)}
               </a>
             ))}
-            <a
-              href={ROBOTRENT_FIGMA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/robotrent"
               className={cn(
                 "text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none",
                 onDarkHero
@@ -164,7 +160,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
               )}
             >
               {ROBOTRENT_NAV_LABEL}
-            </a>
+            </Link>
           </nav>
         )}
 
@@ -262,10 +258,8 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
             );
           })}
           {!isPortal ? (
-            <a
-              href={ROBOTRENT_FIGMA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/robotrent"
               onClick={closeMenu}
               className={cn(
                 "rounded-lg px-3 py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none",
@@ -275,7 +269,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
               )}
             >
               {ROBOTRENT_NAV_LABEL}
-            </a>
+            </Link>
           ) : null}
           <div
             className={cn(

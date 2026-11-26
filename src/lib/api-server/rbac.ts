@@ -53,7 +53,8 @@ export type RbacResource =
   | "clients"
   | "tasks"
   | "vehicles"
-  | "bookings";
+  | "bookings"
+  | "robotrent";
 
 export type RbacMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
@@ -72,6 +73,7 @@ const ALL_RESOURCES: readonly RbacResource[] = [
   "tasks",
   "vehicles",
   "bookings",
+  "robotrent",
 ] as const;
 
 const EMPLOYEE_GET_RESOURCES = new Set<RbacResource>([
@@ -176,7 +178,8 @@ export function canAccessResource(
   if (
     resource === "employees" ||
     resource === "attendance" ||
-    resource === "qr-codes"
+    resource === "qr-codes" ||
+    resource === "robotrent"
   ) {
     return false;
   }

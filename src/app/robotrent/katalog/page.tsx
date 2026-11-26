@@ -8,9 +8,11 @@ export const metadata: Metadata = {
 
 export default function RobotRentCatalogPage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <h1 className="mb-2 text-3xl font-bold text-white">Robotlar katalogi</h1>
-      <p className="mb-8 text-slate-400">
+    <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
+      <h1 className="mb-2 text-2xl font-bold text-[var(--rr-text)] md:text-3xl">
+        Robotlar katalogi
+      </h1>
+      <p className="mb-8 text-[var(--rr-muted)]">
         Obyektingiz uchun mos robotni tanlang va 14 kunlik sinovga ariza
         qoldiring.
       </p>

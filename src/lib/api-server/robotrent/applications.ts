@@ -70,30 +70,30 @@ export async function createRobotRentApplication(input: CreateInput) {
     Object.assign(base, {
       companyName: d.companyName,
       city: d.city,
-      objectType: d.objectType,
-      areaSqm: d.areaSqm,
       phone: d.phone,
-      startDate: new Date(d.startDate),
+      objectType: d.objectType ?? undefined,
+      areaSqm: d.areaSqm ?? undefined,
+      startDate: d.startDate ? new Date(d.startDate) : undefined,
     });
   } else if (input.type === "DISTRIBUTOR") {
     const d = input.data as DistributorApplicationInput;
     Object.assign(base, {
       companyName: d.companyName,
-      serviceCity: d.serviceCity,
       robotModel: d.robotModel,
-      hasDemoRobot: d.hasDemoRobot,
-      serviceCapability: d.serviceCapability,
       phone: d.phone,
+      serviceCity: d.serviceCity ?? undefined,
+      hasDemoRobot: d.hasDemoRobot ?? false,
+      serviceCapability: d.serviceCapability ?? undefined,
     });
   } else {
     const d = input.data as ManufacturerApplicationInput;
     Object.assign(base, {
       companyName: d.companyName,
       country: d.country,
-      robotModel: d.robotModel,
-      techDocumentNote: d.techDocumentNote,
-      monthlyRentalTerms: d.monthlyRentalTerms,
       email: d.email,
+      robotModel: d.robotModel ?? undefined,
+      techDocumentNote: d.techDocumentNote ?? undefined,
+      monthlyRentalTerms: d.monthlyRentalTerms ?? undefined,
     });
   }
 

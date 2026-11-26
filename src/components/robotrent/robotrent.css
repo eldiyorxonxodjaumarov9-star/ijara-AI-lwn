@@ -1,29 +1,104 @@
-.robotrent-root {
-  --rr-bg: #071429;
-  --rr-bg-soft: #0b1d3a;
-  --rr-card: rgba(255, 255, 255, 0.04);
-  --rr-border: rgba(255, 255, 255, 0.1);
-  --rr-text: #e6edf7;
-  --rr-muted: #93a4bf;
-  --rr-cyan: #22d3ee;
-  --rr-cyan-strong: #06b6d4;
+/* RobotRent Global — Ijara AI uslubidan alohida (Figma token nomlari) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
+.robotrent-root {
+  --rr-bg: #ffffff;
+  --rr-surface: #f3f4f6;
+  --rr-surface-elevated: #ffffff;
+  --rr-text: #111827;
+  --rr-muted: #6b7280;
+  --rr-border: #e5e7eb;
+  --rr-primary: #2563eb;
+  --rr-primary-hover: #1d4ed8;
+  --rr-radius: 0.75rem;
+  --rr-radius-lg: 1rem;
+  --rr-input-h: 3rem;
+  --rr-font: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  min-height: 100vh;
   background: var(--rr-bg);
   color: var(--rr-text);
+  font-family: var(--rr-font);
 }
 
 .robotrent-root ::selection {
-  background: rgba(34, 211, 238, 0.35);
+  background: rgba(37, 99, 235, 0.2);
 }
 
 .robotrent-card {
-  background: var(--rr-card);
+  background: var(--rr-surface-elevated);
   border: 1px solid var(--rr-border);
-  border-radius: 1rem;
+  border-radius: var(--rr-radius-lg);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
 }
 
-.robotrent-glow {
-  background:
-    radial-gradient(60% 60% at 20% 0%, rgba(34, 211, 238, 0.16), transparent 70%),
-    radial-gradient(50% 50% at 90% 10%, rgba(59, 130, 246, 0.18), transparent 70%);
+.robotrent-input {
+  height: var(--rr-input-h);
+  width: 100%;
+  border-radius: var(--rr-radius);
+  border: 1px solid var(--rr-border);
+  background: #fff;
+  padding: 0 1rem;
+  font-size: 1rem;
+  color: var(--rr-text);
+}
+
+.robotrent-input::placeholder {
+  color: #9ca3af;
+}
+
+.robotrent-input:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 0;
+  border-color: var(--rr-primary);
+}
+
+.robotrent-btn-primary {
+  display: inline-flex;
+  min-height: var(--rr-input-h);
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rr-radius);
+  background: var(--rr-primary);
+  padding: 0 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.15s ease;
+}
+
+.robotrent-btn-primary:hover:not(:disabled) {
+  background: var(--rr-primary-hover);
+}
+
+.robotrent-btn-primary:disabled {
+  opacity: 0.65;
+}
+
+.robotrent-partner-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: var(--rr-radius-lg);
+  border: 1px solid var(--rr-border);
+  background: #fff;
+  padding: 1.125rem 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--rr-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.robotrent-partner-link:hover {
+  border-color: var(--rr-primary);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
+}
+
+@media (max-width: 1023px) {
+  .robotrent-form-panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
 }

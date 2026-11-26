@@ -1,89 +1,42 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  ROBOTRENT_TRIAL_DAYS_DEFAULT,
-  ROBOTRENT_TYPE_LABELS,
-} from "@/lib/robotrent/constants";
+  fieldsForProfile,
+  FORM_TITLES,
+  SUBMIT_LABELS,
+  type FormProfile,
+  type RobotRentFormType,
+} from "@/lib/robotrent/form-fields";
 
-export type RobotRentFormType = "CUSTOMER" | "DISTRIBUTOR" | "MANUFACTURER";
-
-type FieldKind = "text" | "tel" | "email" | "number" | "date" | "textarea" | "checkbox";
-
-interface FieldDef {
-  name: string;
-  label: string;
-  kind: FieldKind;
-  placeholder?: string;
-  hint?: string;
-}
-
-const FIELDS: Record<RobotRentFormType, FieldDef[]> = {
-  CUSTOMER: [
-    { name: "companyName", label: "Kompaniya nomi", kind: "text", placeholder: "Masalan: Tashkent Mall" },
-    { name: "city", label: "Shahar", kind: "text", placeholder: "Toshkent" },
-    { name: "objectType", label: "Obyekt turi", kind: "text", placeholder: "Ofis, ombor, savdo markazi…" },
-    { name: "areaSqm", label: "Maydon (m²)", kind: "number", placeholder: "1500" },
-    { name: "phone", label: "Telefon", kind: "tel", placeholder: "+998 90 123 45 67" },
-    { name: "startDate", label: "Boshlanish sanasi", kind: "date" },
-  ],
-  DISTRIBUTOR: [
-    { name: "companyName", label: "Kompaniya nomi", kind: "text" },
-    { name: "serviceCity", label: "Xizmat ko‘rsatish shahri", kind: "text", placeholder: "Toshkent" },
-    { name: "robotModel", label: "Robot modeli", kind: "text" },
-    { name: "hasDemoRobot", label: "Demo robot mavjud", kind: "checkbox" },
-    {
-      name: "serviceCapability",
-      label: "Servis imkoniyati",
-      kind: "textarea",
-      placeholder: "Texnik xizmat, ehtiyot qismlar, o‘qitish…",
-    },
-    { name: "phone", label: "Telefon", kind: "tel", placeholder: "+998 90 123 45 67" },
-  ],
-  MANUFACTURER: [
-    { name: "companyName", label: "Kompaniya nomi", kind: "text" },
-    { name: "country", label: "Davlat", kind: "text", placeholder: "Xitoy, Janubiy Koreya…" },
-    { name: "robotModel", label: "Robot modeli", kind: "text" },
-    {
-      name: "techDocumentNote",
-      label: "Texnik hujjat izohi",
-      kind: "textarea",
-      placeholder: "Spetsifikatsiya, sertifikatlar, hujjatlar havolasi…",
-    },
-    {
-      name: "monthlyRentalTerms",
-      label: "Oylik ijara shartlari",
-      kind: "textarea",
-      placeholder: "Taxminiy oylik narx, minimal muddat…",
-    },
-    { name: "email", label: "Email", kind: "email", placeholder: "info@company.com" },
-  ],
-};
-
-const TITLES: Record<RobotRentFormType, string> = {
-  CUSTOMER: "Sinov uchun ariza",
-  DISTRIBUTOR: "Distribyutor arizasi",
-  MANUFACTURER: "Ishlab chiqaruvchi arizasi",
-};
-
-const inputCls =
-  "border-white/15 bg-white/5 text-white placeholder:text-slate-500 focus-visible:ring-cyan-400/50";
+export type { RobotRentFormType };
 
 type FormValues = Record<string, string | boolean>;
 
+function useFormProfile(): FormProfile {
+  const [profile, setProfile] = useState<FormProfile>("mobile");
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setProfile(mq.matches ? "desktop" : "mobile");
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  return profile;
+}
+
 function initialValues(type: RobotRentFormType, robot?: string): FormValues {
   const values: FormValues = {};
-  for (const f of FIELDS[type]) {
+  for (const f of fieldsForProfile(type, "desktop")) {
     values[f.name] = f.kind === "checkbox" ? false : "";
   }
-  if (robot && type !== "CUSTOMER" && "robotModel" in values) {
-    values.robotModel = robot;
+  if (robot && (type === "DISTRIBUTOR" || type === "CUSTOMER")) {
+    if ("robotModel" in values) values.robotModel = robot;
   }
   return values;
 }
@@ -91,11 +44,18 @@ function initialValues(type: RobotRentFormType, robot?: string): FormValues {
 export function RobotRentApplicationForm({
   type,
   robotSlug,
+  embedded,
 }: {
   type: RobotRentFormType;
-  /** Katalogdan kelgan robot slug (?robot=slug) */
   robotSlug?: string;
+  /** Form sahifasida sarlavha tashqarida bo‘lsa */
+  embedded?: boolean;
 }) {
+  const formProfile = useFormProfile();
+  const fields = useMemo(
+    () => fieldsForProfile(type, formProfile),
+    [type, formProfile]
+  );
   const [values, setValues] = useState<FormValues>(() =>
     initialValues(type, robotSlug)
   );
@@ -104,7 +64,7 @@ export function RobotRentApplicationForm({
   const [error, setError] = useState<string | null>(null);
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
 
-  const fields = FIELDS[type];
+  const title = FORM_TITLES[type][formProfile];
 
   function setValue(name: string, value: string | boolean) {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -116,11 +76,15 @@ export function RobotRentApplicationForm({
     setError(null);
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = { type, website };
+      const payload: Record<string, unknown> = {
+        type,
+        formProfile,
+        website,
+      };
       for (const f of fields) {
         const v = values[f.name];
         payload[f.name] =
-          f.kind === "number" ? Number(v) : f.kind === "checkbox" ? Boolean(v) : v;
+          f.kind === "number" ? (v === "" ? undefined : Number(v)) : f.kind === "checkbox" ? Boolean(v) : v;
       }
       if (robotSlug && type === "CUSTOMER") payload.robotSlug = robotSlug;
 
@@ -131,7 +95,6 @@ export function RobotRentApplicationForm({
       });
       const json = (await res.json().catch(() => null)) as {
         data?: { trackingCode?: string };
-        message?: string;
       } | null;
       if (!res.ok || !json?.data?.trackingCode) {
         setError(
@@ -151,65 +114,36 @@ export function RobotRentApplicationForm({
 
   if (trackingCode) {
     return (
-      <div className="robotrent-card p-8 text-center">
-        <CheckCircle2 className="mx-auto size-12 text-cyan-300" />
-        <h2 className="mt-4 text-2xl font-bold text-white">
+      <div className="robotrent-card px-6 py-8 text-center">
+        <CheckCircle2 className="mx-auto size-11 text-[var(--rr-primary)]" />
+        <h2 className="mt-4 text-xl font-bold text-[var(--rr-text)]">
           Arizangiz qabul qilindi
         </h2>
-        <p className="mt-2 text-slate-400">
-          Ariza holatini kuzatish uchun tracking kodni saqlab qo‘ying:
-        </p>
-        <p className="mx-auto mt-4 w-fit select-all rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-5 py-3 font-mono text-lg font-semibold tracking-wider text-cyan-300">
+        <p className="mt-2 text-sm text-[var(--rr-muted)]">Tracking kod:</p>
+        <p className="mx-auto mt-3 w-fit select-all rounded-lg border border-[var(--rr-border)] bg-[var(--rr-surface)] px-4 py-2 font-mono text-base font-semibold text-[var(--rr-text)]">
           {trackingCode}
         </p>
-        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button
-            asChild
-            className="bg-cyan-400 text-[#071429] hover:bg-cyan-300"
-          >
-            <Link href={`/robotrent/track/${encodeURIComponent(trackingCode)}`}>
-              Ariza holatini ko‘rish
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-          >
-            <Link href="/robotrent">Bosh sahifaga</Link>
-          </Button>
-        </div>
+        <Link
+          href={`/robotrent/track/${encodeURIComponent(trackingCode)}`}
+          className="robotrent-btn-primary mt-6 inline-flex max-w-xs"
+        >
+          Ariza holatini ko‘rish
+        </Link>
       </div>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="robotrent-card space-y-5 p-6 sm:p-8" noValidate={false}>
-      <div>
-        <h2 className="text-xl font-bold text-white">{TITLES[type]}</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          {ROBOTRENT_TYPE_LABELS[type]} sifatida ariza qoldiring.
-          {type === "CUSTOMER"
-            ? ` Sinov muddati ${ROBOTRENT_TRIAL_DAYS_DEFAULT} kun.`
-            : null}
-        </p>
-        {robotSlug && type === "CUSTOMER" ? (
-          <p className="mt-2 text-xs text-cyan-300">
-            Tanlangan robot: <span className="font-mono">{robotSlug}</span>
-          </p>
-        ) : null}
-      </div>
+    <form onSubmit={onSubmit} className="space-y-5" noValidate={false}>
+      {!embedded ? (
+        <h2 className="text-xl font-bold text-[var(--rr-text)] md:text-2xl">{title}</h2>
+      ) : null}
 
-      {/* Honeypot: odamlar ko‘rmaydi */}
       <div
-        aria-hidden="true"
+        aria-hidden
         className="absolute -left-[9999px] h-0 w-0 overflow-hidden"
       >
-        <label htmlFor="rr-website">Website</label>
         <input
-          id="rr-website"
-          name="website"
-          type="text"
           tabIndex={-1}
           autoComplete="off"
           value={website}
@@ -217,7 +151,7 @@ export function RobotRentApplicationForm({
         />
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="space-y-4">
         {fields.map((f) => {
           const id = `rr-${f.name}`;
           if (f.kind === "checkbox") {
@@ -225,14 +159,14 @@ export function RobotRentApplicationForm({
               <label
                 key={f.name}
                 htmlFor={id}
-                className="flex cursor-pointer items-center gap-3 text-sm text-slate-200 sm:col-span-2"
+                className="flex cursor-pointer items-center gap-3 text-sm text-[var(--rr-text)]"
               >
                 <input
                   id={id}
                   type="checkbox"
                   checked={Boolean(values[f.name])}
                   onChange={(e) => setValue(f.name, e.target.checked)}
-                  className="size-4 accent-cyan-400"
+                  className="size-4 accent-[var(--rr-primary)]"
                 />
                 {f.label}
               </label>
@@ -240,10 +174,10 @@ export function RobotRentApplicationForm({
           }
           if (f.kind === "textarea") {
             return (
-              <div key={f.name} className="space-y-2 sm:col-span-2">
-                <Label htmlFor={id} className="text-slate-200">
+              <div key={f.name}>
+                <label htmlFor={id} className="mb-2 block text-sm font-medium text-[var(--rr-text)]">
                   {f.label}
-                </Label>
+                </label>
                 <textarea
                   id={id}
                   required
@@ -252,27 +186,25 @@ export function RobotRentApplicationForm({
                   placeholder={f.placeholder}
                   value={String(values[f.name] ?? "")}
                   onChange={(e) => setValue(f.name, e.target.value)}
-                  className="flex w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+                  className="robotrent-input min-h-[6rem] resize-y py-3"
                 />
               </div>
             );
           }
           return (
-            <div key={f.name} className="space-y-2">
-              <Label htmlFor={id} className="text-slate-200">
+            <div key={f.name}>
+              <label htmlFor={id} className="mb-2 block text-sm font-medium text-[var(--rr-text)]">
                 {f.label}
-              </Label>
-              <Input
+              </label>
+              <input
                 id={id}
                 required
                 type={f.kind}
                 min={f.kind === "number" ? 1 : undefined}
-                step={f.kind === "number" ? "any" : undefined}
-                maxLength={f.kind === "text" || f.kind === "email" ? 200 : undefined}
                 placeholder={f.placeholder}
                 value={String(values[f.name] ?? "")}
                 onChange={(e) => setValue(f.name, e.target.value)}
-                className={`${inputCls} ${f.kind === "date" ? "[color-scheme:dark]" : ""}`}
+                className="robotrent-input"
               />
             </div>
           );
@@ -280,20 +212,18 @@ export function RobotRentApplicationForm({
       </div>
 
       {error ? (
-        <p role="alert" className="rounded-md border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {error}
         </p>
       ) : null}
 
-      <Button
-        type="submit"
-        size="lg"
-        disabled={submitting}
-        className="w-full bg-cyan-400 text-[#071429] hover:bg-cyan-300 sm:w-auto"
-      >
-        {submitting ? <Loader2 className="animate-spin" /> : null}
-        {submitting ? "Yuborilmoqda…" : "Arizani yuborish"}
-      </Button>
+      <button type="submit" disabled={submitting} className="robotrent-btn-primary">
+        {submitting ? <Loader2 className="mr-2 size-5 animate-spin" /> : null}
+        {submitting ? "Yuborilmoqda…" : SUBMIT_LABELS[type]}
+      </button>
     </form>
   );
 }

@@ -1,48 +1,77 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { Factory, Store, UserRound } from "lucide-react";
 
-import { RobotRentHeroImage } from "@/components/robotrent/robotrent-media";
-import { ROBOTRENT_BRAND } from "@/lib/robotrent/constants";
-
-const PARTNERS = [
-  { title: "Mijoz", href: "/robotrent/mijoz" },
-  { title: "Distribyutor", href: "/robotrent/distribyutor" },
-  { title: "Ishlab chiqaruvchi", href: "/robotrent/ishlab-chiqaruvchi" },
+const CARDS = [
+  {
+    title: "Mijoz",
+    href: "/robotrent/mijoz",
+    cta: "Sinovga ariza berish",
+    icon: UserRound,
+  },
+  {
+    title: "Distribyutor",
+    href: "/robotrent/distribyutor",
+    cta: "Robot taklif qilish",
+    icon: Store,
+  },
+  {
+    title: "Ishlab chiqaruvchi",
+    href: "/robotrent/ishlab-chiqaruvchi",
+    cta: "Hamkorlikka ariza berish",
+    icon: Factory,
+  },
 ] as const;
 
 export function RobotRentHome() {
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-16 pt-6 md:max-w-5xl md:px-8 md:pb-24 md:pt-10">
-      <p className="text-sm font-semibold uppercase tracking-wide text-[var(--rr-muted)] md:text-base">
-        {ROBOTRENT_BRAND}
-      </p>
-      <h1 className="mt-3 text-[1.75rem] font-bold leading-tight text-[var(--rr-text)] md:mt-4 md:max-w-xl md:text-4xl">
-        Robotni obyektingizda sinab ko‘ring
-      </h1>
-
-      <div className="mt-6 md:mt-8">
-        <RobotRentHeroImage />
-      </div>
-
-      <div className="mt-6 flex flex-col gap-3 md:mt-10 md:max-w-md">
-        {PARTNERS.map((p) => (
-          <Link key={p.href} href={p.href} className="robotrent-partner-link">
-            <span>{p.title}</span>
-            <ChevronRight className="size-5 text-[var(--rr-muted)]" aria-hidden />
+    <div>
+      {/* Desktop + mobile hero */}
+      <section className="mx-auto grid max-w-6xl gap-8 px-4 py-8 md:grid-cols-2 md:items-center md:gap-10 md:px-8 md:py-14">
+        <div className="order-1 md:order-1">
+          <h1 className="rr-serif text-[1.85rem] font-semibold leading-[1.15] tracking-tight text-[var(--rr-text)] md:text-[2.75rem]">
+            Robotni obyektingizda sinab ko‘ring
+          </h1>
+          <p className="mt-4 max-w-md text-[0.95rem] leading-relaxed text-[var(--rr-muted)] md:text-base">
+            14 kunlik pulli sinov. Natija asosida oylik ijara.
+          </p>
+          <Link href="/robotrent/mijoz" className="rr-btn mt-6">
+            Sinovga ariza berish
           </Link>
-        ))}
-      </div>
+        </div>
 
-      <div className="mt-10 hidden border-t border-[var(--rr-border)] pt-8 md:grid md:grid-cols-3 md:gap-6">
-        <Link href="/robotrent/katalog" className="robotrent-card p-6 text-sm font-semibold">
-          Robotlar katalogi
-        </Link>
-        <Link href="/robotrent/sinovdan-ijaraga" className="robotrent-card p-6 text-sm font-semibold">
-          Sinovdan ijaragacha
-        </Link>
-        <Link href="/robotrent/track" className="robotrent-card p-6 text-sm font-semibold">
-          Ariza holati
-        </Link>
+        <div className="relative order-2 aspect-[4/3] w-full overflow-hidden border border-[var(--rr-border)] bg-[#e8e4dc] md:order-2 md:aspect-[5/4]">
+          <Image
+            src="/robotrent/hero-1.jpg"
+            alt="RobotRent Global tozalash roboti"
+            fill
+            priority
+            className="object-cover object-center"
+            sizes="(max-width: 768px) 100vw, 560px"
+          />
+        </div>
+      </section>
+
+      {/* Three cards — Figma: horizontal on desktop */}
+      <section
+        id="qanday-ishlaydi"
+        className="mx-auto grid max-w-6xl gap-4 px-4 pb-10 md:grid-cols-3 md:gap-5 md:px-8 md:pb-14"
+      >
+        {CARDS.map((c) => (
+          <article key={c.title} className="rr-card flex flex-col">
+            <c.icon className="size-6 text-[var(--rr-text)]" strokeWidth={1.5} />
+            <h2 className="mt-4 text-lg font-semibold text-[var(--rr-text)]">{c.title}</h2>
+            <Link href={c.href} className="rr-btn mt-6 w-full md:mt-auto">
+              {c.cta}
+            </Link>
+          </article>
+        ))}
+      </section>
+
+      <div className="rr-process">
+        <p className="mx-auto max-w-6xl px-4 py-4 text-center text-sm font-medium tracking-wide text-[var(--rr-text)] md:px-8 md:text-base">
+          Ariza → Robot tanlash → 14 kunlik sinov → Oylik ijara
+        </p>
       </div>
     </div>
   );

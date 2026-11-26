@@ -9,7 +9,9 @@ export const metadata: Metadata = {
 export default function RobotRentTrackPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-10 md:max-w-3xl md:px-8">
-      <h1 className="mb-2 text-2xl font-bold text-[var(--rr-text)]">Ariza holati</h1>
+      <h1 className="rr-serif mb-2 text-2xl font-semibold text-[var(--rr-text)]">
+        Ariza holati
+      </h1>
       <p className="mb-8 text-[var(--rr-muted)]">
         Ariza topshirganda berilgan tracking kodni kiriting.
       </p>

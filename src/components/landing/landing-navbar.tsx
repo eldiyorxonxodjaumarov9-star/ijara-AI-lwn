@@ -16,6 +16,7 @@ const LANDING_NAV_KEYS = [
   { href: "#ai", labelKey: "navbar.nav.ai" as const },
   { href: "#kimlar-uchun", labelKey: "navbar.nav.audience" as const },
   { href: "#biz-haqimizda", labelKey: "navbar.nav.about" as const },
+  { href: "/robotrent", label: "RobotRent" as const },
 ];
 
 const PORTAL_NAV_KEYS = [
@@ -145,7 +146,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
                     : "text-slate-600 hover:text-slate-900"
                 )}
               >
-                {t(link.labelKey)}
+                {"label" in link ? link.label : t(link.labelKey)}
               </a>
             ))}
           </nav>
@@ -240,7 +241,7 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
             }
             return (
               <a key={link.href} href={link.href} onClick={closeMenu} className={className}>
-                {t(link.labelKey)}
+                {"label" in link ? link.label : t(link.labelKey)}
               </a>
             );
           })}
@@ -294,3 +295,4 @@ export function LandingNavbar({ activePath }: { activePath?: string } = {}) {
     </header>
   );
 }
+

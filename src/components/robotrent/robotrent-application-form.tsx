@@ -133,55 +133,9 @@ export function RobotRentApplicationForm({
         <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </div>
 
-      <div
-        className={
-          formProfile === "desktop"
-            ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
-            : "space-y-4"
-        }
-      >
+      <div className="space-y-4">
         {fields.map((f) => {
           const id = `rr-${f.name}`;
-          const spanFull =
-            f.kind === "textarea" || f.kind === "checkbox" ? "sm:col-span-2" : "";
-          if (f.kind === "checkbox") {
-            return (
-              <label
-                key={f.name}
-                htmlFor={id}
-                className={`flex items-center gap-3 text-sm ${spanFull}`}
-              >
-                <input
-                  id={id}
-                  type="checkbox"
-                  checked={Boolean(values[f.name])}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, [f.name]: e.target.checked }))
-                  }
-                />
-                {f.label}
-              </label>
-            );
-          }
-          if (f.kind === "textarea") {
-            return (
-              <div key={f.name} className={spanFull}>
-                <label htmlFor={id} className="mb-2 block text-sm font-medium">
-                  {f.label}
-                </label>
-                <textarea
-                  id={id}
-                  required
-                  rows={3}
-                  className="rr-input min-h-[5.5rem] py-3"
-                  value={String(values[f.name] ?? "")}
-                  onChange={(e) =>
-                    setValues((p) => ({ ...p, [f.name]: e.target.value }))
-                  }
-                />
-              </div>
-            );
-          }
           return (
             <div key={f.name}>
               <label htmlFor={id} className="mb-2 block text-sm font-medium">

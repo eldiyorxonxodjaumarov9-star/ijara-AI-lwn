@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { parseRobotRentApplicationBody } from "./validation";
 
 describe("robotrent application validation", () => {
-  it("accepts mobile customer with 3 fields", () => {
+  it("accepts customer with exactly 3 fields (mobile)", () => {
     const parsed = parseRobotRentApplicationBody({
       type: "CUSTOMER",
       formProfile: "mobile",
@@ -15,17 +15,7 @@ describe("robotrent application validation", () => {
     assert.equal(parsed.ok, true);
   });
 
-  it("rejects mobile customer without phone", () => {
-    const parsed = parseRobotRentApplicationBody({
-      type: "CUSTOMER",
-      formProfile: "mobile",
-      companyName: "Acme",
-      city: "Toshkent",
-    });
-    assert.equal(parsed.ok, false);
-  });
-
-  it("requires desktop customer extras", () => {
+  it("accepts customer with exactly 3 fields (desktop)", () => {
     const parsed = parseRobotRentApplicationBody({
       type: "CUSTOMER",
       formProfile: "desktop",
@@ -33,13 +23,23 @@ describe("robotrent application validation", () => {
       city: "Toshkent",
       phone: "+998901234567",
     });
+    assert.equal(parsed.ok, true);
+  });
+
+  it("rejects customer without phone", () => {
+    const parsed = parseRobotRentApplicationBody({
+      type: "CUSTOMER",
+      formProfile: "desktop",
+      companyName: "Acme",
+      city: "Toshkent",
+    });
     assert.equal(parsed.ok, false);
   });
 
-  it("accepts mobile distributor with 3 fields", () => {
+  it("accepts distributor with 3 fields", () => {
     const parsed = parseRobotRentApplicationBody({
       type: "DISTRIBUTOR",
-      formProfile: "mobile",
+      formProfile: "desktop",
       companyName: "Servis Co",
       robotModel: "RR-50",
       phone: "+998901234567",
@@ -47,7 +47,7 @@ describe("robotrent application validation", () => {
     assert.equal(parsed.ok, true);
   });
 
-  it("accepts mobile manufacturer with 3 fields", () => {
+  it("accepts manufacturer with 3 fields", () => {
     const parsed = parseRobotRentApplicationBody({
       type: "MANUFACTURER",
       formProfile: "mobile",

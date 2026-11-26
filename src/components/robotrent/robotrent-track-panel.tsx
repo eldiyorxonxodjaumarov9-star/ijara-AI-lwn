@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -46,8 +46,8 @@ interface TrackingData {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
-      <dt className="text-sm text-slate-400">{label}</dt>
-      <dd className="text-sm font-medium text-white sm:text-right">{value}</dd>
+      <dt className="text-sm text-[var(--rr-muted)]">{label}</dt>
+      <dd className="text-sm font-medium text-[var(--rr-text)] sm:text-right">{value}</dd>
     </div>
   );
 }
@@ -121,7 +121,7 @@ export function RobotRentTrackPanel({
         className="robotrent-card flex flex-col gap-3 p-5 sm:flex-row sm:items-end"
       >
         <div className="flex-1 space-y-2">
-          <Label htmlFor="rr-track-code" className="text-slate-200">
+          <Label htmlFor="rr-track-code" className="text-[var(--rr-text)]">
             Tracking kod
           </Label>
           <Input
@@ -130,13 +130,13 @@ export function RobotRentTrackPanel({
             onChange={(e) => setCode(e.target.value)}
             placeholder="RRG-20260101-ABC123"
             autoComplete="off"
-            className="border-white/15 bg-white/5 font-mono uppercase text-white placeholder:text-slate-500 focus-visible:ring-cyan-400/50"
+            className="border-white/15 bg-white/5 font-mono uppercase text-[var(--rr-text)] placeholder:text-[var(--rr-muted)] focus-visible:ring-cyan-400/50"
           />
         </div>
         <Button
           type="submit"
           disabled={loading || !code.trim()}
-          className="bg-cyan-400 text-[#071429] hover:bg-cyan-300"
+          className="bg-[var(--rr-primary)] text-white hover:bg-[var(--rr-primary-hover)]"
         >
           {loading ? <Loader2 className="animate-spin" /> : <Search />}
           Tekshirish
@@ -144,7 +144,7 @@ export function RobotRentTrackPanel({
       </form>
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+        <div className="flex items-center justify-center gap-2 py-10 text-[var(--rr-muted)]">
           <Loader2 className="size-5 animate-spin" />
           Yuklanmoqda…
         </div>
@@ -153,7 +153,7 @@ export function RobotRentTrackPanel({
       {error ? (
         <p
           role="alert"
-          className="rounded-md border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           {error}
         </p>
@@ -164,13 +164,13 @@ export function RobotRentTrackPanel({
           <section className="robotrent-card p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="font-mono text-sm text-cyan-300">
+                <p className="font-mono text-sm text-[var(--rr-primary)]">
                   {data.trackingCode}
                 </p>
-                <h2 className="mt-1 text-xl font-bold text-white">
+                <h2 className="mt-1 text-xl font-bold text-[var(--rr-text)]">
                   {displayValue(data.companyName)}
                 </h2>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-[var(--rr-muted)]">
                   {data.typeLabel} · {displayDate(data.createdAt)}
                 </p>
               </div>
@@ -178,8 +178,8 @@ export function RobotRentTrackPanel({
                 className={cn(
                   "rounded-full px-3 py-1 text-sm font-semibold",
                   rejected
-                    ? "bg-red-500/15 text-red-300"
-                    : "bg-cyan-400/15 text-cyan-300"
+                    ? "bg-red-500/15 text-red-800"
+                    : "bg-cyan-400/15 text-[var(--rr-primary)]"
                 )}
               >
                 {data.statusLabel}
@@ -188,7 +188,7 @@ export function RobotRentTrackPanel({
           </section>
 
           <section className="robotrent-card p-6">
-            <h3 className="text-lg font-semibold text-white">Holat tarixi</h3>
+            <h3 className="text-lg font-semibold text-[var(--rr-text)]">Holat tarixi</h3>
             <ol className="mt-5 space-y-0">
               {ROBOTRENT_STATUS_ORDER.map((status, i) => {
                 const event = eventByStatus.get(status);
@@ -202,7 +202,7 @@ export function RobotRentTrackPanel({
                         aria-hidden="true"
                         className={cn(
                           "absolute left-[11px] top-6 h-[calc(100%-1.5rem)] w-px",
-                          done ? "bg-cyan-300/50" : "bg-white/10"
+                          done ? "bg-[var(--rr-primary)]/40" : "bg-black/10"
                         )}
                       />
                     ) : null}
@@ -210,23 +210,23 @@ export function RobotRentTrackPanel({
                       <CheckCircle2
                         className={cn(
                           "relative size-6 shrink-0",
-                          current ? "text-cyan-300" : "text-cyan-300/70"
+                          current ? "text-[var(--rr-primary)]" : "text-[var(--rr-primary)]/70"
                         )}
                       />
                     ) : (
-                      <Circle className="relative size-6 shrink-0 text-slate-600" />
+                      <Circle className="relative size-6 shrink-0 text-[var(--rr-muted)]" />
                     )}
                     <div>
                       <p
                         className={cn(
                           "font-medium",
-                          done ? "text-white" : "text-slate-500"
+                          done ? "text-[var(--rr-text)]" : "text-[var(--rr-muted)]"
                         )}
                       >
                         {ROBOTRENT_STATUS_LABELS[status]}
                       </p>
                       {event ? (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-[var(--rr-muted)]">
                           {displayDate(event.at)}
                           {event.note ? ` · ${event.note}` : ""}
                         </p>
@@ -239,11 +239,11 @@ export function RobotRentTrackPanel({
                 <li className="relative flex gap-4 pt-0">
                   <XCircle className="relative size-6 shrink-0 text-red-400" />
                   <div>
-                    <p className="font-medium text-red-300">
+                    <p className="font-medium text-red-800">
                       {ROBOTRENT_STATUS_LABELS.REJECTED}
                     </p>
                     {eventByStatus.get("REJECTED") ? (
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-[var(--rr-muted)]">
                         {displayDate(eventByStatus.get("REJECTED")!.at)}
                         {eventByStatus.get("REJECTED")!.note
                           ? ` · ${eventByStatus.get("REJECTED")!.note}`
@@ -258,7 +258,7 @@ export function RobotRentTrackPanel({
 
           <div className="grid gap-6 md:grid-cols-2">
             <section className="robotrent-card p-6">
-              <h3 className="text-lg font-semibold text-white">Sinov</h3>
+              <h3 className="text-lg font-semibold text-[var(--rr-text)]">Sinov</h3>
               {data.trial ? (
                 <dl className="mt-4 space-y-3">
                   <Row label="Robot" value={displayValue(data.trial.robotName)} />
@@ -274,14 +274,14 @@ export function RobotRentTrackPanel({
                   <Row label="Hisobot" value={displayValue(data.trial.reportSummary)} />
                 </dl>
               ) : (
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm text-[var(--rr-muted)]">
                   {displayValue(null)}
                 </p>
               )}
             </section>
 
             <section className="robotrent-card p-6">
-              <h3 className="text-lg font-semibold text-white">Oylik ijara</h3>
+              <h3 className="text-lg font-semibold text-[var(--rr-text)]">Oylik ijara</h3>
               {data.rentalOffer ? (
                 <dl className="mt-4 space-y-3">
                   <Row
@@ -295,7 +295,7 @@ export function RobotRentTrackPanel({
                   <Row label="Amal qilish muddati" value={displayDate(data.rentalOffer.validUntil)} />
                 </dl>
               ) : (
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm text-[var(--rr-muted)]">
                   {displayValue(null)}
                 </p>
               )}
@@ -306,3 +306,4 @@ export function RobotRentTrackPanel({
     </div>
   );
 }
+

@@ -18,7 +18,6 @@ type FormValues = Record<string, string | boolean>;
 
 function useFormProfile(): FormProfile {
   const [profile, setProfile] = useState<FormProfile>("mobile");
-
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     const apply = () => setProfile(mq.matches ? "desktop" : "mobile");
@@ -26,7 +25,6 @@ function useFormProfile(): FormProfile {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-
   return profile;
 }
 
@@ -35,9 +33,7 @@ function initialValues(type: RobotRentFormType, robot?: string): FormValues {
   for (const f of fieldsForProfile(type, "desktop")) {
     values[f.name] = f.kind === "checkbox" ? false : "";
   }
-  if (robot && (type === "DISTRIBUTOR" || type === "CUSTOMER")) {
-    if ("robotModel" in values) values.robotModel = robot;
-  }
+  if (robot && "robotModel" in values) values.robotModel = robot;
   return values;
 }
 
@@ -48,7 +44,6 @@ export function RobotRentApplicationForm({
 }: {
   type: RobotRentFormType;
   robotSlug?: string;
-  /** Form sahifasida sarlavha tashqarida bo‘lsa */
   embedded?: boolean;
 }) {
   const formProfile = useFormProfile();
@@ -63,12 +58,7 @@ export function RobotRentApplicationForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
-
   const title = FORM_TITLES[type][formProfile];
-
-  function setValue(name: string, value: string | boolean) {
-    setValues((prev) => ({ ...prev, [name]: value }));
-  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -76,15 +66,17 @@ export function RobotRentApplicationForm({
     setError(null);
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {
-        type,
-        formProfile,
-        website,
-      };
+      const payload: Record<string, unknown> = { type, formProfile, website };
       for (const f of fields) {
         const v = values[f.name];
         payload[f.name] =
-          f.kind === "number" ? (v === "" ? undefined : Number(v)) : f.kind === "checkbox" ? Boolean(v) : v;
+          f.kind === "number"
+            ? v === ""
+              ? undefined
+              : Number(v)
+            : f.kind === "checkbox"
+              ? Boolean(v)
+              : v;
       }
       if (robotSlug && type === "CUSTOMER") payload.robotSlug = robotSlug;
 
@@ -99,14 +91,14 @@ export function RobotRentApplicationForm({
       if (!res.ok || !json?.data?.trackingCode) {
         setError(
           res.status === 429
-            ? "Juda ko‘p so‘rov yuborildi. Birozdan so‘ng qayta urinib ko‘ring."
-            : "Arizani yuborib bo‘lmadi. Maydonlarni tekshirib, qayta urinib ko‘ring."
+            ? "Juda ko‘p so‘rov. Keyinroq urinib ko‘ring."
+            : "Ariza yuborilmadi. Maydonlarni tekshiring."
         );
         return;
       }
       setTrackingCode(json.data.trackingCode);
     } catch {
-      setError("Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring.");
+      setError("Server bilan bog‘lanib bo‘lmadi.");
     } finally {
       setSubmitting(false);
     }
@@ -114,41 +106,31 @@ export function RobotRentApplicationForm({
 
   if (trackingCode) {
     return (
-      <div className="robotrent-card px-6 py-8 text-center">
-        <CheckCircle2 className="mx-auto size-11 text-[var(--rr-primary)]" />
-        <h2 className="mt-4 text-xl font-bold text-[var(--rr-text)]">
-          Arizangiz qabul qilindi
-        </h2>
+      <div className="border border-[var(--rr-border)] bg-white px-6 py-8 text-center">
+        <CheckCircle2 className="mx-auto size-10 text-[var(--rr-primary)]" />
+        <h2 className="rr-serif mt-4 text-xl font-semibold">Ariza qabul qilindi</h2>
         <p className="mt-2 text-sm text-[var(--rr-muted)]">Tracking kod:</p>
-        <p className="mx-auto mt-3 w-fit select-all rounded-lg border border-[var(--rr-border)] bg-[var(--rr-surface)] px-4 py-2 font-mono text-base font-semibold text-[var(--rr-text)]">
+        <p className="mx-auto mt-3 w-fit border border-[var(--rr-border)] bg-[var(--rr-bg)] px-4 py-2 font-mono text-sm font-semibold">
           {trackingCode}
         </p>
         <Link
           href={`/robotrent/track/${encodeURIComponent(trackingCode)}`}
-          className="robotrent-btn-primary mt-6 inline-flex max-w-xs"
+          className="rr-btn mt-6 inline-flex"
         >
-          Ariza holatini ko‘rish
+          Holatni ko‘rish
         </Link>
       </div>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5" noValidate={false}>
+    <form onSubmit={onSubmit} className="space-y-5">
       {!embedded ? (
-        <h2 className="text-xl font-bold text-[var(--rr-text)] md:text-2xl">{title}</h2>
+        <h2 className="rr-serif text-xl font-semibold md:text-2xl">{title}</h2>
       ) : null}
 
-      <div
-        aria-hidden
-        className="absolute -left-[9999px] h-0 w-0 overflow-hidden"
-      >
-        <input
-          tabIndex={-1}
-          autoComplete="off"
-          value={website}
-          onChange={(e) => setWebsite(e.target.value)}
-        />
+      <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden>
+        <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </div>
 
       <div className="space-y-4">
@@ -156,17 +138,14 @@ export function RobotRentApplicationForm({
           const id = `rr-${f.name}`;
           if (f.kind === "checkbox") {
             return (
-              <label
-                key={f.name}
-                htmlFor={id}
-                className="flex cursor-pointer items-center gap-3 text-sm text-[var(--rr-text)]"
-              >
+              <label key={f.name} htmlFor={id} className="flex items-center gap-3 text-sm">
                 <input
                   id={id}
                   type="checkbox"
                   checked={Boolean(values[f.name])}
-                  onChange={(e) => setValue(f.name, e.target.checked)}
-                  className="size-4 accent-[var(--rr-primary)]"
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, [f.name]: e.target.checked }))
+                  }
                 />
                 {f.label}
               </label>
@@ -175,36 +154,37 @@ export function RobotRentApplicationForm({
           if (f.kind === "textarea") {
             return (
               <div key={f.name}>
-                <label htmlFor={id} className="mb-2 block text-sm font-medium text-[var(--rr-text)]">
+                <label htmlFor={id} className="mb-2 block text-sm font-medium">
                   {f.label}
                 </label>
                 <textarea
                   id={id}
                   required
                   rows={3}
-                  maxLength={500}
-                  placeholder={f.placeholder}
+                  className="rr-input min-h-[5.5rem] py-3"
                   value={String(values[f.name] ?? "")}
-                  onChange={(e) => setValue(f.name, e.target.value)}
-                  className="robotrent-input min-h-[6rem] resize-y py-3"
+                  onChange={(e) =>
+                    setValues((p) => ({ ...p, [f.name]: e.target.value }))
+                  }
                 />
               </div>
             );
           }
           return (
             <div key={f.name}>
-              <label htmlFor={id} className="mb-2 block text-sm font-medium text-[var(--rr-text)]">
+              <label htmlFor={id} className="mb-2 block text-sm font-medium">
                 {f.label}
               </label>
               <input
                 id={id}
                 required
                 type={f.kind}
-                min={f.kind === "number" ? 1 : undefined}
+                className="rr-input"
                 placeholder={f.placeholder}
                 value={String(values[f.name] ?? "")}
-                onChange={(e) => setValue(f.name, e.target.value)}
-                className="robotrent-input"
+                onChange={(e) =>
+                  setValues((p) => ({ ...p, [f.name]: e.target.value }))
+                }
               />
             </div>
           );
@@ -212,16 +192,13 @@ export function RobotRentApplicationForm({
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
+        <p role="alert" className="border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       ) : null}
 
-      <button type="submit" disabled={submitting} className="robotrent-btn-primary">
-        {submitting ? <Loader2 className="mr-2 size-5 animate-spin" /> : null}
+      <button type="submit" disabled={submitting} className="rr-btn w-full">
+        {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
         {submitting ? "Yuborilmoqda…" : SUBMIT_LABELS[type]}
       </button>
     </form>

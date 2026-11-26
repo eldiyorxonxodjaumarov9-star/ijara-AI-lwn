@@ -10,16 +10,13 @@ export function RobotRentPartnerPage({
   robotSlug?: string;
 }) {
   return (
-    <div className="mx-auto w-full max-w-lg md:max-w-3xl">
+    <div className="mx-auto w-full max-w-lg md:max-w-3xl md:px-8 md:py-10">
       <RobotRentPartnerHero badge={PARTNER_BADGES[type]} />
-      <div className="px-4 py-6 md:px-0 md:py-10">
-        <h1 className="text-2xl font-bold text-[var(--rr-text)] md:hidden">
+      <div className="px-4 py-6 md:border md:border-[var(--rr-border)] md:bg-white md:px-8 md:py-8">
+        <h1 className="rr-serif text-2xl font-semibold text-[var(--rr-text)]">
           {FORM_TITLES[type].mobile}
         </h1>
-        <div className="robotrent-form-panel robotrent-card mt-6 md:mt-0 md:p-8">
-          <h1 className="mb-6 hidden text-2xl font-bold text-[var(--rr-text)] md:block">
-            {FORM_TITLES[type].desktop}
-          </h1>
+        <div className="mt-6">
           <RobotRentApplicationForm type={type} robotSlug={robotSlug} embedded />
         </div>
       </div>
